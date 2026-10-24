@@ -11,12 +11,12 @@ const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 export const gmailConfigured = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_TOKEN_KEY);
 const redirectUri = (origin: string) => `${origin}/api/google/callback`;
 
-export function googleAuthUrl(origin: string, state: string) {
+export function googleAuthUrl(origin: string, state: string, scope = GMAIL_SCOPE) {
   const p = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: redirectUri(origin),
     response_type: "code",
-    scope: GMAIL_SCOPE,
+    scope,
     access_type: "offline",
     // Pick any account (each space can track a different inbox), and always
     // consent so Google returns a refresh token even on a reconnect.

@@ -5,6 +5,7 @@ import { appOrigin } from "@/lib/url";
 import { getDict } from "@/i18n";
 import { exchangeCode, GmailApiDisabled, gmailAddress, GMAIL_SCOPE, GoogleAuthError, readState, sealToken } from "@/lib/subs/gmail";
 import { scanGmail } from "@/lib/subs/scan";
+import { calendarAccount, CALENDAR_SCOPE, CALENDAR_STATE } from "@/lib/gcal";
 
 export const dynamic = "force-dynamic";
 // The first scan reads up to a year of receipts.
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
   };
 
   if (!user) return NextResponse.redirect(`${origin}/login`);
+  if (state?.s === CALENDAR_STATE && state.u === user.id) return connectCalendar(q, origin, user.id);
   if (q.get("error")) return back("cancelled", q.get("error")!);
   // The signed state must be this user's: nobody can hand you a link that connects your Gmail to their space.
   if (!state || state.u !== user.id) return back("failed", state ? "state: other user" : "state: missing/invalid/expired");
@@ -58,5 +60,26 @@ export async function GET(request: NextRequest) {
     }
     console.error("[gmail] connect failed", e);
     return back(e instanceof GmailApiDisabled ? "apidisabled" : "failed", String(e));
+  }
+}
+
+/** The Google Calendar branch: store this person's calendar connection, then back to the Me tab. */
+async function connectCalendar(q: URLSearchParams, origin: string, userId: string) {
+  const back = (result: string) => NextResponse.redirect(`${origin}/me?calendar=${result}`);
+  if (q.get("error")) return back("cancelled");
+  if (!q.get("code")) return back("failed");
+  try {
+    const tokens = await exchangeCode(q.get("code")!, origin);
+    if (!tokens.scope?.split(" ").includes(CALENDAR_SCOPE)) return back("noscope");
+    if (!tokens.refresh_token) return back("failed");
+    const email = await calendarAccount(tokens.access_token!);
+    const { error } = await createSupabaseAdmin()
+      .from("calendar_connections")
+      .upsert({ user_id: userId, email, refresh_token: sealToken(tokens.refresh_token), status: "ok", updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) throw error;
+    return back("connected");
+  } catch (e) {
+    console.error("[calendar] connect failed", e);
+    return back("failed");
   }
 }

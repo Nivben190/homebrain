@@ -10,6 +10,7 @@ import { PHOTOS_PROP, readPhotos } from "@/lib/photos";
 import { PhotoField } from "@/components/photos/PhotoField";
 import type { Item, Section } from "@/lib/db-types";
 import { spaceType } from "@/lib/registry/spaces";
+import { syncItemToCalendar } from "@/app/actions";
 import { dueReminderAt, LEAD_OPTIONS, readLead, REMIND_PROP } from "@/lib/engine/due";
 
 export function ItemSheet({
@@ -30,10 +31,12 @@ export function ItemSheet({
   const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [gcal, setGcal] = useState<"idle" | "busy" | "done">("idle");
 
   useEffect(() => {
     setTitle(item?.title ?? "");
     setNotes(typeof item?.props._notes === "string" ? item.props._notes : "");
+    setGcal(item?.gcal_event_id ? "done" : "idle");
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!item) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
@@ -45,6 +48,16 @@ export function ItemSheet({
     // Memory dates are when it happened, not something due.
     const due_at = !spaceType(section.view).datesAreDue ? null : dueFromProps(section.schema, props);
     onChange(item.id, remindable ? { props, due_at, remind_at: dueReminderAt(due_at, readLead(props)) } : { props, due_at });
+    // Already in Google Calendar: move (or remove) the event with the date.
+    if (item.gcal_event_id && due_at !== item.due_at) setTimeout(() => void syncItemToCalendar(item.id), 800);
+  };
+  const addToGoogle = async () => {
+    setGcal("busy");
+    const r = await syncItemToCalendar(item.id);
+    if (r.ok) return setGcal("done");
+    setGcal("idle");
+    // Not connected: fall back to Google's add-event page.
+    if (dueDay) window.open(googleCalendarLink(item.title, dueDay, new Date(dueDay.getTime() + 86400000)), "_blank", "noopener");
   };
   const lead = readLead(item.props);
   const photosField = (
@@ -117,14 +130,14 @@ export function ItemSheet({
               >
                 🍎 Apple
               </a>
-              <a
+              <button
+                type="button"
+                disabled={gcal !== "idle"}
+                onClick={addToGoogle}
                 className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-sunken font-semibold"
-                href={googleCalendarLink(item.title, dueDay, new Date(dueDay.getTime() + 86400000))}
-                target="_blank"
-                rel="noreferrer"
               >
-                📅 Google
-              </a>
+                {gcal === "done" ? t.settings.gcalAdded : "📅 Google"}
+              </button>
             </div>
           </Field>
         )}

@@ -4,7 +4,7 @@
 
 **Blocked by:** 15 - Due dates trigger reminders
 
-**Status:** ready-for-agent
+**Status:** done (needs the Google Calendar API enabled in the Cloud project, and the 0013 migration)
 
 - [ ] Connect / disconnect Google Calendar from Settings, showing which account
 - [ ] An item with a date can be added to Google Calendar in one tap; editing the date updates the event

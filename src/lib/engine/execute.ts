@@ -17,6 +17,7 @@ import { allowedSections, sectionRefs } from "./scope";
 import { planEvent } from "./events";
 import { reminderAudience } from "./audience";
 import { readLead } from "./due";
+import { calendarAccess, upsertEvent } from "@/lib/gcal";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
 
 /** Schedules more than this late (e.g. after downtime) are skipped instead of fired. */
@@ -106,8 +107,23 @@ export async function fireAutomation(db: Admin, automation: Automation, now = ne
   };
   const out = renderActions(def.name, def.actions, ctx);
 
-  // Emails go out first so the card can say what really happened.
   const skipped: string[] = [];
+  // Connected to Google Calendar: write the event instead of offering links.
+  const calendar = out.effects.filter((e) => e.kind === "calendar");
+  const access = calendar.length ? await calendarAccess(db, me.user_id) : null;
+  const drop = new Set<number>();
+  for (const effect of calendar) {
+    if (!access) break;
+    try {
+      await upsertEvent(access, { title: effect.title, start: effect.start, end: effect.end, timeZone: me.timezone });
+      out.rendered[effect.links[0]] = { kind: "note", icon: "📅", text: `Added to Google Calendar: ${effect.title}` };
+      effect.links.slice(1).forEach((i) => drop.add(i));
+    } catch (e) {
+      skipped.push(`calendar: ${String(e).slice(0, 200)}`);
+    }
+  }
+
+  // Emails go out first so the card can say what really happened.
   for (const effect of out.effects) {
     if (effect.kind !== "email") continue;
     const sent = await sendEmail(effect.to, effect.subject, effect.body);
@@ -115,6 +131,8 @@ export async function fireAutomation(db: Admin, automation: Automation, now = ne
     out.rendered[effect.note] = { kind: "note", icon: sent.ok ? "📧" : "⚠️", text };
     if (!sent.ok) skipped.push(`email: ${sent.reason}${sent.reason === "failed" ? ` ${sent.detail}` : ""}`);
   }
+  // Only now (indexes above point into the full list) drop the replaced calendar links.
+  if (drop.size) out.rendered = out.rendered.filter((_, i) => !drop.has(i));
 
   const { data: run, error } = await db
     .from("runs")

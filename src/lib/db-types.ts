@@ -106,6 +106,7 @@ export interface Item {
   position: number;
   due_at: string | null;
   remind_at: string | null;
+  gcal_event_id?: string | null;
   assignee_id: string | null;
   created_by: string | null;
   created_at: string;

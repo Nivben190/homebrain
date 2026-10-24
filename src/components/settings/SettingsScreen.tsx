@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BellRing, Calendar, ChevronRight, Copy, LogOut, Mail, Smartphone } from "lucide-react";
-import { sendTestPush, signOut, updateProfile } from "@/app/actions";
+import { disconnectCalendar, sendTestPush, signOut, updateProfile } from "@/app/actions";
 import { enablePush, getPushState, type PushState } from "@/lib/push-client";
 import { useI18n } from "@/i18n/client";
+import { fill } from "@/i18n";
 import { Button, Card, EmojiPicker, Field, Input, PageHeader, SectionTitle, Select, Sheet } from "@/components/ui";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import type { Member } from "@/components/sections/PropertyInput";
@@ -32,6 +34,7 @@ export function SettingsScreen({
   feedUrl,
   daily,
   gmail,
+  gcal,
 }: {
   profile: ProfileForm;
   household: { name: string; invite_code: string };
@@ -39,6 +42,7 @@ export function SettingsScreen({
   feedUrl: string;
   daily: DailyPrefs;
   gmail: { sectionId: string; email: string | null; expired: boolean; space: string }[];
+  gcal: { email: string | null; expired: boolean } | null;
 }) {
   const { t } = useI18n();
   const [p, setP] = useState(profile);
@@ -180,6 +184,8 @@ export function SettingsScreen({
         </button>
       </Card>
 
+      <GoogleCalendarCard gcal={gcal} />
+
       {gmail.length > 0 && (
         <>
           <SectionTitle>{t.subs.gmailTitle}</SectionTitle>
@@ -220,5 +226,45 @@ export function SettingsScreen({
         </div>
       </Sheet>
     </>
+  );
+}
+
+function GoogleCalendarCard({ gcal }: { gcal: { email: string | null; expired: boolean } | null }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const params = useSearchParams();
+  const result = params.get("calendar");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Card className="space-y-3">
+      <div className="flex gap-3">
+        <span className="text-2xl">📅</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{t.settings.gcalTitle}</p>
+          <p className={gcal?.expired ? "text-sm text-warn" : "truncate text-sm text-muted"}>
+            {gcal ? (gcal.expired ? t.settings.gcalExpired : fill(t.settings.gcalConnected, { email: gcal.email ?? "" })) : t.settings.gcalHint}
+          </p>
+        </div>
+      </div>
+      {result && <p className="text-sm font-semibold text-accent">{t.settings.gcalResult[result] ?? t.settings.gcalResult.failed}</p>}
+      {!gcal || gcal.expired ? (
+        <a href="/api/google/calendar" className="flex h-11 items-center justify-center rounded-2xl bg-accent font-semibold text-accent-fg">
+          {t.settings.gcalConnect}
+        </a>
+      ) : (
+        <button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await disconnectCalendar();
+            setBusy(false);
+            router.replace("/me");
+          }}
+          className="flex h-11 w-full items-center justify-center rounded-2xl bg-sunken font-semibold"
+        >
+          {t.settings.gcalDisconnect}
+        </button>
+      )}
+    </Card>
   );
 }

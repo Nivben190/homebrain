@@ -39,7 +39,9 @@ export function alarmShortcutUrl(time: string, label?: string): string {
 export type ServerEffect =
   /** `note` is the index in `rendered` of the card line to update with the outcome. */
   | { kind: "email"; to: string; subject: string; body: string; note: number }
-  | { kind: "create_item"; sectionId: string; title: string };
+  | { kind: "create_item"; sectionId: string; title: string }
+  /** `links`: indexes in `rendered` of the add-to-calendar links, replaced when the event is written directly. */
+  | { kind: "calendar"; title: string; start: Date; end: Date; links: number[] };
 
 export interface RenderResult {
   title: string;
@@ -153,6 +155,7 @@ export function renderActions(fallbackTitle: string, actions: Action[], ctx: Tem
         const start = new Date(ctx.now.getTime() + a.startInMinutes * 60000);
         const end = new Date(start.getTime() + a.durationMinutes * 60000);
         const title = r(a.title);
+        result.effects.push({ kind: "calendar", title, start, end, links: [result.rendered.length, result.rendered.length + 1] });
         result.rendered.push({ kind: "link", icon: "🍎", label: "Apple Calendar", href: icsLink(title, start, end) });
         result.rendered.push({ kind: "link", icon: "📅", label: "Google Calendar", href: googleCalendarLink(title, start, end), external: true });
         break;

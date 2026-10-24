@@ -12,6 +12,7 @@ import type { RenderedAction } from "@/lib/engine/types";
 import { nextRunAt } from "@/lib/engine/schedule";
 import { allowedSections, sectionRefs } from "@/lib/engine/scope";
 import { canSignUp } from "@/lib/signup";
+import { calendarAccess, deleteEvent, upsertEvent } from "@/lib/gcal";
 import { automationDefSchema } from "@/lib/engine/types";
 import { addDays, todayKey } from "@/lib/engine/habits";
 import { getDict, fill } from "@/i18n";
@@ -477,6 +478,36 @@ export async function deletePet(petId: string) {
  * Disconnects a Subscriptions space from its Gmail. Google access is revoked
  * only when no other space still uses that inbox (revoking ends them all).
  */
+/** Disconnects Google Calendar for this person (Gmail spaces are untouched). */
+export async function disconnectCalendar(): Promise<Result> {
+  const { user } = await requireHome();
+  const db = createSupabaseAdmin();
+  const { data } = await db.from("calendar_connections").select("refresh_token").eq("user_id", user.id).maybeSingle();
+  if (data) await revokeToken(openToken(data.refresh_token));
+  await db.from("calendar_connections").delete().eq("user_id", user.id);
+  revalidatePath("/me");
+  return { ok: true };
+}
+
+/** Adds a dated item to the user's Google Calendar as an all-day event, or moves the one it already has. */
+export async function syncItemToCalendar(itemId: string): Promise<Result> {
+  const { supabase, user, profile } = await requireHome();
+  const { data: item } = await supabase.from("items").select("id,title,due_at,gcal_event_id,sections(title)").eq("id", itemId).single();
+  if (!item) return { ok: false, error: "Not found" };
+  const db = createSupabaseAdmin();
+  const access = await calendarAccess(db, user.id);
+  if (!access) return { ok: false, error: "not_connected" };
+  if (!item.due_at) {
+    if (item.gcal_event_id) await deleteEvent(access, item.gcal_event_id);
+    await supabase.from("items").update({ gcal_event_id: null }).eq("id", itemId);
+    return { ok: true };
+  }
+  const section = item.sections as unknown as { title: string } | null;
+  const id = await upsertEvent(access, { title: item.title, description: section?.title, day: todayKey(profile.timezone, new Date(item.due_at)), timeZone: profile.timezone }, item.gcal_event_id);
+  await supabase.from("items").update({ gcal_event_id: id }).eq("id", itemId);
+  return { ok: true };
+}
+
 export async function disconnectGmail(sectionId: string): Promise<Result> {
   const { supabase } = await requireHome();
   const { data: section } = await supabase.from("sections").select("id").eq("id", sectionId).maybeSingle();
