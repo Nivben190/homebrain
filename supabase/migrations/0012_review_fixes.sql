@@ -2,15 +2,9 @@
 
 -- ---------------------------------------------------------------------------
 -- 01: members can read each other's profile, but never the secret tokens.
--- Column privileges hide hook_token / ics_token; my_tokens() returns your own.
+-- my_tokens() returns your own; 0014 then hides the columns (applied after the app
+-- switched to my_tokens(), so the running app never loses its profile).
 -- ---------------------------------------------------------------------------
-revoke select on public.profiles from anon, authenticated;
-grant select (
-  user_id, household_id, display_name, emoji, locale, timezone, phone, email,
-  wake_mode, wake_time, created_at, lat, lon, place, briefing, wrapup,
-  wrapup_time, quiet_shabbat, shabbat_shop
-) on public.profiles to authenticated;
-
 create or replace function public.my_tokens()
 returns table (hook_token text, ics_token text)
 language sql stable security definer set search_path = public as $$
