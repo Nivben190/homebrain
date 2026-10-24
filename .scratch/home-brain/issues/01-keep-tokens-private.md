@@ -6,7 +6,7 @@ Move the secrets out of reach of the household read rule (e.g. a self-only table
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Signed in as one member, reading the partner's profile returns no hook token and no calendar-feed token
 - [ ] Each person still sees and copies their own tokens on the iPhone setup screen

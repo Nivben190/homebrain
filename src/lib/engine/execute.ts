@@ -13,6 +13,7 @@ import type { RenderedAction } from "./types";
 import { conditionsPass, nextRunAt } from "./schedule";
 import { referencedSections, type TemplateContext } from "./templates";
 import { automationDefSchema } from "./types";
+import { allowedSections, sectionRefs } from "./scope";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
 
 /** Schedules more than this late (e.g. after downtime) are skipped instead of fired. */
@@ -42,6 +43,13 @@ async function loadPeople(db: Admin, userId: string) {
     partner = data;
   }
   return { me, partner };
+}
+
+/** The referenced spaces this automation is allowed to touch. */
+async function scopeFor(db: Admin, automation: Automation, sectionIds: string[]) {
+  if (sectionIds.length === 0) return new Set<string>();
+  const { data } = await db.from("sections").select("id,household_id,owner_id").in("id", sectionIds);
+  return allowedSections(data ?? [], automation);
 }
 
 async function prefetchPicks(db: Admin, sectionIds: string[]) {
@@ -80,7 +88,8 @@ export async function fireAutomation(db: Admin, automation: Automation, now = ne
   if (!ok) return { automationId: automation.id, status: "skipped", reason: "conditions" };
   if (await isQuiet(me, now)) return { automationId: automation.id, status: "skipped", reason: "quiet shabbat" };
 
-  const pool = await prefetchPicks(db, referencedSections(JSON.stringify(def.actions)));
+  const allowed = await scopeFor(db, automation, sectionRefs(def.actions));
+  const pool = await prefetchPicks(db, referencedSections(JSON.stringify(def.actions)).filter((id) => allowed.has(id)));
   const ctx: TemplateContext = {
     me: { name: me.display_name, phone: me.phone, email: me.email },
     partner: partner ? { name: partner.display_name, phone: partner.phone, email: partner.email } : null,
@@ -93,6 +102,16 @@ export async function fireAutomation(db: Admin, automation: Automation, now = ne
     },
   };
   const out = renderActions(def.name, def.actions, ctx);
+
+  // Emails go out first so the card can say what really happened.
+  const skipped: string[] = [];
+  for (const effect of out.effects) {
+    if (effect.kind !== "email") continue;
+    const sent = await sendEmail(effect.to, effect.subject, effect.body);
+    const text = sent.ok ? `Email sent to ${effect.to}` : sent.reason === "not_configured" ? `Email not sent - email isn't set up` : `Couldn't send email to ${effect.to}`;
+    out.rendered[effect.note] = { kind: "note", icon: sent.ok ? "📧" : "⚠️", text };
+    if (!sent.ok) skipped.push(`email: ${sent.reason}${sent.reason === "failed" ? ` ${sent.detail}` : ""}`);
+  }
 
   const { data: run, error } = await db
     .from("runs")
@@ -111,14 +130,17 @@ export async function fireAutomation(db: Admin, automation: Automation, now = ne
   if (error || !run) return { automationId: automation.id, status: "error", reason: error?.message };
 
   for (const effect of out.effects) {
-    if (effect.kind === "email") await sendEmail(effect.to, effect.subject, effect.body);
     if (effect.kind === "create_item") {
+      if (!allowed.has(effect.sectionId)) {
+        skipped.push(`create_item: space ${effect.sectionId} is outside this home`);
+        continue;
+      }
       await db.from("items").insert({ section_id: effect.sectionId, title: effect.title, created_by: me.user_id });
     }
   }
   await sendPush(db, me.user_id, { title: `${def.icon} ${out.title}`, body: out.body, url: `/runs/${run.id}` });
 
-  return { automationId: automation.id, status: "fired", runId: run.id };
+  return { automationId: automation.id, status: "fired", runId: run.id, reason: skipped.join("; ") || undefined };
 }
 
 /** Writes next_run_at for a schedule automation (null for event automations). */
@@ -172,7 +194,12 @@ export async function tick(db: Admin, now = new Date()) {
       if (a?.enabled) outcomes.push(await fireAutomation(db, a, now));
       await db.from("jobs").update({ status: "done" }).eq("id", job.id);
     } catch (e) {
-      await db.from("jobs").update({ status: "failed", error: String(e) }).eq("id", job.id);
+      // Retry a minute later, up to 3 attempts in all.
+      const retry = (job.attempts ?? 1) < 3;
+      await db
+        .from("jobs")
+        .update(retry ? { status: "pending", error: String(e), run_at: new Date(now.getTime() + 60_000).toISOString() } : { status: "failed", error: String(e) })
+        .eq("id", job.id);
     }
   }
   return outcomes;

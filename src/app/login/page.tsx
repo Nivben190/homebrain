@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { createAccount } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [invite, setInvite] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,14 +33,14 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     if (mode === "signup") {
-      const res = await createAccount({ email, password });
+      const res = await createAccount({ email, password, inviteCode: invite });
       if (!res.ok) {
         setBusy(false);
         if (res.error === "exists") {
           setMode("signin");
           return setError(t.login.exists);
         }
-        return setError(res.error);
+        return setError(res.error === "not_invited" ? t.login.notInvited : res.error);
       }
     }
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
@@ -118,6 +119,20 @@ export default function LoginPage() {
               {show ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
             </button>
           </div>
+          {mode === "signup" && (
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute start-4 top-1/2 size-5 -translate-y-1/2 text-faint" />
+              <Input
+                name="invite"
+                autoCapitalize="characters"
+                autoComplete="off"
+                placeholder={t.login.inviteCode}
+                value={invite}
+                onChange={(e) => setInvite(e.target.value)}
+                className="h-14 ps-12"
+              />
+            </div>
+          )}
           <Button size="lg" className="w-full" loading={busy}>
             {mode === "signin" ? t.login.signIn : t.login.createAccount} <ArrowRight className="size-5 rtl:rotate-180" />
           </Button>

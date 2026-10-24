@@ -32,6 +32,13 @@ export interface Profile {
   shabbat_shop: boolean;
 }
 
+/** Columns any household member may read (everything but the secret tokens). */
+export const PUBLIC_PROFILE_COLUMNS =
+  "user_id,household_id,display_name,emoji,locale,timezone,phone,email,wake_mode,wake_time,lat,lon,place,briefing,wrapup,wrapup_time,quiet_shabbat,shabbat_shop";
+
+/** A household member as others see them. */
+export type Member = Omit<Profile, "hook_token" | "ics_token">;
+
 export interface Pet {
   id: string;
   household_id: string;
@@ -152,4 +159,5 @@ export interface Job {
   run_at: string;
   context: Record<string, unknown>;
   status: "pending" | "running" | "done" | "failed";
+  attempts?: number;
 }

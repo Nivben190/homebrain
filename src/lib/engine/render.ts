@@ -37,7 +37,8 @@ export function alarmShortcutUrl(time: string, label?: string): string {
 
 /** Side effects the executor performs server-side (no user tap needed). */
 export type ServerEffect =
-  | { kind: "email"; to: string; subject: string; body: string }
+  /** `note` is the index in `rendered` of the card line to update with the outcome. */
+  | { kind: "email"; to: string; subject: string; body: string; note: number }
   | { kind: "create_item"; sectionId: string; title: string };
 
 export interface RenderResult {
@@ -126,8 +127,8 @@ export function renderActions(fallbackTitle: string, actions: Action[], ctx: Tem
       case "email": {
         const to = resolveRecipient(a.to, "email", ctx);
         if (to) {
-          result.effects.push({ kind: "email", to, subject: r(a.subject), body: r(a.body) });
-          result.rendered.push({ kind: "note", icon: "📧", text: `Email sent to ${to}` });
+          result.effects.push({ kind: "email", to, subject: r(a.subject), body: r(a.body), note: result.rendered.length });
+          result.rendered.push({ kind: "note", icon: "📧", text: `Sending email to ${to}` });
         }
         break;
       }

@@ -6,7 +6,7 @@ Check on save, and check again in the engine before reading or writing.
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Saving an automation that targets a space outside the household is refused with a clear message
 - [ ] A random-pick template naming a foreign or someone else's private space renders as empty, never leaking titles

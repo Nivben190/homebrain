@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] With no email key configured, the card shows "not sent - email isn't set up"
 - [ ] A provider error shows "couldn't send" and is recorded on the run

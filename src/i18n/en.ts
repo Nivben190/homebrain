@@ -37,6 +37,8 @@ export const en = {
     hide: "Hide password",
     invalid: "Wrong email or password.",
     exists: "You already have an account — sign in with your password.",
+    inviteCode: "Invite code (from your partner's Me tab)",
+    notInvited: "Sign-up is invite only. Ask your partner for the home's invite code.",
   },
   onboarding: {
     title: "Let's set up your brain",

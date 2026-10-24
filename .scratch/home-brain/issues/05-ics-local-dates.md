@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] An item due at 00:30 Israel time appears on that same day in Apple Calendar
 - [ ] Timed entries are unchanged

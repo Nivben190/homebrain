@@ -1,11 +1,13 @@
 import "server-only";
 
-/** Sends a plain email through Resend's HTTP API. No-op without RESEND_API_KEY. */
-export async function sendEmail(to: string, subject: string, body: string) {
+export type EmailResult = { ok: true } | { ok: false; reason: "not_configured" | "failed"; detail?: string };
+
+/** Sends a plain email through Resend's HTTP API. Not sent without RESEND_API_KEY. */
+export async function sendEmail(to: string, subject: string, body: string): Promise<EmailResult> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
-    console.warn("[email] RESEND_API_KEY missing, skipping email to", to);
-    return false;
+    console.warn("[email] RESEND_API_KEY missing, skipping email");
+    return { ok: false, reason: "not_configured" };
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -17,6 +19,8 @@ export async function sendEmail(to: string, subject: string, body: string) {
       text: body,
     }),
   });
-  if (!res.ok) console.error("[email] failed", res.status, await res.text());
-  return res.ok;
+  if (res.ok) return { ok: true };
+  const detail = `${res.status} ${await res.text()}`.slice(0, 300);
+  console.error("[email] failed", detail);
+  return { ok: false, reason: "failed", detail };
 }

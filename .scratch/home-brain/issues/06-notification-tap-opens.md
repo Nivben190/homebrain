@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] If navigating an existing window fails, a new window opens on the run instead
 - [ ] Tested on iPhone with the app closed, open in the background, and open on another screen

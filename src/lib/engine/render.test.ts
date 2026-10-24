@@ -25,6 +25,10 @@ describe("templates", () => {
     expect(renderTemplate("{{nope}}", ctx)).toBe("{{nope}}");
   });
 
+  it("accepts the plan's {{user.name}} and {{partner.name}} spellings", () => {
+    expect(renderTemplate("{{user.name}} & {{partner.name}}", ctx)).toBe(renderTemplate("{{me}} & {{partner}}", ctx));
+  });
+
   it("finds referenced sections", () => {
     expect(referencedSections(`a {{random:${SECTION}}} b {{ random:${SECTION} }}`)).toEqual([SECTION]);
   });
@@ -101,7 +105,7 @@ describe("renderActions", () => {
       ctx,
     );
     expect(out.effects).toEqual([
-      { kind: "email", to: "niv@example.com", subject: "Weekly", body: "Hi Niv" },
+      { kind: "email", to: "niv@example.com", subject: "Weekly", body: "Hi Niv", note: 0 },
       { kind: "create_item", sectionId: SECTION, title: "Buy dog food" },
     ]);
   });

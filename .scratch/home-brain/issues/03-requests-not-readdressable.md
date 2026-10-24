@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] The recipient can change status; nobody can change sender or recipient after creation
 - [ ] The sender can withdraw (delete) their own request

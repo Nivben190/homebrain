@@ -10,6 +10,8 @@ import { fireAutomation, handledDays, handleEvent, rescheduleDate } from "@/lib/
 import { currentOccurrence, readDate } from "@/lib/engine/dates";
 import type { RenderedAction } from "@/lib/engine/types";
 import { nextRunAt } from "@/lib/engine/schedule";
+import { allowedSections, sectionRefs } from "@/lib/engine/scope";
+import { canSignUp } from "@/lib/signup";
 import { automationDefSchema } from "@/lib/engine/types";
 import { addDays, todayKey } from "@/lib/engine/habits";
 import { getDict } from "@/i18n";
@@ -34,20 +36,24 @@ const accountInput = z.object({
  * Creates a confirmed email+password user without sending any email (the
  * default Supabase emails only carry links, which open in Safari instead of the
  * installed app). The client signs in with the password right after.
- * Optional ALLOWED_EMAILS (comma separated) limits who can sign up.
+ * Invite only: the email must be in ALLOWED_EMAILS or come with a household's
+ * invite code. Before any home exists, the first account is let through.
  */
-export async function createAccount(input: { email: string; password: string }): Promise<Result> {
+export async function createAccount(input: { email: string; password: string; inviteCode?: string }): Promise<Result> {
   const parsed = accountInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const { email, password } = parsed.data;
 
-  const allowed = (process.env.ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  if (allowed.length && !allowed.includes(email)) return { ok: false, error: "This email isn't invited to this home." };
+  const admin = createSupabaseAdmin();
+  const code = input.inviteCode?.trim().toUpperCase() ?? "";
+  const [{ data: invited }, { count }] = await Promise.all([
+    code ? admin.from("households").select("id").eq("invite_code", code).maybeSingle() : Promise.resolve({ data: null }),
+    admin.from("households").select("id", { count: "exact", head: true }),
+  ]);
+  const ok = canSignUp({ email, allowedEmails: process.env.ALLOWED_EMAILS, inviteValid: !!invited, anyHome: (count ?? 0) > 0 });
+  if (!ok) return { ok: false, error: "not_invited" };
 
-  const { error } = await createSupabaseAdmin().auth.admin.createUser({ email, password, email_confirm: true });
+  const { error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) {
     const exists = /already|registered|exists/i.test(error.message);
     return { ok: false, error: exists ? "exists" : error.message };
@@ -158,6 +164,14 @@ export async function saveAutomation(id: string | null, raw: unknown, targetUser
   const parsed = automationDefSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
   const target = members.find((m) => m.user_id === targetUserId) ?? profile;
+
+  // Only spaces this household can see (RLS hides foreign and partner-private ones).
+  const refs = sectionRefs(parsed.data.actions);
+  if (refs.length) {
+    const { data: visible } = await supabase.from("sections").select("id,household_id,owner_id").in("id", refs);
+    const allowed = allowedSections(visible ?? [], { household_id: household.id, owner_id: user.id });
+    if (refs.some((r) => !allowed.has(r))) return { ok: false, error: "This automation points at a space outside your home." };
+  }
 
   const row = {
     ...parsed.data,

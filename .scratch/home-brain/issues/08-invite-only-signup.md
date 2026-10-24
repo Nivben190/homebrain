@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Signing up with an unknown email and no invite code is refused
 - [ ] Joining with a valid household invite code works

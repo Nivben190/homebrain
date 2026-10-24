@@ -4,25 +4,29 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { getDict, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
-import type { Household, Profile } from "@/lib/db-types";
+import { PUBLIC_PROFILE_COLUMNS, type Household, type Member, type Profile } from "@/lib/db-types";
 
 /**
  * Current user + profile + household, deduped per request.
  * Fast path: the JWT is verified locally (getClaims, asymmetric keys) and one
  * query returns every profile RLS lets us see — ourselves plus our partner —
- * each with its household embedded.
+ * each with its household embedded. Secret tokens aren't readable that way;
+ * our own come from my_tokens().
  */
 export const getSession = cache(async () => {
   const supabase = await createSupabaseServer();
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
-  if (!userId) return { supabase, user: null, profile: null, household: null, members: [] as Profile[] };
+  if (!userId) return { supabase, user: null, profile: null, household: null, members: [] as Member[] };
   const user = { id: userId, email: (data.claims.email as string | undefined) ?? null };
 
-  const { data: rows } = await supabase.from("profiles").select("*, households(*)").returns<(Profile & { households: Household | null })[]>();
-  const strip = ({ households: _h, ...p }: Profile & { households: Household | null }): Profile => p; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [{ data: rows }, { data: tokens }] = await Promise.all([
+    supabase.from("profiles").select(`${PUBLIC_PROFILE_COLUMNS}, households(*)`).returns<(Member & { households: Household | null })[]>(),
+    supabase.rpc("my_tokens").maybeSingle<Pick<Profile, "hook_token" | "ics_token">>(),
+  ]);
+  const strip = ({ households: _h, ...p }: Member & { households: Household | null }): Member => p; // eslint-disable-line @typescript-eslint/no-unused-vars
   const mine = rows?.find((r) => r.user_id === userId) ?? null;
-  const profile = mine ? strip(mine) : null;
+  const profile: Profile | null = mine && tokens ? { ...strip(mine), ...tokens } : null;
   const household = mine?.households ?? null;
   const members = household ? (rows ?? []).filter((r) => r.household_id === household.id).map(strip) : [];
   return { supabase, user, profile, household, members };

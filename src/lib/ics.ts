@@ -1,4 +1,5 @@
 // Minimal RFC 5545 writer: enough for Apple/Google Calendar to import events.
+import { addDays, todayKey } from "@/lib/engine/habits";
 
 export interface IcsEvent {
   uid: string;
@@ -6,12 +7,21 @@ export interface IcsEvent {
   start: Date;
   end: Date;
   allDay?: boolean;
+  /** For all-day events: the zone whose calendar day `start` falls on (default UTC). `end` is then ignored. */
+  timeZone?: string;
   description?: string;
   url?: string;
 }
 
 const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-const dateOnly = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+const compact = (day: string) => day.replace(/-/g, "");
+
+/** DTSTART/DTEND days for an all-day event, on the calendar day `start` falls on in `timeZone`. */
+export function allDayRange(e: Pick<IcsEvent, "start" | "end" | "timeZone">): [string, string] {
+  if (!e.timeZone) return [compact(e.start.toISOString().slice(0, 10)), compact(e.end.toISOString().slice(0, 10))];
+  const day = todayKey(e.timeZone, e.start);
+  return [compact(day), compact(addDays(day, 1))];
+}
 
 function escape(text: string) {
   return text.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (m) => `\\${m}`);
@@ -30,7 +40,8 @@ export function buildIcs(calendarName: string, events: IcsEvent[]): string {
   for (const e of events) {
     lines.push("BEGIN:VEVENT", `UID:${e.uid}`, `DTSTAMP:${now}`, `SUMMARY:${escape(e.title)}`);
     if (e.allDay) {
-      lines.push(`DTSTART;VALUE=DATE:${dateOnly(e.start)}`, `DTEND;VALUE=DATE:${dateOnly(e.end)}`);
+      const [from, to] = allDayRange(e);
+      lines.push(`DTSTART;VALUE=DATE:${from}`, `DTEND;VALUE=DATE:${to}`);
     } else {
       lines.push(`DTSTART:${stamp(e.start)}`, `DTEND:${stamp(e.end)}`);
     }

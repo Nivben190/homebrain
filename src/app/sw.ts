@@ -41,10 +41,22 @@ self.addEventListener("notificationclick", (event) => {
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const w of windows) {
-        if ("focus" in w) {
+        if (w.url === url) {
           await w.focus();
-          await w.navigate(url);
           return;
+        }
+      }
+      // navigate() rejects (or returns null) for windows this worker doesn't
+      // control; fall back to opening a new one so the tap never goes nowhere.
+      for (const w of windows) {
+        try {
+          const moved = await w.navigate(url);
+          if (moved) {
+            await moved.focus();
+            return;
+          }
+        } catch {
+          // try the next window
         }
       }
       await self.clients.openWindow(url);

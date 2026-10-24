@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Both spellings render the same names in pushes and WhatsApp/SMS text
 - [ ] Unknown tokens still render as before

@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] A job left running longer than a lease (a few minutes) becomes claimable again
 - [ ] A job that keeps failing stops after a small number of attempts and is marked failed

@@ -39,6 +39,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       start,
       end: new Date(start.getTime() + 86400000),
       allDay: true,
+      timeZone: profile.timezone,
       description: s.title,
       url: `${origin}/sections/${s.id}`,
     };

@@ -28,15 +28,17 @@ export function referencedSections(...templates: string[]): string[] {
 }
 
 /**
- * Renders {{me}}, {{partner}}, {{date}}, {{time}}, {{weekday}} and
+ * Renders {{me}} / {{user.name}}, {{partner}} / {{partner.name}}, {{date}}, {{time}}, {{weekday}} and
  * {{random:<sectionId>}}. Unknown tokens are left untouched so typos are visible.
  */
 export function renderTemplate(template: string, ctx: TemplateContext): string {
   return template.replace(TOKEN, (whole, key: string, arg?: string) => {
     switch (key) {
       case "me":
+      case "user.name":
         return ctx.me.name;
       case "partner":
+      case "partner.name":
         return ctx.partner?.name ?? "";
       case "random":
         return arg ? ctx.pick(arg) : whole;
