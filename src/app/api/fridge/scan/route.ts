@@ -6,7 +6,7 @@ import { planScan, toBuy } from "@/lib/fridge";
 import { fill, getDict, isLocale } from "@/i18n";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     .from("sections")
     .update({ settings: { lastScan: space.settings?.lastScan, scanningAt: started.toISOString() } })
     .eq("id", space.id)
-    .or(`settings->>scanningAt.is.null,settings->>scanningAt.lt.${new Date(started.getTime() - 90_000).toISOString()}`)
+    .or(`settings->>scanningAt.is.null,settings->>scanningAt.lt.${new Date(started.getTime() - 130_000).toISOString()}`)
     .select("id");
   if (!claimed?.length) return NextResponse.json({ error: "already scanning" }, { status: 409 });
   try {
