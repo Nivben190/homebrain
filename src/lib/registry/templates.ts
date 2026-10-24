@@ -677,6 +677,16 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     title: { en: "Commitments", he: "התחייבויות" },
     desc: { en: "\"Under ₪300 on Cibus this month\", \"laundry today\" — at the end you find out if you made it, with a scoreboard.", he: "\"עד 300 ₪ בסיבוס החודש\", \"כביסה היום\" — בסוף מגלים אם עמדתם בזה, עם לוח תוצאות." },
   },
+  // A photo of the fridge becomes the inventory; staples running out go on the shopping list.
+  {
+    key: "fridge",
+    category: "home",
+    icon: "🧊",
+    color: "sky",
+    view: "fridge",
+    title: { en: "Fridge", he: "מקרר" },
+    desc: { en: "Snap the fridge: see what you have, and what's running out goes on the shopping list.", he: "מצלמים את המקרר: רואים מה יש, ומה שנגמר עובר לרשימת הקניות." },
+  },
   // Card purchases forwarded from the bank's texts by an iPhone automation.
   {
     key: "spending",

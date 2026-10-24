@@ -42,6 +42,8 @@ import { WheelView } from "./WheelView";
 import { WHEEL_PROP } from "@/lib/wheel";
 import { CommitView } from "./CommitView";
 import { SpendView } from "./SpendView";
+import { FridgeView } from "./FridgeView";
+import { FRIDGE_PROP } from "@/lib/fridge";
 import { newCommit, type Period } from "@/lib/commit";
 
 export function SectionScreen({
@@ -220,6 +222,7 @@ export function SectionScreen({
       updated_at: new Date().toISOString(),
     };
     if (isDates) Object.assign(temp, datePatch(temp, defaultDate(selectedDay), [], timeZone));
+    if (section.view === "fridge") temp.props = { [FRIDGE_PROP]: { level: "full", staple: true } };
     if (section.view === "wheel") temp.props = { [WHEEL_PROP]: { options: [] } };
     if (section.view === "commit") Object.assign(temp, newCommit(title, new Date(), timeZone));
     if (isSubs) temp.props = { [SUB_PROP]: manualSub(locale === "he" ? "ILS" : "USD") };
@@ -371,7 +374,9 @@ export function SectionScreen({
 
       {sorted.length === 0 && !kind.ownEmptyState && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
 
-      {section.view === "spend" ? (
+      {section.view === "fridge" ? (
+        <FridgeView section={section} items={sorted} onUpdate={update} onDelete={remove} onReload={reload} />
+      ) : section.view === "spend" ? (
         <SpendView
           section={section}
           items={sorted}

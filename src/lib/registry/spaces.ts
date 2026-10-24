@@ -48,6 +48,7 @@ export const SPACE_TYPES: Record<SectionView, SpaceType> = {
   dates: { ...base, addPlaceholder: (t) => t.dates.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true, reminds: true },
   subscriptions: { ...base, addPlaceholder: (t) => t.subs.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true },
   commit: { ...base, addPlaceholder: (t) => t.commit.addPlaceholder, ownEmptyState: true, datesAreDue: false, reminds: true },
+  fridge: { ...base, addPlaceholder: (t) => t.fridge.addPlaceholder, ownEmptyState: true, datesAreDue: false },
   spend: { ...base, ownEmptyState: true, datesAreDue: false, quickAdd: false },
   wheel: { ...base, addPlaceholder: (t) => t.wheel.addPlaceholder, ownEmptyState: true, datesAreDue: false },
 };

@@ -60,6 +60,11 @@ async function render(img: HTMLImageElement, max: number, quality: number, scan:
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
+/** A phone photo shrunk for sending (e.g. a fridge scan). */
+export async function resizeImage(file: Blob, max: number): Promise<Blob> {
+  return render(await loadImage(file), max, 0.82, false);
+}
+
 export interface UploadTarget {
   householdId: string;
   sectionId: string;
