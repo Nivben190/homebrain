@@ -6,7 +6,7 @@ No visible change for users.
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] One shared audience helper and one shared send helper are used by every reminder kind
 - [ ] Quiet hours, language and card wording are unchanged

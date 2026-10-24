@@ -8,6 +8,7 @@ import { instantiateTemplate, SECTION_TEMPLATES, TEMPLATE_CATEGORIES, templateIs
 import { nextReminder, todayKey } from "@/lib/engine/habits";
 import { useI18n } from "@/i18n/client";
 import { Button, Chip, ColorPicker, EmojiPicker, Field, IconButton, IconTile, Input, Segmented, Sheet } from "@/components/ui";
+import { spaceType } from "@/lib/registry/spaces";
 
 export function NewSectionButton({ householdId, userId, timeZone }: { householdId: string; userId: string; timeZone: string }) {
   const { t, locale } = useI18n();
@@ -104,7 +105,7 @@ export function NewSectionButton({ householdId, userId, timeZone }: { householdI
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 font-bold">
                         {s.title[locale]}
-                        {(s.view === "tracker" || s.view === "dates") && <BellRing className="size-3.5 text-accent" />}
+                        {spaceType(s.view).reminds && <BellRing className="size-3.5 text-accent" />}
                       </span>
                       <span className="line-clamp-2 block text-sm leading-snug text-muted">{s.desc[locale]}</span>
                     </span>

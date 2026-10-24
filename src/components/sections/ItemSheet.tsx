@@ -9,6 +9,7 @@ import { dueFromProps } from "@/lib/registry/properties";
 import { PHOTOS_PROP, readPhotos } from "@/lib/photos";
 import { PhotoField } from "@/components/photos/PhotoField";
 import type { Item, Section } from "@/lib/db-types";
+import { spaceType } from "@/lib/registry/spaces";
 
 export function ItemSheet({
   item,
@@ -39,7 +40,7 @@ export function ItemSheet({
   const setProp = (id: string, v: unknown) => {
     const props = { ...item.props, [id]: v };
     // Memory dates are when it happened, not something due.
-    onChange(item.id, { props, due_at: section.view === "gallery" ? null : dueFromProps(section.schema, props) });
+    onChange(item.id, { props, due_at: !spaceType(section.view).datesAreDue ? null : dueFromProps(section.schema, props) });
   };
   const photosField = (
     <Field label={t.photos.title}>
@@ -68,20 +69,20 @@ export function ItemSheet({
       title={`${section.icon} ${section.title}`}
       footer={
         <div className="flex gap-2">
-          {section.view === "checklist" && (
+          {spaceType(section.view).checkable && (
             <Button size="lg" variant={item.done ? "ghost" : "soft"} className="flex-1" onClick={() => onChange(item.id, { done: !item.done })}>
               {item.done ? "↺" : "✓"} {t.common.done}
             </Button>
           )}
-          <Button size="lg" variant="danger" className={section.view === "checklist" ? "" : "flex-1"} onClick={() => onDelete(item.id)} aria-label={t.common.delete}>
-            <Trash2 className="size-5" /> {section.view === "checklist" ? "" : t.common.delete}
+          <Button size="lg" variant="danger" className={spaceType(section.view).checkable ? "" : "flex-1"} onClick={() => onDelete(item.id)} aria-label={t.common.delete}>
+            <Trash2 className="size-5" /> {spaceType(section.view).checkable ? "" : t.common.delete}
           </Button>
         </div>
       }
     >
       <div className="space-y-4 pb-4">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={commitText} className="h-14 text-lg font-bold" />
-        {section.view === "gallery" && photosField}
+        {spaceType(section.view).photos && photosField}
         {section.schema.map((def) => (
           <Field key={def.id} label={def.name}>
             <PropertyInput def={def} value={item.props[def.id]} onChange={(v) => setProp(def.id, v)} members={members} />

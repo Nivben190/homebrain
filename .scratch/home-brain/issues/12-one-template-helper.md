@@ -6,7 +6,7 @@ No visible change for users.
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] The copied fill helpers are replaced by one shared helper
 - [ ] No inline Hebrew-vs-English wording choices remain outside the translation files

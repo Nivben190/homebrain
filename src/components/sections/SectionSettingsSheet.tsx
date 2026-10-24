@@ -8,6 +8,7 @@ import { useI18n } from "@/i18n/client";
 import { Button, ColorPicker, EmojiPicker, Field, Input, Segmented, Select, Sheet } from "@/components/ui";
 import { newPropertyId, PROPERTY_TYPES, type PropertyDef, type PropertyType } from "@/lib/registry/properties";
 import type { Section, SectionView } from "@/lib/db-types";
+import { spaceType } from "@/lib/registry/spaces";
 
 export function SectionSettingsSheet({
   open,
@@ -126,7 +127,7 @@ export function SectionSettingsSheet({
           />
         </Field>
 
-        {(section.view === "checklist" || section.view === "list") && (
+        {spaceType(section.view).notesSync && (
           <>
             <Field label={t.notesSync.linkedNote} hint={t.notesSync.linkedHint}>
               <Input value={s.notes_link ?? ""} onChange={(e) => setS({ ...s, notes_link: e.target.value })} placeholder="רשימת קניות" />

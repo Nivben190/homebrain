@@ -6,7 +6,7 @@ No visible change for users.
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Each space type has exactly one entry describing its UI behaviour
 - [ ] The repeated view-type checks across screens are gone

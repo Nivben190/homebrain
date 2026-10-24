@@ -37,6 +37,7 @@ async function purgeItem(item: Item) {
 }
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import { fill } from "@/i18n";
+import { spaceType } from "@/lib/registry/spaces";
 
 export function SectionScreen({
   initialSection,
@@ -185,7 +186,8 @@ export function SectionScreen({
   }, [sb, section.id]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at)), [items]);
-  const isChecklist = section.view === "checklist";
+  const kind = spaceType(section.view);
+  const isChecklist = kind.checkable;
   const isTracker = section.view === "tracker";
   const isGallery = section.view === "gallery";
   const isDates = section.view === "dates";
@@ -217,7 +219,7 @@ export function SectionScreen({
     setItems((p) => [...p, temp]);
     await sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at });
     // New tracker items go straight to their schedule; memories to their photos; reminders to their alerts.
-    if (isTracker || isGallery || isDates || isSubs) setOpenItem(temp);
+    if (kind.opensSheetOnAdd) setOpenItem(temp);
     else inputRef.current?.focus();
   }
 
@@ -311,7 +313,7 @@ export function SectionScreen({
             <ChevronLeft className="size-4 rtl:rotate-180" /> {t.nav.spaces}
           </Link>
           <div className="flex items-center gap-2">
-            {(section.view === "checklist" || section.view === "list") && (
+            {kind.notesSync && (
               <IconButton
                 aria-label={t.notesSync.button}
                 title={t.notesSync.button}
@@ -352,7 +354,7 @@ export function SectionScreen({
         </div>
       </header>
 
-      {sorted.length === 0 && !isGallery && !isDates && !isSubs && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
+      {sorted.length === 0 && !kind.ownEmptyState && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
 
       {isSubs ? (
         <SubscriptionsView section={section} items={sorted} gmail={gmail} timeZone={timeZone} editing={editing} onOpen={setOpenItem} onDelete={removeSub} onReload={reload} />
@@ -436,7 +438,7 @@ export function SectionScreen({
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={isGallery ? t.memories.addPlaceholder : isDates ? t.dates.addPlaceholder : isSubs ? t.subs.addPlaceholder : t.sections.addItem}
+            placeholder={kind.addPlaceholder(t)}
             className="h-10 min-w-0 flex-1 bg-transparent outline-none placeholder:text-faint"
             enterKeyHint="done"
           />

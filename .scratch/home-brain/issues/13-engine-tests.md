@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** partial — the concurrent-claim DB test still needs a local or branch database
 
 - [ ] A schedule at a time that doesn't exist on the spring-forward day fires once, at a sensible time
 - [ ] A wake event creates the immediate run and the +N-minute follow-up jobs
