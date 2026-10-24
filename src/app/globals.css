@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens. Light by default, dark follows the phone's setting.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: #f5f3fb;
+  --fg: #17131f;
+  --muted: #6d6882;
+  --faint: #a7a3b8;
+  --card: rgb(255 255 255 / 0.72);
+  --card-solid: #ffffff;
+  --card-border: rgb(23 19 31 / 0.06);
+  --sunken: rgb(23 19 31 / 0.045);
+  --accent: #7457ff;
+  --accent-fg: #ffffff;
+  --accent-soft: rgb(116 87 255 / 0.12);
+  --success: #22c38e;
+  --warn: #ffab2e;
+  --danger: #ff4d6d;
+  --blob-1: #c9b8ff;
+  --blob-2: #ffc4dc;
+  --blob-3: #ffe2b0;
+  --shadow: 0 1px 2px rgb(23 19 31 / 0.04), 0 8px 24px -8px rgb(23 19 31 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0a13;
+    --fg: #f3f1fa;
+    --muted: #9d98b3;
+    --faint: #5f5a73;
+    --card: rgb(28 25 40 / 0.72);
+    --card-solid: #1a1726;
+    --card-border: rgb(255 255 255 / 0.07);
+    --sunken: rgb(255 255 255 / 0.05);
+    --accent: #8d75ff;
+    --accent-soft: rgb(141 117 255 / 0.18);
+    --blob-1: #3a2a7a;
+    --blob-2: #5a1f45;
+    --blob-3: #4a3410;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-card: var(--card);
+  --color-card-solid: var(--card-solid);
+  --color-card-border: var(--card-border);
+  --color-sunken: var(--sunken);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-jakarta), var(--font-heebo), system-ui, sans-serif;
+  --shadow-soft: var(--shadow);
+  --radius-4xl: 2rem;
+}
+
+html {
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* No body background: it would paint over the fixed .aurora layer (z-index -1). */
+body {
+  color: var(--fg);
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+}
+
+/* Hebrew reads better in Heebo; switch the primary face under RTL. */
+[dir="rtl"] body {
+  font-family: var(--font-heebo), var(--font-jakarta), system-ui, sans-serif;
+}
+
+/* Soft aurora behind everything */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora::before,
+.aurora::after,
+.aurora > span {
+  content: "";
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.55;
+}
+.aurora::before {
+  background: var(--blob-1);
+  top: -35vmax;
+  left: -25vmax;
+}
+.aurora::after {
+  background: var(--blob-2);
+  top: -20vmax;
+  right: -35vmax;
+}
+.aurora > span {
+  background: var(--blob-3);
+  bottom: -45vmax;
+  left: -10vmax;
+  opacity: 0.35;
+}
+
+@utility glass {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+@utility safe-top {
+  padding-top: max(env(safe-area-inset-top), 1rem);
+}
+
+@utility safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Inputs: iOS zooms into fields under 16px, so never go smaller. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

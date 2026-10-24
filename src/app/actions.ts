@@ -1,0 +1,475 @@
+"use server";
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { getSession, requireHome } from "@/lib/session";
+import { seedStarterBrain } from "@/lib/starter";
+import { fireAutomation, handledDays, handleEvent, rescheduleDate } from "@/lib/engine/execute";
+import { currentOccurrence, readDate } from "@/lib/engine/dates";
+import type { RenderedAction } from "@/lib/engine/types";
+import { nextRunAt } from "@/lib/engine/schedule";
+import { automationDefSchema } from "@/lib/engine/types";
+import { addDays, todayKey } from "@/lib/engine/habits";
+import { getDict } from "@/i18n";
+import { dueFromProps, type PropertyDef } from "@/lib/registry/properties";
+import { sendPush } from "@/lib/push";
+import { openToken, revokeToken } from "@/lib/subs/gmail";
+import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
+import type { Automation, RequestRow } from "@/lib/db-types";
+
+type Result = { ok: true } | { ok: false; error: string };
+
+// ---------------------------------------------------------------------------
+// Accounts
+// ---------------------------------------------------------------------------
+
+const accountInput = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+/**
+ * Creates a confirmed email+password user without sending any email (the
+ * default Supabase emails only carry links, which open in Safari instead of the
+ * installed app). The client signs in with the password right after.
+ * Optional ALLOWED_EMAILS (comma separated) limits who can sign up.
+ */
+export async function createAccount(input: { email: string; password: string }): Promise<Result> {
+  const parsed = accountInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { email, password } = parsed.data;
+
+  const allowed = (process.env.ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length && !allowed.includes(email)) return { ok: false, error: "This email isn't invited to this home." };
+
+  const { error } = await createSupabaseAdmin().auth.admin.createUser({ email, password, email_confirm: true });
+  if (error) {
+    const exists = /already|registered|exists/i.test(error.message);
+    return { ok: false, error: exists ? "exists" : error.message };
+  }
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding
+// ---------------------------------------------------------------------------
+
+const profileInput = z.object({
+  displayName: z.string().trim().min(1).max(40),
+  emoji: z.string().min(1).max(8),
+  phone: z.string().trim().max(30).optional().default(""),
+  timezone: z.string().default("Asia/Jerusalem"),
+});
+
+export async function setupHome(input: {
+  mode: "create" | "join";
+  homeName?: string;
+  inviteCode?: string;
+  starter: boolean;
+  displayName: string;
+  emoji: string;
+  phone?: string;
+  timezone?: string;
+}): Promise<Result> {
+  const { supabase, user, profile } = await getSession();
+  if (!user || !profile) return { ok: false, error: "Not signed in" };
+  const p = profileInput.parse(input);
+
+  await supabase
+    .from("profiles")
+    .update({ display_name: p.displayName, emoji: p.emoji, phone: p.phone || null, timezone: p.timezone })
+    .eq("user_id", user.id);
+
+  const rpc =
+    input.mode === "create"
+      ? await supabase.rpc("create_household", { p_name: input.homeName?.trim() || "Home" })
+      : await supabase.rpc("join_household", { p_code: input.inviteCode ?? "" });
+  if (rpc.error) return { ok: false, error: rpc.error.message };
+
+  if (input.starter) {
+    await seedStarterBrain(supabase, {
+      userId: user.id,
+      householdId: rpc.data.id,
+      locale: profile.locale,
+      timezone: p.timezone,
+      shared: input.mode === "create",
+    });
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Profile & settings
+// ---------------------------------------------------------------------------
+
+export async function setLocale(locale: Locale) {
+  if (!isLocale(locale)) return;
+  (await cookies()).set(LOCALE_COOKIE, locale, { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  const { supabase, user } = await getSession();
+  if (user) await supabase.from("profiles").update({ locale }).eq("user_id", user.id);
+  revalidatePath("/", "layout");
+}
+
+const settingsInput = z.object({
+  display_name: z.string().trim().min(1).max(40).optional(),
+  emoji: z.string().min(1).max(8).optional(),
+  phone: z.string().trim().max(30).nullable().optional(),
+  timezone: z.string().optional(),
+  wake_mode: z.enum(["shortcut", "fixed", "first_open"]).optional(),
+  wake_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  lat: z.number().min(-90).max(90).nullable().optional(),
+  lon: z.number().min(-180).max(180).nullable().optional(),
+  place: z.string().trim().max(60).nullable().optional(),
+  briefing: z.boolean().optional(),
+  wrapup: z.boolean().optional(),
+  wrapup_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  quiet_shabbat: z.boolean().optional(),
+  shabbat_shop: z.boolean().optional(),
+});
+
+export async function updateProfile(patch: z.input<typeof settingsInput>): Promise<Result> {
+  const { supabase, user } = await requireHome();
+  const parsed = settingsInput.safeParse(patch);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { error } = await supabase.from("profiles").update(parsed.data).eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function signOut() {
+  const { supabase } = await getSession();
+  await supabase.auth.signOut();
+  redirect("/login");
+}
+
+// ---------------------------------------------------------------------------
+// Automations
+// ---------------------------------------------------------------------------
+
+export async function saveAutomation(id: string | null, raw: unknown, targetUserId: string): Promise<Result & { id?: string }> {
+  const { supabase, user, profile, household, members } = await requireHome();
+  const parsed = automationDefSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
+  const target = members.find((m) => m.user_id === targetUserId) ?? profile;
+
+  const row = {
+    ...parsed.data,
+    household_id: household.id,
+    owner_id: user.id,
+    target_user_id: target.user_id,
+    next_run_at: parsed.data.enabled ? (nextRunAt(parsed.data.trigger, new Date(), target.timezone)?.toISOString() ?? null) : null,
+  };
+  const q = id ? supabase.from("automations").update(row).eq("id", id) : supabase.from("automations").insert(row);
+  const { data, error } = await q.select("id").single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/brain");
+  return { ok: true, id: data.id };
+}
+
+export async function toggleAutomation(id: string, enabled: boolean): Promise<Result> {
+  const { supabase, members } = await requireHome();
+  const { data: a } = await supabase.from("automations").select("*").eq("id", id).single<Automation>();
+  if (!a) return { ok: false, error: "Not found" };
+  const tz = members.find((m) => m.user_id === a.target_user_id)?.timezone ?? "Asia/Jerusalem";
+  await supabase
+    .from("automations")
+    .update({ enabled, next_run_at: enabled ? (nextRunAt(a.trigger, new Date(), tz)?.toISOString() ?? null) : null })
+    .eq("id", id);
+  revalidatePath("/brain");
+  return { ok: true };
+}
+
+export async function deleteAutomation(id: string) {
+  const { supabase } = await requireHome();
+  const { data: mine } = await supabase.from("automations").select("id").eq("id", id).maybeSingle();
+  if (mine) {
+    // Its unanswered cards would otherwise linger in "Waiting for you" (both of us).
+    await createSupabaseAdmin().from("runs").update({ acknowledged_at: new Date().toISOString() }).eq("automation_id", id).is("acknowledged_at", null);
+    await supabase.from("automations").delete().eq("id", id);
+  }
+  revalidatePath("/brain");
+  revalidatePath("/");
+  redirect("/brain");
+}
+
+/** Fires an automation immediately (for testing from the editor). */
+export async function runAutomationNow(id: string): Promise<Result & { runId?: string }> {
+  const { supabase } = await requireHome();
+  // RLS proves ownership; the engine then needs service-role access.
+  const { data: a } = await supabase.from("automations").select("*").eq("id", id).single<Automation>();
+  if (!a) return { ok: false, error: "Not found" };
+  const out = await fireAutomation(createSupabaseAdmin(), { ...a, conditions: [] });
+  revalidatePath("/");
+  return out.status === "fired" ? { ok: true, runId: out.runId } : { ok: false, error: out.reason ?? out.status };
+}
+
+// ---------------------------------------------------------------------------
+// Runs & events
+// ---------------------------------------------------------------------------
+
+export async function markRun(id: string, done: boolean) {
+  const { supabase, profile } = await requireHome();
+  const now = new Date().toISOString();
+  const { data: run } = await supabase
+    .from("runs")
+    .update(done ? { done_at: now, acknowledged_at: now } : { done_at: null })
+    .eq("id", id)
+    .select("item_id,automation_id,user_id,rendered")
+    .single<{ item_id: string | null; automation_id: string | null; user_id: string; rendered: RenderedAction[] }>();
+  // Tracker reminders: "Done" checks the session in for today. Reminder-calendar
+  // alerts carry the date they're about ("No more needed" handles that date).
+  if (run?.item_id) {
+    const doneAction = run.rendered.find((r) => r.kind === "done");
+    const dateDay = doneAction?.kind === "done" ? doneAction.day : undefined;
+    const day = dateDay ?? todayKey(profile.timezone);
+    if (done) await supabase.from("checkins").upsert({ item_id: run.item_id, day, status: "done" }, { onConflict: "item_id,day" });
+    else await supabase.from("checkins").delete().eq("item_id", run.item_id).eq("day", day);
+    if (dateDay) await afterDateHandled(supabase, run.item_id, profile.timezone);
+  } else if (run?.automation_id && done) {
+    // Earlier unanswered cards from the same automation are answered too.
+    await supabase.from("runs").update({ acknowledged_at: now }).eq("automation_id", run.automation_id).eq("user_id", run.user_id).is("acknowledged_at", null);
+  }
+  revalidatePath("/");
+}
+
+/**
+ * After a reminder-calendar date was handled (or un-handled): a one-time date
+ * is finished — or reopened — and a repeating one moves to its next date.
+ */
+async function afterDateHandled(supabase: Awaited<ReturnType<typeof requireHome>>["supabase"], itemId: string, timeZone: string) {
+  const { data: item } = await supabase.from("items").select("id,props").eq("id", itemId).single();
+  const spec = item ? readDate(item.props ?? {}) : null;
+  if (!spec) return;
+  const handled = await handledDays(supabase, itemId);
+  if (spec.repeat === "once") {
+    const isDone = handled.has(spec.date);
+    await supabase.from("items").update({ done: isDone, updated_at: new Date().toISOString() }).eq("id", itemId);
+    if (isDone) return void (await supabase.from("items").update({ remind_at: null }).eq("id", itemId));
+  }
+  await rescheduleDate(supabase, itemId, spec, timeZone, handled);
+}
+
+/** "No more needed" from the space itself (not from an alert). */
+export async function handleDate(itemId: string, handled: boolean) {
+  const { supabase, profile } = await requireHome();
+  const { data: item } = await supabase.from("items").select("id,props").eq("id", itemId).single();
+  const spec = item ? readDate(item.props ?? {}) : null;
+  if (!spec) return;
+  const today = todayKey(profile.timezone);
+  const done = await handledDays(supabase, itemId);
+  const occurrence = handled ? currentOccurrence(spec, today, (d) => done.has(d)) : [...done].sort().at(-1);
+  if (!occurrence) return;
+  if (handled) await supabase.from("checkins").upsert({ item_id: itemId, day: occurrence, status: "done" }, { onConflict: "item_id,day" });
+  else await supabase.from("checkins").delete().eq("item_id", itemId).eq("day", occurrence);
+  await afterDateHandled(supabase, itemId, profile.timezone);
+  revalidatePath("/");
+}
+
+export async function dismissRun(id: string) {
+  const { supabase } = await requireHome();
+  await supabase.from("runs").update({ acknowledged_at: new Date().toISOString() }).eq("id", id);
+  revalidatePath("/");
+}
+
+/** In-app events, e.g. the "I'm awake" button or first open of the day. */
+export async function emitEvent(type: "wake", source: "button" | "first_open") {
+  const { user, profile } = await requireHome();
+  const admin = createSupabaseAdmin();
+  if (source === "first_open") {
+    if (profile.wake_mode !== "first_open") return { fired: 0 };
+    const since = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
+    const { count } = await admin.from("events").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("type", "wake").gte("created_at", since);
+    if (count) return { fired: 0 };
+  }
+  const outcomes = await handleEvent(admin, user.id, type, { source });
+  revalidatePath("/");
+  return { fired: outcomes.filter((o) => o.status === "fired").length, queued: outcomes.filter((o) => o.reason?.startsWith("queued")).length };
+}
+
+// ---------------------------------------------------------------------------
+// Push
+// ---------------------------------------------------------------------------
+
+const subInput = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({ p256dh: z.string(), auth: z.string() }),
+});
+
+export async function savePushSubscription(sub: unknown, deviceLabel: string): Promise<Result> {
+  const { supabase, user } = await requireHome();
+  const parsed = subInput.safeParse(sub);
+  if (!parsed.success) return { ok: false, error: "Invalid subscription" };
+  const { error } = await supabase.from("push_subscriptions").upsert(
+    { user_id: user.id, endpoint: parsed.data.endpoint, p256dh: parsed.data.keys.p256dh, auth: parsed.data.keys.auth, device_label: deviceLabel.slice(0, 60) },
+    { onConflict: "endpoint" },
+  );
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function sendTestPush(): Promise<Result> {
+  const { user, profile } = await requireHome();
+  const sent = await sendPush(createSupabaseAdmin(), user.id, {
+    title: `🧠 ${profile.locale === "he" ? "המוח מחובר!" : "Your brain is connected!"}`,
+    body: profile.locale === "he" ? "ככה ייראו התזכורות שלך." : "This is how your reminders will look.",
+    url: "/",
+  });
+  return sent > 0 ? { ok: true } : { ok: false, error: "No devices registered" };
+}
+
+// ---------------------------------------------------------------------------
+// Partner requests ("Can you…?")
+// ---------------------------------------------------------------------------
+
+const fillVars = (str: string, vars: Record<string, string>) => str.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+
+export async function sendRequest(input: { to: string; text: string; due: "today" | "tomorrow" | null }): Promise<Result> {
+  const { supabase, user, profile, household, members } = await requireHome();
+  const to = members.find((m) => m.user_id === input.to && m.user_id !== user.id);
+  const text = input.text.trim().slice(0, 300);
+  if (!to || !text) return { ok: false, error: "Invalid request" };
+  const today = todayKey(profile.timezone);
+  const due_day = input.due === "today" ? today : input.due === "tomorrow" ? addDays(today, 1) : null;
+  const { data, error } = await supabase.from("requests").insert({ household_id: household.id, to_user: to.user_id, text, due_day }).select("id").single();
+  if (error) return { ok: false, error: error.message };
+  const t = getDict(to.locale).ask;
+  await sendPush(createSupabaseAdmin(), to.user_id, { title: fillVars(t.pushTitle, { name: `${profile.emoji} ${profile.display_name}` }), body: text, url: `/?request=${data.id}` });
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function setRequestStatus(id: string, status: "doing" | "done" | "declined" | "open"): Promise<Result> {
+  const { supabase, profile, members } = await requireHome();
+  const { data: req } = await supabase.from("requests").update({ status, updated_at: new Date().toISOString() }).eq("id", id).select("*").single<RequestRow>();
+  if (!req) return { ok: false, error: "Not found" };
+  // Tell the sender when it's done (or can't be done).
+  const sender = members.find((m) => m.user_id === req.from_user);
+  if (sender && sender.user_id !== profile.user_id && (status === "done" || status === "declined")) {
+    const t = getDict(sender.locale).ask;
+    const body = status === "done" ? fillVars(t.donePush, { name: `${profile.emoji} ${profile.display_name}`, text: req.text }) : `↩ ${profile.display_name}: ${req.text}`;
+    await sendPush(createSupabaseAdmin(), sender.user_id, { title: "Home Brain", body, url: "/" });
+  }
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function deleteRequest(id: string) {
+  const { supabase } = await requireHome();
+  await supabase.from("requests").delete().eq("id", id);
+  revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// Wrap-up
+// ---------------------------------------------------------------------------
+
+/** Push a dated item's due date (and its first date property) one day later. */
+export async function moveItemToTomorrow(itemId: string): Promise<Result> {
+  const { supabase, profile } = await requireHome();
+  const { data: item } = await supabase.from("items").select("props, due_at, sections(schema)").eq("id", itemId).single();
+  if (!item) return { ok: false, error: "Not found" };
+  const schema = ((item.sections as unknown as { schema: PropertyDef[] } | null)?.schema ?? []) as PropertyDef[];
+  const dateProp = schema.find((p) => p.type === "date");
+  const tomorrow = addDays(todayKey(profile.timezone), 1);
+  const props = dateProp ? { ...(item.props as Record<string, unknown>), [dateProp.id]: tomorrow } : item.props;
+  const due = dateProp ? dueFromProps(schema, props as Record<string, unknown>) : new Date(new Date(item.due_at!).getTime() + 86400000).toISOString();
+  await supabase.from("items").update({ props, due_at: due }).eq("id", itemId);
+  revalidatePath("/wrapup");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Dog
+// ---------------------------------------------------------------------------
+
+const petInput = z.object({
+  name: z.string().trim().min(1).max(40),
+  emoji: z.string().min(1).max(8).default("🐶"),
+  breed: z.string().trim().max(60).nullable().optional(),
+  birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  chip: z.string().trim().max(40).nullable().optional(),
+  vet_name: z.string().trim().max(60).nullable().optional(),
+  vet_phone: z.string().trim().max(30).nullable().optional(),
+  food_bag_kg: z.number().positive().max(100).nullable().optional(),
+  daily_grams: z.number().positive().max(5000).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
+export async function savePet(id: string | null, raw: z.input<typeof petInput>): Promise<Result & { id?: string }> {
+  const { supabase, household } = await requireHome();
+  const parsed = petInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const q = id ? supabase.from("pets").update(parsed.data).eq("id", id) : supabase.from("pets").insert({ ...parsed.data, household_id: household.id });
+  const { data, error } = await q.select("id").single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true, id: data.id };
+}
+
+export async function logPetWeight(petId: string, kg: number): Promise<Result> {
+  const { supabase, profile } = await requireHome();
+  if (!(kg > 0 && kg < 200)) return { ok: false, error: "Invalid weight" };
+  const { error } = await supabase.from("pet_weights").upsert({ pet_id: petId, day: todayKey(profile.timezone), kg }, { onConflict: "pet_id,day" });
+  revalidatePath(`/pets/${petId}`);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function newFoodBag(petId: string): Promise<Result> {
+  const { supabase, profile } = await requireHome();
+  const { error } = await supabase.from("pets").update({ bag_started: todayKey(profile.timezone), food_alerted_bag: null }).eq("id", petId);
+  revalidatePath(`/pets/${petId}`);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Adds "Dog food" to the dog supplies list (or groceries), re-opening it if it's in history. */
+export async function reorderFood(petId: string): Promise<Result> {
+  const { supabase, profile, household } = await requireHome();
+  const { data: pet } = await supabase.from("pets").select("name").eq("id", petId).single();
+  const { data: lists } = await supabase.from("sections").select("id,template").eq("household_id", household.id).in("template", ["dog-supplies", "groceries"]);
+  const list = lists?.find((l) => l.template === "dog-supplies") ?? lists?.[0];
+  if (!list) return { ok: false, error: "No shopping list" };
+  const title = profile.locale === "he" ? `אוכל ל${pet?.name ?? "כלב"} 🦴` : `Food for ${pet?.name ?? "the dog"} 🦴`;
+  const { data: existing } = await supabase.from("items").select("id").eq("section_id", list.id).ilike("title", `%${profile.locale === "he" ? "אוכל" : "food"}%`).limit(1).maybeSingle();
+  if (existing) await supabase.from("items").update({ done: false }).eq("id", existing.id);
+  else await supabase.from("items").insert({ section_id: list.id, title, position: Date.now() / 1000 });
+  revalidatePath(`/pets/${petId}`);
+  return { ok: true };
+}
+
+export async function deletePet(petId: string) {
+  const { supabase } = await requireHome();
+  await supabase.from("pets").delete().eq("id", petId);
+  revalidatePath("/");
+  redirect("/");
+}
+
+/**
+ * Disconnects a Subscriptions space from its Gmail. Google access is revoked
+ * only when no other space still uses that inbox (revoking ends them all).
+ */
+export async function disconnectGmail(sectionId: string): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { data: section } = await supabase.from("sections").select("id").eq("id", sectionId).maybeSingle();
+  if (!section) return { ok: false, error: "Not found" };
+  const db = createSupabaseAdmin();
+  const { data: conn } = await db.from("gmail_connections").select("email,refresh_token").eq("section_id", sectionId).maybeSingle();
+  if (!conn) return { ok: true };
+  await db.from("gmail_connections").delete().eq("section_id", sectionId);
+  const { count } = await db.from("gmail_connections").select("section_id", { count: "exact", head: true }).eq("email", conn.email ?? "");
+  if (!count) {
+    try {
+      await revokeToken(openToken(conn.refresh_token));
+    } catch {
+      // Unreadable token: deleting it is enough.
+    }
+  }
+  revalidatePath(`/sections/${sectionId}`);
+  revalidatePath("/me");
+  return { ok: true };
+}

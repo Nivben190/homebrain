@@ -1,0 +1,8 @@
+.env*
+!.env.example
+.next
+node_modules
+.vercel
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js

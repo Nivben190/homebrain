@@ -1,0 +1,152 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Pet, Profile } from "@/lib/db-types";
+import { getDict } from "@/i18n";
+import { sendPush } from "@/lib/push";
+import { buildDay, dayScore, openTitles } from "@/lib/day";
+import { DEFAULT_PLACE, weatherEmoji } from "@/lib/weather";
+import { getJewishCalendar, hhmmOf, holyStatus } from "@/lib/jewish";
+import { addDays, diffDays, todayKey } from "./habits";
+import { foodDaysLeft } from "./food";
+import { minuteOfDay, parseHHmm, zonedParts, zonedTimeToUtc } from "./time";
+
+type Admin = SupabaseClient;
+
+const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+
+/** Start of the user's local day, as an ISO timestamp. */
+function localMidnight(day: string, timeZone: string) {
+  return zonedTimeToUtc(+day.slice(0, 4), +day.slice(5, 7), +day.slice(8, 10), 0, 0, timeZone).toISOString();
+}
+
+async function sentToday(db: Admin, p: Profile, type: string, now: Date) {
+  const { count } = await db
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", p.user_id)
+    .eq("type", type)
+    .gte("created_at", localMidnight(todayKey(p.timezone, now), p.timezone));
+  return (count ?? 0) > 0;
+}
+
+const markSent = (db: Admin, p: Profile, type: string) => db.from("events").insert({ user_id: p.user_id, type });
+
+async function membersOf(db: Admin, householdId: string) {
+  const { data } = await db.from("profiles").select("*").eq("household_id", householdId).returns<Profile[]>();
+  return data ?? [];
+}
+
+/** True during Shabbat/chag when the user asked for quiet. */
+export async function isQuiet(p: Profile, now = new Date()) {
+  if (!p.quiet_shabbat) return false;
+  const today = todayKey(p.timezone, now);
+  const items = await getJewishCalendar(p.lat ?? DEFAULT_PLACE.lat, p.lon ?? DEFAULT_PLACE.lon, p.timezone, addDays(today, -2), addDays(today, 3));
+  return holyStatus(items, now).now;
+}
+
+// ---------------------------------------------------------------------------
+// Morning briefing
+// ---------------------------------------------------------------------------
+
+/** One push that sums up the day. Sent on wake (or 09:30 fallback), once a day. */
+export async function sendBriefing(db: Admin, userId: string, now = new Date()) {
+  const { data: me } = await db.from("profiles").select("*").eq("user_id", userId).single<Profile>();
+  if (!me?.household_id || !me.briefing || (await sentToday(db, me, "briefing", now)) || (await isQuiet(me, now))) return false;
+  const members = await membersOf(db, me.household_id);
+  const day = await buildDay(db, me, members.map((m) => m.user_id), now);
+  const t = getDict(me.locale).daily;
+
+  const parts: string[] = [];
+  if (day.weather) parts.push(`${weatherEmoji(day.weather.code)} ${day.weather.max}°/${day.weather.min}°${day.weather.rain >= 40 ? ` · 🌧️ ${day.weather.rain}%` : ""}`);
+  if (day.advice?.hot && day.advice.windows.length && day.sessions.some((s) => s.habit.outdoor)) {
+    const w = day.advice.windows.map((x) => fill(x.startsWith("<") ? t.before : t.after, { t: x.slice(1) })).join(t.or);
+    parts.push(fill(t.hotWalk, { w }));
+  }
+  if (day.holy.erevDay === day.today && day.holy.candles) parts.push(`🕯️ ${fill(t.candles, { t: hhmmOf(day.holy.candles) })}`);
+  const chag = day.holy.holidays.find((h) => diffDays(day.today, h.day) >= 0 && diffDays(day.today, h.day) <= 3);
+  if (chag) {
+    const n = diffDays(day.today, chag.day);
+    const name = me.locale === "he" ? (chag.hebrew ?? chag.title) : chag.title;
+    parts.push(`🎉 ${fill(n === 0 ? t.chagToday : n === 1 ? t.chagTomorrow : t.chagIn, { name, n })}`);
+  }
+  const open = openTitles(day);
+  parts.push(open.length ? fill(t.todayList, { n: open.length, list: open.slice(0, 3).join(", ") + (open.length > 3 ? "…" : "") }) : t.nothing);
+
+  await markSent(db, me, "briefing");
+  await sendPush(db, me.user_id, { title: `☀️ ${t.goodMorning}, ${me.display_name}`, body: parts.join(" · "), url: "/" });
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Jobs checked every tick
+// ---------------------------------------------------------------------------
+
+const inWindow = (nowMin: number, at: string, minutes = 30) => {
+  const start = minuteOfDay(parseHHmm(at.slice(0, 5)));
+  return nowMin >= start && nowMin < start + minutes;
+};
+
+export async function dailyJobs(db: Admin, now = new Date()) {
+  const { data: people } = await db.from("profiles").select("*").not("household_id", "is", null).returns<Profile[]>();
+  const sent: string[] = [];
+  for (const p of people ?? []) {
+    const local = zonedParts(now, p.timezone);
+    const nowMin = minuteOfDay(local);
+
+    // Briefing fallback for people who don't use the wake Shortcut.
+    if (p.briefing && inWindow(nowMin, "09:30") && (await sendBriefing(db, p.user_id, now))) sent.push(`briefing:${p.user_id}`);
+
+    // Evening wrap-up.
+    if (p.wrapup && inWindow(nowMin, p.wrapup_time) && !(await sentToday(db, p, "wrapup", now)) && !(await isQuiet(p, now))) {
+      const members = await membersOf(db, p.household_id!);
+      const day = await buildDay(db, p, members.map((m) => m.user_id), now);
+      const score = dayScore(day);
+      await markSent(db, p, "wrapup");
+      if (score.total > 0) {
+        const t = getDict(p.locale).daily;
+        const body = score.left === 0 ? t.wrapupAllDone : fill(t.wrapupBody, score);
+        await sendPush(db, p.user_id, { title: t.wrapupTitle, body, url: "/wrapup" });
+        sent.push(`wrapup:${p.user_id}`);
+      }
+    }
+
+    // Shabbat / chag shopping, morning of erev.
+    if (p.shabbat_shop && inWindow(nowMin, "09:00") && !(await sentToday(db, p, "shabbat_shop", now))) {
+      const today = todayKey(p.timezone, now);
+      const items = await getJewishCalendar(p.lat ?? DEFAULT_PLACE.lat, p.lon ?? DEFAULT_PLACE.lon, p.timezone, addDays(today, -1), addDays(today, 7));
+      if (holyStatus(items, now).erevDay === today) {
+        const { data: lists } = await db.from("sections").select("id,owner_id").eq("household_id", p.household_id!).eq("template", "groceries");
+        const list = (lists ?? []).find((s) => !s.owner_id || s.owner_id === p.user_id);
+        const { count } = list ? await db.from("items").select("id", { count: "exact", head: true }).eq("section_id", list.id).eq("done", false) : { count: 0 };
+        const t = getDict(p.locale).daily;
+        await markSent(db, p, "shabbat_shop");
+        await sendPush(db, p.user_id, { title: t.shopTitle, body: count ? fill(t.shopBody, { n: count }) : t.shopBodyEmpty, url: list ? `/sections/${list.id}` : "/" });
+        sent.push(`shop:${p.user_id}`);
+      }
+    }
+  }
+
+  sent.push(...(await foodAlerts(db, people ?? [], now)));
+  return sent;
+}
+
+/** "Food runs out in ~5 days" once per bag, to everyone in the home, between 09:00 and 21:00. */
+async function foodAlerts(db: Admin, people: Profile[], now: Date) {
+  const { data: pets } = await db.from("pets").select("*").not("bag_started", "is", null).returns<Pet[]>();
+  const sent: string[] = [];
+  for (const pet of pets ?? []) {
+    if (pet.food_alerted_bag === pet.bag_started) continue;
+    const members = people.filter((p) => p.household_id === pet.household_id);
+    const tz = members[0]?.timezone ?? "Asia/Jerusalem";
+    const hour = zonedParts(now, tz).hour;
+    const left = foodDaysLeft(pet, todayKey(tz, now));
+    if (left === null || left > 5 || hour < 9 || hour >= 21) continue;
+    await db.from("pets").update({ food_alerted_bag: pet.bag_started }).eq("id", pet.id);
+    for (const m of members) {
+      const t = getDict(m.locale).daily;
+      await sendPush(db, m.user_id, { title: `${pet.emoji} ${fill(t.foodTitle, { name: pet.name })}`, body: fill(t.foodBody, { n: left }), url: `/pets/${pet.id}` });
+    }
+    sent.push(`food:${pet.id}`);
+  }
+  return sent;
+}
