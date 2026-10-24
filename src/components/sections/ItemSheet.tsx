@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useI18n } from "@/i18n/client";
-import { Button, Field, Input, Sheet, Textarea } from "@/components/ui";
+import { Button, Field, Input, Segmented, Sheet, Textarea } from "@/components/ui";
 import { googleCalendarLink, icsLink } from "@/lib/engine/render";
 import { PropertyInput, type Member } from "./PropertyInput";
 import { dueFromProps } from "@/lib/registry/properties";
@@ -10,6 +10,7 @@ import { PHOTOS_PROP, readPhotos } from "@/lib/photos";
 import { PhotoField } from "@/components/photos/PhotoField";
 import type { Item, Section } from "@/lib/db-types";
 import { spaceType } from "@/lib/registry/spaces";
+import { dueReminderAt, LEAD_OPTIONS, readLead, REMIND_PROP } from "@/lib/engine/due";
 
 export function ItemSheet({
   item,
@@ -37,11 +38,15 @@ export function ItemSheet({
 
   if (!item) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
 
+  // Plain dated items (not trackers / reminder calendars, which schedule themselves) can remind before they're due.
+  const remindable = spaceType(section.view).datesAreDue && !spaceType(section.view).reminds;
   const setProp = (id: string, v: unknown) => {
     const props = { ...item.props, [id]: v };
     // Memory dates are when it happened, not something due.
-    onChange(item.id, { props, due_at: !spaceType(section.view).datesAreDue ? null : dueFromProps(section.schema, props) });
+    const due_at = !spaceType(section.view).datesAreDue ? null : dueFromProps(section.schema, props);
+    onChange(item.id, remindable ? { props, due_at, remind_at: dueReminderAt(due_at, readLead(props)) } : { props, due_at });
   };
+  const lead = readLead(item.props);
   const photosField = (
     <Field label={t.photos.title}>
       <PhotoField
@@ -92,6 +97,16 @@ export function ItemSheet({
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={commitText} rows={4} />
         </Field>
         {section.view !== "gallery" && photosField}
+
+        {dueDay && remindable && (
+          <Field label={t.sections.remind}>
+            <Segmented<string>
+              value={lead === null ? "off" : String(lead)}
+              onChange={(v) => setProp(REMIND_PROP, v === "off" ? null : Number(v))}
+              options={[{ value: "off", label: t.sections.remindOff }, ...LEAD_OPTIONS.map((m) => ({ value: String(m), label: t.sections.remindLead[m] }))]}
+            />
+          </Field>
+        )}
 
         {dueDay && (
           <Field label={t.sections.addToCalendar}>

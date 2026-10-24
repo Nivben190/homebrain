@@ -97,6 +97,11 @@ export const en = {
     notes: "Notes",
     due: "Due",
     addToCalendar: "Add to calendar",
+    remind: "Remind me",
+    remindOff: "Off",
+    remindLead: { 0: "At the time", 60: "1 hour before", 1440: "1 day before" } as Record<number, string>,
+    dueTitle: "{item} is due",
+    dueSoonBody: "Due {when}",
   },
   views: { list: "List", checklist: "Checklist", notes: "Notes", tracker: "Tracker", gallery: "Memories", dates: "Reminders", subscriptions: "Subscriptions" },
   viewHints: {

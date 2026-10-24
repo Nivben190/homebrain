@@ -16,6 +16,7 @@ import { automationDefSchema } from "./types";
 import { allowedSections, sectionRefs } from "./scope";
 import { planEvent } from "./events";
 import { reminderAudience } from "./audience";
+import { readLead } from "./due";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
 
 /** Schedules more than this late (e.g. after downtime) are skipped instead of fired. */
@@ -217,6 +218,7 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
   const spec = item ? readDate(item.props ?? {}) : null;
   if (item && section && spec && !item.done) return fireDateReminder(db, item, section, spec, dueAt, now);
   const habit = item ? readHabit(item.props ?? {}) : null;
+  if (item && section && !habit && !item.done && item.due_at && readLead(item.props ?? {}) !== null) return fireDueReminder(db, item, section, dueAt, now);
   if (!item || !section || !habit || item.done) {
     if (item) await db.from("items").update({ remind_at: null }).eq("id", itemId);
     return { automationId: itemId, status: "skipped", reason: "no schedule" };
@@ -267,6 +269,25 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
   });
   await reschedule();
   return { automationId: itemId, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
+}
+
+/** A dated item's "remind me before" alert, to its assignee (or the space's audience). One-off: clears remind_at. */
+async function fireDueReminder(db: Admin, item: { id: string; title: string; due_at: string; assignee_id: string | null }, section: Section, remindAt: Date, now: Date): Promise<FireOutcome> {
+  await db.from("items").update({ remind_at: null }).eq("id", item.id);
+  if (now.getTime() - remindAt.getTime() > MAX_LATENESS_MS) return { automationId: item.id, status: "skipped", reason: "too late" };
+  const { eligible } = await audienceOf(db, section);
+  const assigned = item.assignee_id ? eligible.filter((m) => m.user_id === item.assignee_id) : [];
+  const targets = assigned.length ? assigned : eligible;
+  const fired = await sendReminders(db, section, item.id, targets, now, (target) => {
+    const t = getDict(target.locale).sections;
+    const when = new Intl.DateTimeFormat(target.locale, { weekday: "long", day: "numeric", month: "long", timeZone: target.timezone }).format(new Date(item.due_at));
+    return {
+      title: fill(t.dueTitle, { item: item.title }),
+      body: fill(t.dueSoonBody, { when }),
+      rendered: [{ kind: "link", icon: section.icon, label: section.title, href: `/sections/${section.id}` }],
+    };
+  });
+  return { automationId: item.id, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
 }
 
 /** The household members a reminder about this space can reach, and their timezone. */

@@ -4,7 +4,7 @@
 
 **Blocked by:** 11 - One reminder sender
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Setting a date on an item and a lead time sends a push at the right moment in your timezone
 - [ ] Changing or clearing the date reschedules or cancels the reminder

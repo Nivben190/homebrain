@@ -4,7 +4,7 @@
 
 **Blocked by:** 10 - One table per space type
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Long-press and drag reorders spaces on iPhone
 - [ ] The new order survives a reload and shows up live on the other phone

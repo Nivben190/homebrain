@@ -99,6 +99,11 @@ export const he: Dict = {
     notes: "הערות",
     due: "תאריך יעד",
     addToCalendar: "הוספה ליומן",
+    remind: "להזכיר לי",
+    remindOff: "כבוי",
+    remindLead: { 0: "בזמן", 60: "שעה לפני", 1440: "יום לפני" } as Record<number, string>,
+    dueTitle: "הגיע הזמן: {item}",
+    dueSoonBody: "מתוכנן ל{when}",
   },
   views: { list: "רשימה", checklist: "צ׳קליסט", notes: "פתקים", tracker: "מעקב", gallery: "זיכרונות", dates: "תזכורות", subscriptions: "מנויים" },
   viewHints: {
