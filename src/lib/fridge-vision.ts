@@ -10,13 +10,15 @@ const RETRY_ON = new Set([404, 429, 500, 503]);
  * Asks Gemini what's in a fridge photo. `known` are the names already in the
  * inventory, so the same product keeps the same name between scans.
  */
-export async function seeFridge(image: Uint8Array, mediaType: string, known: string[], locale: "en" | "he"): Promise<Seen[]> {
+export async function seeFridge(images: { data: Uint8Array; mediaType: string }[], known: string[], locale: "en" | "he"): Promise<Seen[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set");
   const language = locale === "he" ? "Hebrew" : "English";
   const prompt = [
-    "This is a photo of a home fridge (or freezer / pantry shelf). List every food or drink product you can see.",
-    `Name products in ${language}, short and generic ("Milk", "Eggs", "Cottage cheese"), not brands unless that is how people call it.`,
+    "These are photos of one home fridge (shelves, door, drawers — maybe freezer). List every food or drink product you can see, once, even if it shows in several photos.",
+    `Name products in ${language}, short but specific: "Milk", "Eggs", "Hummus", "Chocolate spread", "Strawberry jam". Read the labels.`,
+    `Never answer with a vague category like "spread", "sauce", "food", "container", "bottle" or "drink" on its own (in Hebrew: "ממרח", "רוטב", "אוכל", "קופסה", "בקבוק"). Say which one ("Tahini", "Soy sauce"). If you truly can't tell, describe it so a person can find it: "Jar with red spread", "Container of leftover rice".`,
+    "Each product appears once in the list; several eggs are one item with a qty.",
     known.length ? `Products we already track — reuse these exact names when it's the same product: ${known.join(", ")}.` : "",
     'For each product give "level": "full", "half" or "low" (how much is left), "qty" when you can count units, and one fitting "emoji".',
     'Answer with only a JSON array, e.g. [{"name":"Milk","level":"half","qty":1,"emoji":"🥛"}]. If it is not a fridge photo, answer [].',
@@ -25,7 +27,7 @@ export async function seeFridge(image: Uint8Array, mediaType: string, known: str
     .join("\n");
 
   const body = JSON.stringify({
-    contents: [{ parts: [{ inline_data: { mime_type: mediaType, data: Buffer.from(image).toString("base64") } }, { text: prompt }] }],
+    contents: [{ parts: [...images.map((i) => ({ inline_data: { mime_type: i.mediaType, data: Buffer.from(i.data).toString("base64") } })), { text: prompt }] }],
     generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
   });
   let error = "";

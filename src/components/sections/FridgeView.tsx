@@ -1,10 +1,11 @@
 "use client";
 import { useRef, useState } from "react";
-import { Camera, Loader2, Star } from "lucide-react";
+import { Camera, Check, Loader2, Plus, ShoppingCart, Star, X } from "lucide-react";
+import { supabaseBrowser } from "@/lib/supabase/browser";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { cn } from "@/lib/cn";
-import { fridgeProps, LEVELS, readFridge, type FridgeState, type Level } from "@/lib/fridge";
+import { fridgeProps, LEVELS, readFridge, sameProduct, type FridgeState, type Level } from "@/lib/fridge";
 import { resizeImage } from "@/lib/photos";
 import { Button } from "@/components/ui";
 import { SwipeRow } from "./SwipeRow";
@@ -33,41 +34,89 @@ export function FridgeView({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  // Photos waiting to be scanned together (shelves, door, drawers).
+  const [shots, setShots] = useState<{ blob: Blob; url: string }[]>([]);
+  const [listed, setListed] = useState<string[]>([]);
 
   const all = items.map((item) => ({ item, f: readFridge(item.props) ?? ({ level: "full", staple: false } as FridgeState) }));
   const inside = all.filter((x) => x.f.level !== "out").sort((a, b) => LEVELS.indexOf(b.f.level) - LEVELS.indexOf(a.f.level) || a.item.title.localeCompare(b.item.title));
   const out = all.filter((x) => x.f.level === "out");
-  const missing = all.filter((x) => x.f.staple && (x.f.level === "low" || x.f.level === "out"));
+  // Everything finished, plus starred products running low.
+  const missing = all.filter((x) => x.f.level === "out" || (x.f.staple && x.f.level === "low"));
   const save = (item: Item, f: FridgeState) => onUpdate(item.id, { props: fridgeProps(item.props, f) });
   const lastScan = section.settings?.lastScan;
 
-  async function scan(file: File) {
+  async function addShot(file: File) {
+    const blob = await resizeImage(file, 1600);
+    setShots((s) => [...s, { blob, url: URL.createObjectURL(blob) }].slice(0, 4));
+    if (input.current) input.current.value = "";
+  }
+
+  /** Puts a finished product on the shared shopping list. */
+  async function addToList(title: string) {
+    const sb = supabaseBrowser();
+    const { data: list } = await sb.from("sections").select("id").eq("template", "groceries").is("owner_id", null).order("position").limit(1).maybeSingle();
+    if (!list) return;
+    const { data: open } = await sb.from("items").select("title").eq("section_id", list.id).eq("done", false);
+    if (!(open ?? []).some((o: { title: string }) => sameProduct(o.title, title))) await sb.from("items").insert({ section_id: list.id, title, position: Date.now() / 1000 });
+    setListed((l) => [...l, title]);
+  }
+
+  async function scan() {
+    if (busy || !shots.length) return;
     setBusy(true);
     setResult(null);
     try {
       const form = new FormData();
-      form.append("image", await resizeImage(file, 1600), "fridge.jpg");
+      shots.forEach((s, i) => form.append("image", s.blob, `fridge-${i}.jpg`));
       form.append("space", section.id);
       const res = await fetch("/api/fridge/scan", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setResult(fill(t.fridge.result, { seen: data.seen, added: data.added.length, buy: data.toBuy.length }));
+      shots.forEach((s) => URL.revokeObjectURL(s.url));
+      setShots([]);
       onReload();
     } catch {
       setResult(t.fridge.failed);
     } finally {
       setBusy(false);
-      if (input.current) input.current.value = "";
     }
   }
 
   return (
     <div className="space-y-5">
       <div className="glass rounded-3xl p-4 text-center">
-        <input ref={input} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && scan(e.target.files[0])} />
-        <Button className="w-full" size="lg" disabled={busy} onClick={() => input.current?.click()}>
-          {busy ? <Loader2 className="size-5 animate-spin" /> : <Camera className="size-5" />} {busy ? t.fridge.scanning : t.fridge.scan}
-        </Button>
+        <input ref={input} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && addShot(e.target.files[0])} />
+        {shots.length === 0 ? (
+          <Button className="w-full" size="lg" onClick={() => input.current?.click()}>
+            <Camera className="size-5" /> {t.fridge.scan}
+          </Button>
+        ) : (
+          <>
+            <div className="mb-3 flex gap-2">
+              {shots.map((s, i) => (
+                <div key={s.url} className="relative size-16 overflow-hidden rounded-2xl">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.url} alt="" className="size-full object-cover" />
+                  {!busy && (
+                    <button onClick={() => setShots((all) => all.filter((_, j) => j !== i))} className="absolute end-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white" aria-label={t.common.delete}>
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {shots.length < 4 && !busy && (
+                <button onClick={() => input.current?.click()} className="flex size-16 items-center justify-center rounded-2xl border-2 border-dashed border-faint text-muted" aria-label={t.fridge.another}>
+                  <Plus className="size-5" />
+                </button>
+              )}
+            </div>
+            <Button className="w-full" size="lg" disabled={busy} onClick={scan}>
+              {busy ? <Loader2 className="size-5 animate-spin" /> : <Camera className="size-5" />} {busy ? t.fridge.scanning : fill(t.fridge.scanN, { n: shots.length })}
+            </Button>
+          </>
+        )}
         <p className="mt-2 text-xs text-muted">
           {result ?? (lastScan ? fill(t.fridge.lastScan, { when: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(lastScan)) }) : t.fridge.hint)}
         </p>
@@ -76,8 +125,17 @@ export function FridgeView({
       {missing.length > 0 && (
         <section className="glass space-y-1 rounded-3xl p-4">
           <h2 className="text-sm font-bold text-danger">🛒 {t.fridge.missing}</h2>
-          <p className="text-sm">{missing.map((x) => x.item.title).join(" · ")}</p>
           <p className="text-xs text-muted">{t.fridge.onList}</p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {missing.map(({ item, f }) => {
+              const done = listed.includes(item.title);
+              return (
+                <button key={item.id} disabled={done} onClick={() => addToList(item.title)} className={cn("flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold", done ? "bg-success/15 text-success" : "bg-sunken")}>
+                  {f.emoji ?? "🥡"} {item.title} {done ? <Check className="size-4" /> : <ShoppingCart className="size-4" />}
+                </button>
+              );
+            })}
+          </div>
         </section>
       )}
 

@@ -58,6 +58,8 @@ export interface InventoryRow {
 }
 
 export interface ScanPlan {
+  /** Duplicate rows of the same product (from an earlier double scan), folded into the first. */
+  remove: string[];
   update: { id: string; props: Record<string, unknown> }[];
   insert: { title: string; props: Record<string, unknown> }[];
   /** Staples that are low or out after this scan. */
@@ -70,6 +72,18 @@ export interface ScanPlan {
  */
 export function planScan(rows: InventoryRow[], seen: Seen[], now: Date): ScanPlan {
   const at = now.toISOString();
+  const remove: string[] = [];
+  const keep: InventoryRow[] = [];
+  for (const r of rows) {
+    const first = keep.find((k) => sameProduct(k.title, r.title));
+    if (!first) keep.push({ ...r });
+    else {
+      remove.push(r.id);
+      // A star on either copy survives.
+      if (readFridge(r.props)?.staple && !readFridge(first.props)?.staple) first.props = fridgeProps(first.props, { ...readFridge(first.props)!, staple: true });
+    }
+  }
+  rows = keep;
   const update: ScanPlan["update"] = [];
   const insert: ScanPlan["insert"] = [];
   const matched = new Set<string>();
@@ -97,7 +111,7 @@ export function planScan(rows: InventoryRow[], seen: Seen[], now: Date): ScanPla
     const f = after.get(r.id);
     return f?.staple && (f.level === "low" || f.level === "out");
   });
-  return { update, insert, missing: missing.map((r) => r.title) };
+  return { remove, update, insert, missing: missing.map((r) => r.title) };
 }
 
 /** Shopping-list titles not already on the list. */

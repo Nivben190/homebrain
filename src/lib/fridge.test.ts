@@ -27,7 +27,13 @@ describe("planScan", () => {
   });
   it("leaves already-out products alone and doesn't list non-staples as missing", () => {
     const plan = planScan([row("j", "Jam", { level: "out" })], [], now);
-    expect(plan).toEqual({ update: [], insert: [], missing: [] });
+    expect(plan).toEqual({ remove: [], update: [], insert: [], missing: [] });
+  });
+  it("folds duplicate rows of one product, keeping a star", () => {
+    const plan = planScan([row("a", "ביצה"), row("b", "ביצה", { staple: true }), row("c", "Ketchup")], [{ name: "ביצה", level: "half" }], now);
+    expect(plan.remove).toEqual(["b"]);
+    expect(readFridge(plan.update.find((u) => u.id === "a")!.props)).toMatchObject({ level: "half", staple: true });
+    expect(readFridge(plan.update.find((u) => u.id === "c")!.props)?.level).toBe("out");
   });
 });
 
