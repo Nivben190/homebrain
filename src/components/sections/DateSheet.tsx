@@ -9,6 +9,8 @@ import { alertSummary, relativeDay } from "./DatesView";
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import type { Member } from "./PropertyInput";
 import { fill } from "@/i18n";
+import { GIFTS_PROP, readGifts, type GiftIdea } from "@/lib/gifts";
+import { X } from "lucide-react";
 
 /** The stored fields for a reminder-calendar item after editing its date. */
 export function datePatch(item: Item, spec: DateSpec, checkins: CheckinRow[], timeZone: string): Partial<Item> {
@@ -49,6 +51,7 @@ export function DateSheet({
   const [title, setTitle] = useState("");
   const [spec, setSpec] = useState<DateSpec>(defaultDate(today));
   const [dirty, setDirty] = useState(false);
+  const [idea, setIdea] = useState("");
 
   useEffect(() => {
     if (!item) return;
@@ -68,6 +71,10 @@ export function DateSheet({
   const occ = saved ? openOccurrence(saved, today, (d) => handled.has(d)) : null;
   const lastHandled = [...handled].sort().at(-1);
   const isOpenNow = !!occ && occ <= today;
+
+  // Gift ideas save straight away (they don't change the alerts).
+  const gifts = readGifts(item.props);
+  const setGifts = (next: GiftIdea[]) => onChange(item.id, { props: { ...item.props, [GIFTS_PROP]: next } });
 
   function save() {
     onChange(item!.id, { title: title.trim() || item!.title, ...datePatch(item!, spec, checkins, timeZone) });
@@ -169,6 +176,31 @@ export function DateSheet({
                 {n === 0 ? t.dates.none : n === 1 ? t.dates.dayBefore : n === 7 ? t.dates.weekBefore : fill(t.dates.daysBefore, { n: String(n) })}
               </Chip>
             ))}
+          </div>
+        </Field>
+
+        <Field label={t.dates.gifts}>
+          <div className="space-y-2">
+            {gifts.map((g, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-2xl bg-sunken px-3 py-2">
+                <button type="button" onClick={() => setGifts(gifts.map((x, j) => (j === i ? { ...x, done: !x.done } : x)))} className="flex-1 text-start">
+                  <span className={g.done ? "text-muted line-through" : "font-semibold"}>{g.text}</span>
+                </button>
+                <button type="button" onClick={() => setGifts(gifts.filter((_, j) => j !== i))} aria-label={t.common.delete} className="text-faint">
+                  <X className="size-4" />
+                </button>
+              </div>
+            ))}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!idea.trim()) return;
+                setGifts([...gifts, { text: idea.trim() }]);
+                setIdea("");
+              }}
+            >
+              <Input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder={t.dates.giftAdd} enterKeyHint="done" />
+            </form>
           </div>
         </Field>
 

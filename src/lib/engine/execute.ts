@@ -17,6 +17,7 @@ import { allowedSections, sectionRefs } from "./scope";
 import { planEvent } from "./events";
 import { reminderAudience } from "./audience";
 import { readLead } from "./due";
+import { giftLine, wantsGift } from "@/lib/gifts";
 import { calendarAccess, upsertEvent } from "@/lib/gcal";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
 
@@ -366,7 +367,7 @@ export async function rescheduleDate(db: Admin, itemId: string, spec: DateSpec, 
  * before, or a carried-over nag after) unless that date is already handled,
  * then schedules the next one.
  */
-async function fireDateReminder(db: Admin, item: { id: string; title: string; created_by: string | null }, section: Section, spec: DateSpec, dueAt: Date, now: Date): Promise<FireOutcome> {
+async function fireDateReminder(db: Admin, item: { id: string; title: string; created_by: string | null; props?: Record<string, unknown> }, section: Section, spec: DateSpec, dueAt: Date, now: Date): Promise<FireOutcome> {
   const { eligible, timeZone: tz } = await audienceOf(db, section);
   const handled = await handledDays(db, item.id);
   // Which alert was due: the first one after just before its time.
@@ -384,7 +385,7 @@ async function fireDateReminder(db: Admin, item: { id: string; title: string; cr
     const daysTo = diffDays(due.day, due.occurrence);
     const title =
       due.kind === "ahead" ? fill(t.dates.aheadTitle, { item: item.title, days: daysTo }) : due.kind === "carry" ? fill(t.dates.carryTitle, { item: item.title }) : fill(t.dates.todayTitle, { item: item.title });
-    const body = due.kind === "ahead" ? dateLabel : due.kind === "carry" ? fill(t.dates.carryBody, { date: dateLabel }) : t.dates.todayBody;
+    const body = due.kind === "ahead" ? (wantsGift(item.title, item.props ?? {}) ? `${dateLabel} · ${giftLine(item.props ?? {}, t.dates)}` : dateLabel) : due.kind === "carry" ? fill(t.dates.carryBody, { date: dateLabel }) : t.dates.todayBody;
     const rendered: RenderedAction[] = [
       { kind: "done", label: t.dates.stop, day: due.occurrence },
       { kind: "link", icon: section.icon, label: section.title, href: `/sections/${section.id}` },
