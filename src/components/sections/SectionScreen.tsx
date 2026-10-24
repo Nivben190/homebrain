@@ -360,7 +360,7 @@ export function SectionScreen({
       {sorted.length === 0 && !kind.ownEmptyState && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
 
       {section.view === "wheel" ? (
-        <WheelView section={section} items={sorted} timeZone={timeZone} onUpdate={update} onDelete={remove} />
+        <WheelView section={section} items={sorted} timeZone={timeZone} userId={userId} onUpdate={update} onDelete={remove} />
       ) : isSubs ? (
         <SubscriptionsView section={section} items={sorted} gmail={gmail} timeZone={timeZone} editing={editing} onOpen={setOpenItem} onDelete={removeSub} onReload={reload} />
       ) : isDates ? (

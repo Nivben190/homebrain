@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useI18n } from "@/i18n/client";
@@ -21,12 +21,14 @@ export function WheelView({
   section,
   items,
   timeZone,
+  userId,
   onUpdate,
   onDelete,
 }: {
   section: Section;
   items: Item[];
   timeZone: string;
+  userId: string;
   onUpdate: (id: string, patch: Partial<Item>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -46,9 +48,10 @@ export function WheelView({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A wheel just added from the bar: select it and open its options.
+  // A wheel this person just added from the bar: select it and open its options
+  // (not one the partner added on their phone).
   useEffect(() => {
-    const fresh = items.find((i) => !seen.current.has(i.id));
+    const fresh = items.find((i) => !seen.current.has(i.id) && i.created_by === userId && readWheel(i.props).options.length === 0);
     for (const i of items) seen.current.add(i.id);
     if (fresh) {
       choose(fresh.id);
@@ -116,8 +119,15 @@ function Spinner({ item, timeZone, onUpdate, onEdit }: { item: Item; timeZone: s
   const spec = readWheel(item.props);
   const options = spec.options;
   const today = todayKey(timeZone);
-  const live = useMemo(() => new Set(spinnable(options, today)), [options, today]);
+  const live = new Set(spinnable(options, today));
   const [rotation, setRotation] = useState(0);
+  // The latest item, so the result is saved onto any edit made while spinning.
+  const latest = useRef(item);
+  latest.current = item;
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<number | null>(null);
 
@@ -128,11 +138,12 @@ function Spinner({ item, timeZone, onUpdate, onEdit }: { item: Item; timeZone: s
     setSpinning(true);
     setRotation((r) => landingRotation(r, w, options.length, 5 + Math.floor(Math.random() * 3), Math.random()));
     navigator.vibrate?.(15);
-    setTimeout(() => {
+    timer.current = setTimeout(() => {
       setSpinning(false);
       setWinner(w);
       navigator.vibrate?.([20, 40, 20]);
-      onUpdate({ props: wheelProps(item.props, { ...spec, last: options[w].label }) });
+      const now = latest.current;
+      onUpdate({ props: wheelProps(now.props, { ...readWheel(now.props), last: options[w].label }) });
     }, SPIN_MS);
   }
 

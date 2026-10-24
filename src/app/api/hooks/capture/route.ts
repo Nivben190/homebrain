@@ -1,0 +1,48 @@
+import { NextResponse } from "next/server";
+import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { routeCapture } from "@/lib/capture";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Siri / Shortcuts capture: "Hey Siri, Brain add milk".
+ *   POST /api/hooks/capture?token=<hook_token>&text=milk[&space=<id or name>]
+ * Text and space may also come as JSON: { "text": "...", "space": "..." }.
+ */
+export async function POST(request: Request) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token") ?? request.headers.get("x-brain-token");
+  let text = url.searchParams.get("text");
+  let space = url.searchParams.get("space");
+  try {
+    const body = await request.json();
+    if (body && typeof body === "object") {
+      text ??= typeof body.text === "string" ? body.text : null;
+      space ??= typeof body.space === "string" ? body.space : null;
+    }
+  } catch {
+    // Query params are enough.
+  }
+  if (!token) return NextResponse.json({ error: "missing token" }, { status: 401 });
+  text = text?.trim().slice(0, 300) ?? "";
+  if (!text) return NextResponse.json({ error: "nothing to add" }, { status: 400 });
+
+  const db = createSupabaseAdmin();
+  const { data: me } = await db.from("profiles").select("user_id,household_id").eq("hook_token", token).maybeSingle();
+  if (!me?.household_id) return NextResponse.json({ error: "invalid token" }, { status: 401 });
+
+  // Shared spaces and this person's private ones.
+  const { data: spaces } = await db
+    .from("sections")
+    .select("id,title,template,view")
+    .eq("household_id", me.household_id)
+    .or(`owner_id.is.null,owner_id.eq.${me.user_id}`)
+    .order("position");
+  const { space: target, text: title } = routeCapture(text, spaces ?? [], space);
+  if (!target) return NextResponse.json({ error: "no list to add to" }, { status: 404 });
+
+  const { error } = await db.from("items").insert({ section_id: target.id, title, created_by: me.user_id, position: Date.now() / 1000 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Shortcuts can speak this back.
+  return NextResponse.json({ ok: true, space: target.title, said: `${title} → ${target.title}` });
+}

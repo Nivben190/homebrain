@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done — English and Hebrew Shortcuts (setup steps on the iPhone page)
 
 - [ ] A setup page links the Shortcut and explains it in English and Hebrew
 - [ ] Saying the phrase adds the item to the chosen space within a few seconds, visible on both phones

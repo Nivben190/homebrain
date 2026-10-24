@@ -10,6 +10,7 @@ import { ALARM_SHORTCUT_NAME, alarmShortcutUrl } from "@/lib/engine/render";
 export default async function IphonePage() {
   const { profile } = await requireHome();
   const t = await getT();
+  const captureUrl = `${await appOrigin()}/api/hooks/capture?token=${profile.hook_token}`;
   const hookUrl = `${await appOrigin()}/api/hooks/event?type=wake&token=${profile.hook_token}`;
 
   return (
@@ -32,6 +33,23 @@ export default async function IphonePage() {
         </ol>
         <div className="mt-4">
           <CopyField label={t.iphone.hookUrl} value={hookUrl} hint={t.iphone.keepSecret} />
+        </div>
+      </Card>
+
+      <Card className="mt-4">
+        <h2 className="mb-3 text-lg font-extrabold">🎙️ {t.iphone.siriTitle}</h2>
+        <ol className="space-y-2">
+          {t.iphone.siriSteps.map((s, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{i + 1}</span>
+              <span className="text-[15px]">{s}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-sm text-muted">{t.iphone.siriHebrew}</p>
+        <div className="mt-4 space-y-3">
+          <CopyField label={t.iphone.shortcutName} value={t.iphone.siriPhrase} />
+          <CopyField label={t.iphone.captureUrl} value={captureUrl} hint={t.iphone.keepSecret} />
         </div>
       </Card>
 

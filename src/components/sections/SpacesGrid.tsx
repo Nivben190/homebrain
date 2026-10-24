@@ -57,7 +57,11 @@ export function SpacesGrid({ sections, counts }: { sections: Section[]; counts: 
     cancelHold();
     if (!dragging) return;
     setDragging(null);
-    if (moved.current) await reorderSections(order.map((s) => s.id));
+    if (!moved.current) return;
+    // Let the click that ends the drag be swallowed, then accept taps again.
+    setTimeout(() => (moved.current = false), 0);
+    const res = await reorderSections(order.map((s) => s.id));
+    if (!res.ok) setOrder(sections);
   }
 
   return (

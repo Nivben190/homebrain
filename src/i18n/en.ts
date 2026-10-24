@@ -225,6 +225,18 @@ export const en = {
     saved: "Saved",
   },
   iphone: {
+    siriTitle: "Siri: add to any space",
+    siriPhrase: "Brain add",
+    siriSteps: [
+      "Open Shortcuts → + → name the shortcut “Brain add” (that's what you'll say to Siri).",
+      "Add “Dictate Text” (language: English, or Hebrew for the Hebrew one).",
+      "Add “Get Contents of URL”: paste the address below, Method POST, Request Body JSON with a field “text” = Dictated Text.",
+      "Optional: add a field “space” with a space's name to always add there (otherwise food goes to To buy, “… to House” picks a space, and the rest goes to your first list).",
+      "Add “Show Result” → Contents of URL's “said”, so Siri tells you where it went.",
+      "Say “Hey Siri, Brain add”, then “milk”.",
+    ],
+    siriHebrew: "In Hebrew: make a second shortcut named “מוח תוסיף”, dictation in Hebrew. “חלב לקניות” adds milk to the shopping list.",
+    captureUrl: "Capture address",
     title: "iPhone setup",
     intro: "Two small Shortcuts let your brain know when you wake up and set real alarms.",
     wakeTitle: "1. “I'm awake” automation",
