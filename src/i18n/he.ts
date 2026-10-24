@@ -78,6 +78,7 @@ export const he: Dict = {
     empty: "אין עדיין פריטים. הוסיפו את הראשון למטה.",
     addItem: "הוספת פריט…",
     items: "פריטים",
+    reorderHint: "החזיקו מרחב וגררו כדי לסדר",
     templates: "להתחיל מ־",
     blank: "ריק",
     name: "שם",

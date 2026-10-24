@@ -159,6 +159,17 @@ export async function signOut() {
 // Automations
 // ---------------------------------------------------------------------------
 
+/** Saves the spaces' order as dragged on the Spaces screen (shared by both phones). */
+export async function reorderSections(ids: string[]): Promise<Result> {
+  const { supabase } = await requireHome();
+  const parsed = z.array(z.string().uuid()).max(200).safeParse(ids);
+  if (!parsed.success) return { ok: false, error: "Invalid order" };
+  const results = await Promise.all(parsed.data.map((id, position) => supabase.from("sections").update({ position }).eq("id", id)));
+  const failed = results.find((r) => r.error);
+  revalidatePath("/sections");
+  return failed ? { ok: false, error: failed.error!.message } : { ok: true };
+}
+
 export async function saveAutomation(id: string | null, raw: unknown, targetUserId: string): Promise<Result & { id?: string }> {
   const { supabase, user, profile, household, members } = await requireHome();
   const parsed = automationDefSchema.safeParse(raw);

@@ -76,6 +76,7 @@ export const en = {
     empty: "No items yet. Add your first one below.",
     addItem: "Add an item…",
     items: "items",
+    reorderHint: "Hold a space and drag to reorder",
     templates: "Start from",
     blank: "Blank",
     name: "Name",
