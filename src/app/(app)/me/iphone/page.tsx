@@ -47,6 +47,7 @@ export default async function IphonePage() {
           ))}
         </ol>
         <p className="mt-3 text-sm text-muted">{t.iphone.siriHebrew}</p>
+        <p className="mt-2 text-sm text-muted">🤝 {t.iphone.siriCommit}</p>
         <div className="mt-4 space-y-3">
           <CopyField label={t.iphone.shortcutName} value={t.iphone.siriPhrase} />
           <CopyField label={t.iphone.captureUrl} value={captureUrl} hint={t.iphone.keepSecret} />

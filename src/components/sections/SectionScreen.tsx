@@ -40,6 +40,8 @@ import { fill } from "@/i18n";
 import { spaceType } from "@/lib/registry/spaces";
 import { WheelView } from "./WheelView";
 import { WHEEL_PROP } from "@/lib/wheel";
+import { CommitView } from "./CommitView";
+import { newCommit, type Period } from "@/lib/commit";
 
 export function SectionScreen({
   initialSection,
@@ -218,12 +220,21 @@ export function SectionScreen({
     };
     if (isDates) Object.assign(temp, datePatch(temp, defaultDate(selectedDay), [], timeZone));
     if (section.view === "wheel") temp.props = { [WHEEL_PROP]: { options: [] } };
+    if (section.view === "commit") Object.assign(temp, newCommit(title, new Date(), timeZone));
     if (isSubs) temp.props = { [SUB_PROP]: manualSub(locale === "he" ? "ILS" : "USD") };
     setItems((p) => [...p, temp]);
-    await sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at });
+    await sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at });
     // New tracker items go straight to their schedule; memories to their photos; reminders to their alerts.
     if (kind.opensSheetOnAdd) setOpenItem(temp);
     else inputRef.current?.focus();
+  }
+
+  /** "Commit again" from a finished commitment, for the same length of time. */
+  async function addCommit(text: string, period: Period) {
+    const c = newCommit(text, new Date(), timeZone, period);
+    const row = { id: crypto.randomUUID(), section_id: section.id, title: c.title, props: c.props, remind_at: c.remind_at, position: (sorted.at(-1)?.position ?? 0) + 1 };
+    setItems((p) => [...p, { ...row, done: false, due_at: null, assignee_id: null, created_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+    await sb.from("items").insert(row);
   }
 
   /** "No more needed" (or undo) for a reminder-calendar item's current date. */
@@ -359,7 +370,9 @@ export function SectionScreen({
 
       {sorted.length === 0 && !kind.ownEmptyState && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
 
-      {section.view === "wheel" ? (
+      {section.view === "commit" ? (
+        <CommitView items={sorted} onUpdate={update} onDelete={remove} onAdd={(text, period) => addCommit(text, period)} />
+      ) : section.view === "wheel" ? (
         <WheelView section={section} items={sorted} timeZone={timeZone} userId={userId} onUpdate={update} onDelete={remove} />
       ) : isSubs ? (
         <SubscriptionsView section={section} items={sorted} gmail={gmail} timeZone={timeZone} editing={editing} onOpen={setOpenItem} onDelete={removeSub} onReload={reload} />

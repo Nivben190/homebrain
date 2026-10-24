@@ -667,6 +667,16 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     items: [{ title: { en: "Dentist checkup 🦷", he: "בדיקה אצל רופא שיניים 🦷" } }],
   },
 
+  // Things we said we'd do, checked at the end of their hour / day / week / month / year.
+  {
+    key: "commitments",
+    category: "us",
+    icon: "🤝",
+    color: "green",
+    view: "commit",
+    title: { en: "Commitments", he: "התחייבויות" },
+    desc: { en: "\"Under ₪300 on Cibus this month\", \"laundry today\" — at the end you find out if you made it, with a scoreboard.", he: "\"עד 300 ₪ בסיבוס החודש\", \"כביסה היום\" — בסוף מגלים אם עמדתם בזה, עם לוח תוצאות." },
+  },
   // Several saved wheels in one space; pick one and spin.
   {
     key: "wheels",

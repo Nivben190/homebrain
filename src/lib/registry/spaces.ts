@@ -44,6 +44,7 @@ export const SPACE_TYPES: Record<SectionView, SpaceType> = {
   gallery: { ...base, addPlaceholder: (t) => t.memories.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true, datesAreDue: false, photos: true },
   dates: { ...base, addPlaceholder: (t) => t.dates.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true, reminds: true },
   subscriptions: { ...base, addPlaceholder: (t) => t.subs.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true },
+  commit: { ...base, addPlaceholder: (t) => t.commit.addPlaceholder, ownEmptyState: true, datesAreDue: false, reminds: true },
   wheel: { ...base, addPlaceholder: (t) => t.wheel.addPlaceholder, ownEmptyState: true, datesAreDue: false },
 };
 

@@ -9,6 +9,8 @@ export interface CaptureSpace {
 
 const FOOD = /\b(milk|bread|eggs?|cheese|butter|yogh?urt|apples?|bananas?|tomato(es)?|cucumbers?|onions?|rice|pasta|coffee|tea|sugar|flour|chicken|meat|fish|water|juice|snacks?)\b|חלב|לחם|ביצים|גבינה|חמאה|יוגורט|תפוח|בננ|עגבני|מלפפו|בצל|אורז|פסטה|קפה|תה|סוכר|קמח|עוף|בשר|דג|מים|מיץ|חטיפ|קוטג|במבה/i;
 
+const COMMIT = /^(i\s+)?commit(ment)?\b|^אני מתחייב|^מתחייב|^התחייבות/i;
+
 /** Views an item can sensibly be dropped into by voice. */
 const ADDABLE = new Set(["list", "checklist", "notes"]);
 
@@ -25,6 +27,11 @@ export function routeCapture(raw: string, spaces: CaptureSpace[], explicit?: str
   if (explicit) {
     const s = byName(explicit);
     if (s) return { space: s, text };
+  }
+  // "I commit to…" / "אני מתחייב ל…" goes to the Commitments space.
+  if (COMMIT.test(text)) {
+    const c = spaces.find((s) => s.view === "commit");
+    if (c) return { space: c, text };
   }
   const tail = text.match(/^(.+?)\s+(?:to|in|into|on)\s+(?:the\s+|my\s+)?(.+)$/i) ?? text.match(/^(.+?)\s+ל(?:רשימת\s+)?(\S.*)$/);
   if (tail) {

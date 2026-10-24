@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { routeCapture } from "@/lib/capture";
+import { newCommit } from "@/lib/commit";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   if (!text) return NextResponse.json({ error: "nothing to add" }, { status: 400 });
 
   const db = createSupabaseAdmin();
-  const { data: me } = await db.from("profiles").select("user_id,household_id").eq("hook_token", token).maybeSingle();
+  const { data: me } = await db.from("profiles").select("user_id,household_id,timezone").eq("hook_token", token).maybeSingle();
   if (!me?.household_id) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   // Shared spaces and this person's private ones.
@@ -41,8 +42,10 @@ export async function POST(request: Request) {
   const { space: target, text: title } = routeCapture(text, spaces ?? [], space);
   if (!target) return NextResponse.json({ error: "no list to add to" }, { status: 404 });
 
-  const { error } = await db.from("items").insert({ section_id: target.id, title, created_by: me.user_id, position: Date.now() / 1000 });
+  // A commitment gets its period, any limit, and its end-of-period check.
+  const extra = target.view === "commit" ? newCommit(title, new Date(), me.timezone) : { title };
+  const { error } = await db.from("items").insert({ section_id: target.id, created_by: me.user_id, position: Date.now() / 1000, ...extra });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // Shortcuts can speak this back.
-  return NextResponse.json({ ok: true, space: target.title, said: `${title} → ${target.title}` });
+  return NextResponse.json({ ok: true, space: target.title, said: `${extra.title} → ${target.title}` });
 }

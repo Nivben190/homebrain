@@ -17,6 +17,7 @@ import { allowedSections, sectionRefs } from "./scope";
 import { planEvent } from "./events";
 import { reminderAudience } from "./audience";
 import { readLead } from "./due";
+import { commitProps, readCommit, status, type CommitSpec } from "@/lib/commit";
 import { giftLine, wantsGift } from "@/lib/gifts";
 import { calendarAccess, upsertEvent } from "@/lib/gcal";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
@@ -236,6 +237,8 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
   const section = item?.sections as Section | undefined;
   const spec = item ? readDate(item.props ?? {}) : null;
   if (item && section && spec && !item.done) return fireDateReminder(db, item, section, spec, dueAt, now);
+  const commit = item ? readCommit(item.props ?? {}) : null;
+  if (item && section && commit) return fireCommitEnd(db, item, section, commit, now);
   const habit = item ? readHabit(item.props ?? {}) : null;
   if (item && section && !habit && !item.done && item.due_at && readLead(item.props ?? {}) !== null) return fireDueReminder(db, item, section, dueAt, now);
   if (!item || !section || !habit || item.done) {
@@ -288,6 +291,26 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
   });
   await reschedule();
   return { automationId: itemId, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
+}
+
+/**
+ * A commitment's time is up: limit ones are decided (kept unless over), the
+ * rest ask "did you make it?". Everyone the space reaches hears the result.
+ */
+async function fireCommitEnd(db: Admin, item: { id: string; title: string; props: Record<string, unknown> }, section: Section, spec: CommitSpec, now: Date): Promise<FireOutcome> {
+  const result = status(spec, now);
+  const decided = result === "kept" || result === "broken";
+  await db
+    .from("items")
+    .update({ remind_at: null, ...(decided ? { done: true, props: commitProps(item.props, { ...spec, result }) } : {}) })
+    .eq("id", item.id);
+  const { eligible } = await audienceOf(db, section);
+  const fired = await sendReminders(db, section, item.id, eligible, now, (target) => {
+    const t = getDict(target.locale).commit;
+    const [title, body] = result === "kept" ? [t.keptTitle, t.keptBody] : result === "broken" ? [t.brokenTitle, t.brokenBody] : [t.askTitle, t.askBody];
+    return { title: fill(title, { item: item.title }), body, rendered: [{ kind: "link", icon: "🤝", label: section.title, href: `/sections/${section.id}` }] };
+  });
+  return { automationId: item.id, status: fired ? "fired" : "skipped", reason: result };
 }
 
 /** A dated item's "remind me before" alert, to its assignee (or the space's audience). One-off: clears remind_at. */

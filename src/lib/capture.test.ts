@@ -20,6 +20,12 @@ describe("routeCapture", () => {
     expect(routeCapture("milk", spaces).space?.id).toBe("buy");
     expect(routeCapture("חלב", spaces).space?.id).toBe("buy");
   });
+  it("sends commitments to the Commitments space in both languages", () => {
+    const withCommit = [...spaces, { id: "c", title: "Commitments", template: "commitments", view: "commit" }];
+    expect(routeCapture("I commit to laundry today", withCommit).space?.id).toBe("c");
+    expect(routeCapture("אני מתחייב לא יותר מ-300 שקל בסיבוס החודש", withCommit).space?.id).toBe("c");
+  });
+
   it("falls back to the first list, never a wheel", () => {
     expect(routeCapture("add batteries", spaces)).toEqual({ space: spaces[0], text: "batteries" });
     expect(routeCapture("x", [spaces[2]]).space).toBeNull();
