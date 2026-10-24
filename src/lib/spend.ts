@@ -1,6 +1,5 @@
 // Spending: purchase texts from Max / Leumi, forwarded by an iPhone automation.
 // Each purchase is an item in a Spending space with its details in props._tx.
-import { createHash } from "node:crypto";
 import { zonedParts } from "./engine/time";
 
 export const TX_PROP = "_tx";
@@ -66,7 +65,18 @@ const RULES: [RegExp, Category][] = [
 
 export const categorize = (merchant: string): Category => RULES.find(([re]) => re.test(merchant))?.[1] ?? "other";
 
-export const spendKey = (text: string) => createHash("sha256").update(text.replace(/\s+/g, " ").trim()).digest("hex").slice(0, 24);
+/** Two 32-bit FNV-1a hashes of the normalized text (runs in the browser too). */
+export function spendKey(text: string) {
+  const norm = text.replace(/\s+/g, " ").trim();
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < norm.length; i++) {
+    const c = norm.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x5bd1e995);
+  }
+  return (a >>> 0).toString(16).padStart(8, "0") + (b >>> 0).toString(16).padStart(8, "0");
+}
 
 export interface SpendSpace {
   id: string;
