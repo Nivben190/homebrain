@@ -48,3 +48,6 @@ public/swe-worker-*.js
 
 .vercel
 .env*
+
+/test-results
+/playwright-report

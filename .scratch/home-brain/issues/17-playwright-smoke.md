@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** partial — specs written, not run yet (needs a dedicated test account in E2E_EMAIL / E2E_PASSWORD)
 
 - [ ] Runs locally with one command against a dev or preview environment
 - [ ] Uses a dedicated test account and cleans up what it creates
