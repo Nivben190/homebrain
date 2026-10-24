@@ -7,7 +7,7 @@ import { z } from "zod";
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm");
 const weekday = z.number().int().min(0).max(6); // 0 = Sunday
 
-export const EVENT_TYPES = ["wake", "arrive_home", "leave_home", "bedtime", "custom"] as const;
+export const EVENT_TYPES = ["wake", "arrive_home", "leave_home", "bedtime", "arrive_store", "custom"] as const;
 
 export const triggerSchema = z.discriminatedUnion("type", [
   z.object({

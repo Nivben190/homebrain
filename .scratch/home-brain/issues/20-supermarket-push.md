@@ -4,7 +4,7 @@
 
 **Blocked by:** 19 - Siri capture to any space
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Arriving at a saved store location sends one push with the open To-buy items
 - [ ] Nothing is sent when the list is empty

@@ -84,9 +84,23 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     desc: { en: "Walks & meals — see who already did it, no double feeding.", he: "טיולים וארוחות — רואים מי כבר עשה, בלי להאכיל פעמיים." },
     items: [
       { title: { en: "Morning walk 🦮", he: "טיול בוקר 🦮" }, every: DAILY, time: "07:00", nudge: false, outdoor: true },
-      { title: { en: "Breakfast 🥣", he: "ארוחת בוקר 🥣" }, every: DAILY, time: "08:00", nudge: false },
+      { title: { en: "Breakfast 🥣", he: "ארוחת בוקר 🥣" }, every: DAILY, time: "08:00", nudge: true },
       { title: { en: "Evening walk 🌙", he: "טיול ערב 🌙" }, every: DAILY, time: "19:00", nudge: false, outdoor: true },
-      { title: { en: "Dinner 🥣", he: "ארוחת ערב 🥣" }, every: DAILY, time: "18:00", nudge: false },
+      { title: { en: "Dinner 🥣", he: "ארוחת ערב 🥣" }, every: DAILY, time: "18:00", nudge: true },
+    ],
+  },
+  {
+    key: "dog-vet",
+    category: "dog",
+    icon: "💉",
+    color: "sky",
+    view: "dates",
+    title: { en: "Vet & vaccines", he: "וטרינר וחיסונים" },
+    desc: { en: "Vaccines, flea & tick, vet checkups — reminded ahead, then on the day.", he: "חיסונים, קרציות ופרעושים, ביקורת וטרינר — תזכורת מראש ואז ביום." },
+    items: [
+      { title: { en: "Rabies vaccine 💉", he: "חיסון כלבת 💉" } },
+      { title: { en: "Flea & tick treatment 🪲", he: "טיפול נגד קרציות ופרעושים 🪲" } },
+      { title: { en: "Yearly vet checkup 🩺", he: "בדיקה שנתית אצל וטרינר 🩺" } },
     ],
   },
   {

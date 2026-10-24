@@ -34,6 +34,34 @@ async function membersOf(db: Admin, householdId: string) {
   return data ?? [];
 }
 
+/** Minutes between two supermarket pushes: one per visit. */
+const STORE_VISIT_MIN = 120;
+
+/**
+ * "At the supermarket": one push with the open To-buy items. Nothing when the
+ * list is empty or this visit was already announced.
+ */
+export async function sendStoreList(db: Admin, userId: string, now = new Date()) {
+  const { data: me } = await db.from("profiles").select("*").eq("user_id", userId).single<Profile>();
+  if (!me?.household_id) return false;
+  const { count: recent } = await db
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("type", "arrive_store")
+    .gte("created_at", new Date(now.getTime() - STORE_VISIT_MIN * 60000).toISOString());
+  if (recent) return false;
+  const { data: lists } = await db.from("sections").select("id,owner_id").eq("household_id", me.household_id).eq("template", "groceries");
+  const ids = (lists ?? []).filter((s) => !s.owner_id || s.owner_id === userId).map((s) => s.id);
+  if (!ids.length) return false;
+  const { data: items } = await db.from("items").select("title,section_id").in("section_id", ids).eq("done", false).order("position");
+  if (!items?.length) return false;
+  const t = getDict(me.locale).daily;
+  const titles = items.map((i) => i.title);
+  await sendPush(db, userId, { title: t.storeTitle, body: titles.slice(0, 12).join(", ") + (titles.length > 12 ? "…" : ""), url: `/sections/${items[0].section_id}` });
+  return true;
+}
+
 /** True during Shabbat/chag when the user asked for quiet. */
 export async function isQuiet(p: Profile, now = new Date()) {
   if (!p.quiet_shabbat) return false;

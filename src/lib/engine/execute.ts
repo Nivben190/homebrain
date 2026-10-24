@@ -7,7 +7,7 @@ import { getDict, fill } from "@/i18n";
 import { alarmShortcutUrl, renderActions } from "./render";
 import { addDays, assigneesFor, diffDays, habitStats, isDue, nextReminder, NUDGE_TIME, readHabit, todayKey, type Checkin } from "./habits";
 import { datePlan, nextDateReminder, readDate, type DateSpec } from "./dates";
-import { dailyJobs, isQuiet, sendBriefing } from "./daily";
+import { dailyJobs, isQuiet, sendBriefing, sendStoreList } from "./daily";
 import { DEFAULT_PLACE, getForecast, outdoorWarning, weatherAt } from "@/lib/weather";
 import type { RenderedAction } from "./types";
 import { conditionsPass, nextRunAt } from "./schedule";
@@ -420,6 +420,8 @@ async function emitFixedWakes(db: Admin, now: Date) {
  * automation listening for it.
  */
 export async function handleEvent(db: Admin, userId: string, type: string, payload: Record<string, unknown> = {}) {
+  // Checked before this visit's event is stored, so another arrival within 2 hours stays quiet.
+  if (type === "arrive_store") await sendStoreList(db, userId);
   await db.from("events").insert({ user_id: userId, type, payload });
   const { data: automations } = await db
     .from("automations")

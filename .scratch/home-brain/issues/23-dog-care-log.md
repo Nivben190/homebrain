@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** done — the Dog care tracker already had shared walked/fed check-ins; meals now nudge if missed, plus a new "Vet & vaccines" reminders space
 
 - [ ] Tap walked or fed; the other phone shows it live with who and when
 - [ ] A gentle push if the dog hasn't been fed by a set time
