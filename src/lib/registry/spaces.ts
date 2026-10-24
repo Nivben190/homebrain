@@ -23,6 +23,8 @@ export interface SpaceType {
   reminds: boolean;
   /** Shows the photos field in the item sheet. */
   photos: boolean;
+  /** Has the quick-add bar (Spending fills itself from purchase texts). */
+  quickAdd: boolean;
 }
 
 const base: SpaceType = {
@@ -34,6 +36,7 @@ const base: SpaceType = {
   datesAreDue: true,
   reminds: false,
   photos: false,
+  quickAdd: true,
 };
 
 export const SPACE_TYPES: Record<SectionView, SpaceType> = {
@@ -45,6 +48,7 @@ export const SPACE_TYPES: Record<SectionView, SpaceType> = {
   dates: { ...base, addPlaceholder: (t) => t.dates.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true, reminds: true },
   subscriptions: { ...base, addPlaceholder: (t) => t.subs.addPlaceholder, opensSheetOnAdd: true, ownEmptyState: true },
   commit: { ...base, addPlaceholder: (t) => t.commit.addPlaceholder, ownEmptyState: true, datesAreDue: false, reminds: true },
+  spend: { ...base, ownEmptyState: true, datesAreDue: false, quickAdd: false },
   wheel: { ...base, addPlaceholder: (t) => t.wheel.addPlaceholder, ownEmptyState: true, datesAreDue: false },
 };
 

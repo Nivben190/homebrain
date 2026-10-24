@@ -55,6 +55,21 @@ export default async function IphonePage() {
       </Card>
 
       <Card className="mt-4">
+        <h2 className="mb-3 text-lg font-extrabold">💸 {t.iphone.spendTitle}</h2>
+        <ol className="space-y-2">
+          {t.iphone.spendSteps.map((s, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{i + 1}</span>
+              <span className="text-[15px]">{s}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-4">
+          <CopyField label={t.iphone.spendUrl} value={captureUrl.replace("/capture?", "/spend?")} hint={t.iphone.keepSecret} />
+        </div>
+      </Card>
+
+      <Card className="mt-4">
         <h2 className="mb-3 text-lg font-extrabold">🛒 {t.iphone.storeTitle}</h2>
         <ol className="space-y-2">
           {t.iphone.storeSteps.map((s, i) => (

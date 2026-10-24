@@ -41,6 +41,7 @@ import { spaceType } from "@/lib/registry/spaces";
 import { WheelView } from "./WheelView";
 import { WHEEL_PROP } from "@/lib/wheel";
 import { CommitView } from "./CommitView";
+import { SpendView } from "./SpendView";
 import { newCommit, type Period } from "@/lib/commit";
 
 export function SectionScreen({
@@ -370,7 +371,18 @@ export function SectionScreen({
 
       {sorted.length === 0 && !kind.ownEmptyState && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
 
-      {section.view === "commit" ? (
+      {section.view === "spend" ? (
+        <SpendView
+          section={section}
+          items={sorted}
+          timeZone={timeZone}
+          onDelete={remove}
+          onSettings={async (settings) => {
+            setSection({ ...section, settings });
+            await sb.from("sections").update({ settings }).eq("id", section.id);
+          }}
+        />
+      ) : section.view === "commit" ? (
         <CommitView items={sorted} onUpdate={update} onDelete={remove} onAdd={(text, period) => addCommit(text, period)} />
       ) : section.view === "wheel" ? (
         <WheelView section={section} items={sorted} timeZone={timeZone} userId={userId} onUpdate={update} onDelete={remove} />
@@ -450,6 +462,7 @@ export function SectionScreen({
       )}
 
       {/* Quick-add bar floats above the tab bar */}
+      {kind.quickAdd && (
       <form onSubmit={add} className="fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+5.25rem)] z-30 px-4">
         <div className="glass mx-auto flex max-w-lg items-center gap-2 rounded-2xl p-1.5 ps-4">
           <input
@@ -465,6 +478,7 @@ export function SectionScreen({
           </button>
         </div>
       </form>
+      )}
       <div className="h-20" />
 
       {/* Result of a Notes sync, shown when coming back from Shortcuts */}

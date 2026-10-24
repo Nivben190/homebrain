@@ -76,7 +76,7 @@ export interface RequestRow {
   updated_at: string;
 }
 
-export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions" | "wheel" | "commit";
+export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions" | "wheel" | "commit" | "spend";
 
 export interface Section {
   id: string;
@@ -95,6 +95,8 @@ export interface Section {
   notes_link?: string | null;
   /** The linked note as of the last sync (normalized line → ticked). */
   notes_state?: Record<string, boolean> | null;
+  /** Per-type settings, e.g. a Spending space's card digits. */
+  settings?: { cards?: string[] } | null;
 }
 
 export interface Item {

@@ -677,6 +677,16 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     title: { en: "Commitments", he: "התחייבויות" },
     desc: { en: "\"Under ₪300 on Cibus this month\", \"laundry today\" — at the end you find out if you made it, with a scoreboard.", he: "\"עד 300 ₪ בסיבוס החודש\", \"כביסה היום\" — בסוף מגלים אם עמדתם בזה, עם לוח תוצאות." },
   },
+  // Card purchases forwarded from the bank's texts by an iPhone automation.
+  {
+    key: "spending",
+    category: "money",
+    icon: "💸",
+    color: "green",
+    view: "spend",
+    title: { en: "Spending", he: "הוצאות" },
+    desc: { en: "Every Max / bank purchase shows up by itself, sorted by category, with the month's total.", he: "כל קנייה במקס או בבנק מופיעה לבד, לפי קטגוריות, עם הסיכום החודשי." },
+  },
   // Several saved wheels in one space; pick one and spin.
   {
     key: "wheels",
