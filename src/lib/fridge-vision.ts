@@ -2,7 +2,9 @@ import "server-only";
 import { parseSeen, type Seen } from "./fridge";
 
 // Gemini's free tier (key from aistudio.google.com) is plenty for a few scans a day.
-const MODEL = process.env.FRIDGE_MODEL ?? "gemini-2.5-flash";
+// When the main model is rate-limited (or unavailable), the lighter one takes over.
+const MODELS = [process.env.FRIDGE_MODEL ?? "gemini-3.8-flash", process.env.FRIDGE_FALLBACK_MODEL ?? "gemini-3.5-flash-lite"];
+const RETRY_ON = new Set([404, 429, 500, 503]);
 
 /**
  * Asks Gemini what's in a fridge photo. `known` are the names already in the
@@ -22,15 +24,23 @@ export async function seeFridge(image: Uint8Array, mediaType: string, known: str
     .filter(Boolean)
     .join("\n");
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": key, "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ inline_data: { mime_type: mediaType, data: Buffer.from(image).toString("base64") } }, { text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-    }),
+  const body = JSON.stringify({
+    contents: [{ parts: [{ inline_data: { mime_type: mediaType, data: Buffer.from(image).toString("base64") } }, { text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
   });
-  if (!res.ok) throw new Error(`vision ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  return parseSeen((data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("\n"));
+  let error = "";
+  for (const model of MODELS) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "content-type": "application/json" },
+      body,
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      return parseSeen((data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("\n"));
+    }
+    error = `vision ${model} ${res.status}: ${(await res.text()).slice(0, 200)}`;
+    if (!RETRY_ON.has(res.status)) break;
+  }
+  throw new Error(error);
 }
