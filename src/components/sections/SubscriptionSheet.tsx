@@ -8,6 +8,7 @@ import type { Currency, Cycle } from "@/lib/subs/parse";
 import { readSub, RENEW_AHEAD, subPatch, type SubProps } from "@/lib/subs/types";
 import { money } from "./SubscriptionsView";
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
+import { fill } from "@/i18n";
 
 const CURRENCIES: Currency[] = ["ILS", "USD", "EUR", "GBP"];
 
@@ -61,7 +62,7 @@ export function SubscriptionSheet({
     setSub({ ...sub, ...patch, edited: true });
     setDirty(true);
   };
-  const cancelUrl = sub.cancel ?? `https://www.google.com/search?q=${encodeURIComponent(t.subs.howToCancel.replace("{name}", item.title))}`;
+  const cancelUrl = sub.cancel ?? `https://www.google.com/search?q=${encodeURIComponent(fill(t.subs.howToCancel, { name: item.title }))}`;
 
   return (
     <Sheet
@@ -144,7 +145,7 @@ export function SubscriptionSheet({
         </Field>
         {sub.cycle !== "weekly" && (
           <label className="flex items-center justify-between gap-3 rounded-2xl bg-sunken px-4 py-3">
-            <span className="text-sm font-medium">🔔 {t.subs.remind.replace("{n}", String(RENEW_AHEAD))}</span>
+            <span className="text-sm font-medium">🔔 {fill(t.subs.remind, { n: String(RENEW_AHEAD) })}</span>
             <Toggle checked={sub.remind} onChange={(remind) => commit({ ...sub, remind })} />
           </label>
         )}

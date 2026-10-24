@@ -6,8 +6,7 @@ import { useI18n } from "@/i18n/client";
 import { AlarmSheet } from "./QuickAlarm";
 import { AskSheet } from "./Requests";
 import type { Member } from "@/components/sections/PropertyInput";
-
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+import { fill } from "@/i18n";
 
 export interface PetSummary {
   id: string;

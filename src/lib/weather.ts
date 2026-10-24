@@ -1,3 +1,4 @@
+import { fill } from "@/i18n";
 // Weather from Open-Meteo (free, no key). Responses are cached by Next for 30 min.
 
 export const DEFAULT_PLACE = { lat: 32.0853, lon: 34.7818, name: "Tel Aviv" };
@@ -105,7 +106,7 @@ export function weatherAt(hours: HourWeather[], day: string, hhmm: string): Hour
 /** One short line for an outdoor session, or null when the weather is fine. */
 export function outdoorWarning(w: HourWeather | null, t: { rain: string; hot: string }): string | null {
   if (!w) return null;
-  if (w.rain >= RAINY) return t.rain.replace("{p}", String(w.rain));
-  if (w.feels >= HOT_FEELS) return t.hot.replace("{t}", String(w.feels));
+  if (w.rain >= RAINY) return fill(t.rain, { p: w.rain });
+  if (w.feels >= HOT_FEELS) return fill(t.hot, { t: w.feels });
   return null;
 }

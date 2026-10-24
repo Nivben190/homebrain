@@ -11,6 +11,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { Ring, useCelebrate } from "@/components/sections/TrackerView";
 import { alarmShortcutUrl } from "@/lib/engine/render";
 import { todayKey } from "@/lib/engine/habits";
+import { fill } from "@/i18n";
 
 interface Entry {
   id: string;
@@ -19,8 +20,6 @@ interface Entry {
   done: boolean;
 }
 type Kind = "session" | "due" | "request";
-
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 
 /** Alarm 45 minutes before tomorrow's first thing, never before 05:00. */
 function suggestAlarm(time: string): string {

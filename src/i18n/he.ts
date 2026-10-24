@@ -165,6 +165,8 @@ export const he: Dict = {
     history: "לאחרונה",
   },
   settings: {
+    testPushTitle: "המוח מחובר!",
+    testPushBody: "ככה ייראו התזכורות שלך.",
     title: "אני",
     profile: "פרופיל",
     language: "שפה",
@@ -361,6 +363,9 @@ export const he: Dict = {
     waiting: "מחכה ל{name}",
   },
   pets: {
+    foodItem: "אוכל ל{name} 🦴",
+    foodWord: "אוכל",
+    theDog: "כלב",
     title: "הכלב",
     add: "הוספת הכלב שלכם",
     addHint: "מלאי אוכל, משקל, וטרינר — ותזכורת כשהאוכל עומד להיגמר.",

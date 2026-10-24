@@ -19,3 +19,8 @@ export function isLocale(v: unknown): v is Locale {
 }
 
 export type { Dict };
+
+/** Fills {name}-style placeholders in a translated string. Missing values render empty. */
+export function fill(s: string, vars: Record<string, string | number>): string {
+  return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}

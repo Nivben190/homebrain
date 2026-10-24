@@ -8,6 +8,7 @@ import { DATES_PROP, datePlan, defaultDate, openOccurrence, readDate, type DateS
 import { alertSummary, relativeDay } from "./DatesView";
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import type { Member } from "./PropertyInput";
+import { fill } from "@/i18n";
 
 /** The stored fields for a reminder-calendar item after editing its date. */
 export function datePatch(item: Item, spec: DateSpec, checkins: CheckinRow[], timeZone: string): Partial<Item> {
@@ -139,7 +140,7 @@ export function DateSheet({
             <div className="flex flex-wrap gap-2">
               {[0, 1, 2, 3, 4].map((n) => (
                 <Chip key={n} active={spec.every === n} onClick={() => edit({ every: n })}>
-                  {n ? t.dates.everyH.replace("{n}", String(n)) : t.dates.single}
+                  {n ? fill(t.dates.everyH, { n: String(n) }) : t.dates.single}
                 </Chip>
               ))}
             </div>
@@ -165,7 +166,7 @@ export function DateSheet({
           <div className="flex flex-wrap gap-2">
             {[0, 1, 3, 7].map((n) => (
               <Chip key={n} active={spec.ahead === n} onClick={() => edit({ ahead: n })}>
-                {n === 0 ? t.dates.none : n === 1 ? t.dates.dayBefore : n === 7 ? t.dates.weekBefore : t.dates.daysBefore.replace("{n}", String(n))}
+                {n === 0 ? t.dates.none : n === 1 ? t.dates.dayBefore : n === 7 ? t.dates.weekBefore : fill(t.dates.daysBefore, { n: String(n) })}
               </Chip>
             ))}
           </div>

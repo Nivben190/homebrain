@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
 import { colorClass } from "@/components/ui";
 import { usePhotoUrls, type Photo } from "@/lib/photos";
+import { fill } from "@/i18n";
 
 export interface Memory {
   id: string;
@@ -32,7 +33,7 @@ export function OnThisDay({ memories }: { memories: Memory[] }) {
               <span className={cn("flex aspect-square w-full items-center justify-center rounded-xl bg-linear-to-br text-5xl", colorClass(m.color))}>{m.icon}</span>
             )}
             <span className="mt-2 block truncate px-1 text-sm font-bold">{m.title}</span>
-            <span className="block px-1 text-xs font-semibold text-accent">{m.years === 1 ? t.memories.yearAgo : t.memories.yearsAgo.replace("{n}", String(m.years))}</span>
+            <span className="block px-1 text-xs font-semibold text-accent">{m.years === 1 ? t.memories.yearAgo : fill(t.memories.yearsAgo, { n: String(m.years) })}</span>
           </Link>
         </motion.div>
       ))}

@@ -3,8 +3,7 @@ import { weatherEmoji, type DayWeather, type WalkAdvice } from "@/lib/weather";
 import { hhmmOf, type HolyStatus } from "@/lib/jewish";
 import { diffDays } from "@/lib/engine/habits";
 import type { Locale } from "@/i18n";
-
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+import { fill } from "@/i18n";
 
 /** Weather + dog-walk window + Shabbat/chag, in one glanceable card. */
 export async function DayCard({ weather, advice, holy, today, locale, place }: { weather: DayWeather | null; advice: WalkAdvice | null; holy: HolyStatus; today: string; locale: Locale; place: string }) {

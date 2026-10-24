@@ -36,6 +36,7 @@ async function purgeItem(item: Item) {
   await Promise.all(readPhotos(item.props).map(deleteAttachment));
 }
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
+import { fill } from "@/i18n";
 
 export function SectionScreen({
   initialSection,
@@ -109,10 +110,10 @@ export function SectionScreen({
             p.problem === "empty"
               ? { ok: false, text: t.notesSync.emptyNote }
               : p.problem === "literal"
-                ? { ok: false, text: t.notesSync.literalWord.replace("{word}", title) }
+                ? { ok: false, text: fill(t.notesSync.literalWord, { word: title }) }
                 : section.notes_link
-                  ? { ok: false, text: t.notesSync.otherNote.replace("{title}", title).replaceAll("{link}", section.notes_link) }
-                  : { ok: false, text: t.notesSync.unlinked.replace("{title}", title), link: title },
+                  ? { ok: false, text: fill(t.notesSync.otherNote, { title }).replaceAll("{link}", section.notes_link) }
+                  : { ok: false, text: fill(t.notesSync.unlinked, { title }), link: title },
           );
           setTimeout(() => setSyncToast(null), 10000);
           return;
@@ -125,9 +126,9 @@ export function SectionScreen({
           }
           setSyncToast(
             p.problem === "literal"
-              ? { ok: false, text: t.notesSync.literalWord.replace("{word}", (p.sample ?? "").trim()) }
+              ? { ok: false, text: fill(t.notesSync.literalWord, { word: (p.sample ?? "").trim() }) }
               : p.chars && !p.problem
-                ? { ok: true, text: t.notesSync.synced.replace("{added}", String(p.added ?? 0)).replace("{checked}", String(p.checked ?? 0)).replace("{appended}", String(p.appended ?? 0)).replace("{unchecked}", String(p.unchecked ?? 0)).replace("{removed}", String(p.removed ?? 0)) }
+                ? { ok: true, text: fill(t.notesSync.synced, { added: String(p.added ?? 0), checked: String(p.checked ?? 0), appended: String(p.appended ?? 0), unchecked: String(p.unchecked ?? 0), removed: String(p.removed ?? 0) }) }
                 : { ok: false, text: t.notesSync.emptyNote },
           );
           setTimeout(() => setSyncToast(null), 5000);
@@ -469,7 +470,7 @@ export function SectionScreen({
                   const notes_link = syncToast.link!;
                   await sb.from("sections").update({ notes_link, notes_state: null }).eq("id", section.id);
                   setSection({ ...section, notes_link });
-                  setSyncToast({ ok: true, text: t.notesSync.linkedNow.replace("{title}", notes_link) });
+                  setSyncToast({ ok: true, text: fill(t.notesSync.linkedNow, { title: notes_link }) });
                   setTimeout(() => setSyncToast(null), 6000);
                 }}
               >

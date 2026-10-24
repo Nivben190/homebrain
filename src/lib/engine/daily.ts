@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Pet, Profile } from "@/lib/db-types";
-import { getDict } from "@/i18n";
+import { getDict, fill } from "@/i18n";
 import { sendPush } from "@/lib/push";
 import { buildDay, dayScore, openTitles } from "@/lib/day";
 import { DEFAULT_PLACE, weatherEmoji } from "@/lib/weather";
@@ -11,8 +11,6 @@ import { foodDaysLeft } from "./food";
 import { minuteOfDay, parseHHmm, zonedParts, zonedTimeToUtc } from "./time";
 
 type Admin = SupabaseClient;
-
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 
 /** Start of the user's local day, as an ISO timestamp. */
 function localMidnight(day: string, timeZone: string) {

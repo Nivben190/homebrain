@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Automation, Job, Profile, Section } from "@/lib/db-types";
 import { sendPush } from "@/lib/push";
 import { sendEmail } from "@/lib/email";
-import { getDict } from "@/i18n";
+import { getDict, fill } from "@/i18n";
 import { alarmShortcutUrl, renderActions } from "./render";
 import { addDays, assigneesFor, diffDays, habitStats, isDue, nextReminder, NUDGE_TIME, readHabit, todayKey, type Checkin } from "./habits";
 import { datePlan, nextDateReminder, readDate, type DateSpec } from "./dates";
@@ -14,6 +14,8 @@ import { conditionsPass, nextRunAt } from "./schedule";
 import { referencedSections, type TemplateContext } from "./templates";
 import { automationDefSchema } from "./types";
 import { allowedSections, sectionRefs } from "./scope";
+import { planEvent } from "./events";
+import { reminderAudience } from "./audience";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
 
 /** Schedules more than this late (e.g. after downtime) are skipped instead of fired. */
@@ -205,8 +207,6 @@ export async function tick(db: Admin, now = new Date()) {
   return outcomes;
 }
 
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
-
 /**
  * Sends a tracker reminder (session time or evening nudge) to whoever is on it
  * today, unless the session is already checked in, then schedules the next one.
@@ -222,11 +222,7 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
     return { automationId: itemId, status: "skipped", reason: "no schedule" };
   }
 
-  const { data: members } = await db.from("profiles").select("*").eq("household_id", section.household_id).returns<Profile[]>();
-  const people = members ?? [];
-  // Private spaces only ever involve their owner.
-  const eligible = section.owner_id ? people.filter((m) => m.user_id === section.owner_id) : people;
-  const tz = eligible[0]?.timezone ?? "Asia/Jerusalem";
+  const { eligible, timeZone: tz } = await audienceOf(db, section);
   const today = todayKey(tz, now);
   const { data: rows } = await db.from("checkins").select("day,status").eq("item_id", itemId).gte("day", addDays(today, -400));
   const checkins = (rows ?? []) as Checkin[];
@@ -252,9 +248,7 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
   const snoozeTime = `${String(zonedParts(snooze, tz).hour).padStart(2, "0")}:${String(zonedParts(snooze, tz).minute).padStart(2, "0")}`;
   const hours = habit.outdoor && targets[0] ? ((await getForecast(targets[0].lat ?? DEFAULT_PLACE.lat, targets[0].lon ?? DEFAULT_PLACE.lon, tz))?.hours ?? []) : [];
 
-  let fired = 0;
-  for (const target of targets) {
-    if (await isQuiet(target, now)) continue;
+  const fired = await sendReminders(db, section, itemId, targets, now, (target) => {
     const t = getDict(target.locale);
     const warning = habit.outdoor ? outdoorWarning(weatherAt(hours, today, habit.time), { rain: t.daily.rainAt, hot: t.daily.hotAt }) : null;
     const title = isNudge ? t.tracker.nudgeTitle : fill(t.tracker.remindTitle, { item: item.title });
@@ -269,13 +263,40 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
       { kind: "link", icon: "⏰", label: t.tracker.snooze, href: alarmShortcutUrl(snoozeTime, item.title), external: true },
       { kind: "link", icon: section.icon, label: section.title, href: `/sections/${section.id}` },
     ];
+    return { title, body, rendered };
+  });
+  await reschedule();
+  return { automationId: itemId, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
+}
+
+/** The household members a reminder about this space can reach, and their timezone. */
+async function audienceOf(db: Admin, section: Section) {
+  const { data: members } = await db.from("profiles").select("*").eq("household_id", section.household_id).returns<Profile[]>();
+  return reminderAudience(members ?? [], section);
+}
+
+/**
+ * The one path every item reminder takes: skip people in quiet hours, write
+ * the card (replacing their unanswered one), push it. Returns how many got it.
+ */
+export async function sendReminders(
+  db: Admin,
+  section: Section,
+  itemId: string,
+  targets: Profile[],
+  now: Date,
+  card: (target: Profile) => { title: string; body: string; rendered: RenderedAction[] },
+) {
+  let fired = 0;
+  for (const target of targets) {
+    if (await isQuiet(target, now)) continue;
+    const { title, body, rendered } = card(target);
     const run = await insertItemRun(db, { user_id: target.user_id, household_id: section.household_id, item_id: itemId, title, body, icon: section.icon, rendered, fired_at: now.toISOString() });
     if (!run) continue;
     await sendPush(db, target.user_id, { title: `${section.icon} ${title}`, body, url: `/runs/${run.id}` });
     fired++;
   }
-  await reschedule();
-  return { automationId: itemId, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
+  return fired;
 }
 
 /**
@@ -307,10 +328,7 @@ export async function rescheduleDate(db: Admin, itemId: string, spec: DateSpec, 
  * then schedules the next one.
  */
 async function fireDateReminder(db: Admin, item: { id: string; title: string; created_by: string | null }, section: Section, spec: DateSpec, dueAt: Date, now: Date): Promise<FireOutcome> {
-  const { data: members } = await db.from("profiles").select("*").eq("household_id", section.household_id).returns<Profile[]>();
-  const people = members ?? [];
-  const eligible = section.owner_id ? people.filter((m) => m.user_id === section.owner_id) : people;
-  const tz = eligible[0]?.timezone ?? "Asia/Jerusalem";
+  const { eligible, timeZone: tz } = await audienceOf(db, section);
   const handled = await handledDays(db, item.id);
   // Which alert was due: the first one after just before its time.
   const due = nextDateReminder(spec, new Date(dueAt.getTime() - 1000), tz, (d) => handled.has(d));
@@ -321,9 +339,7 @@ async function fireDateReminder(db: Admin, item: { id: string; title: string; cr
   }
 
   const targets = spec.assign ? eligible.filter((m) => m.user_id === spec.assign!.userId) : eligible;
-  let fired = 0;
-  for (const target of targets) {
-    if (await isQuiet(target, now)) continue;
+  const fired = await sendReminders(db, section, item.id, targets, now, (target) => {
     const t = getDict(target.locale);
     const dateLabel = new Intl.DateTimeFormat(target.locale, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${due.occurrence}T12:00:00Z`));
     const daysTo = diffDays(due.day, due.occurrence);
@@ -334,11 +350,8 @@ async function fireDateReminder(db: Admin, item: { id: string; title: string; cr
       { kind: "done", label: t.dates.stop, day: due.occurrence },
       { kind: "link", icon: section.icon, label: section.title, href: `/sections/${section.id}` },
     ];
-    const run = await insertItemRun(db, { user_id: target.user_id, household_id: section.household_id, item_id: item.id, title, body, icon: section.icon, rendered, fired_at: now.toISOString() });
-    if (!run) continue;
-    await sendPush(db, target.user_id, { title: `${section.icon} ${title}`, body, url: `/runs/${run.id}` });
-    fired++;
-  }
+    return { title, body, rendered };
+  });
   await rescheduleDate(db, item.id, spec, tz, handled, now);
   return { automationId: item.id, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
 }
@@ -379,20 +392,10 @@ export async function handleEvent(db: Admin, userId: string, type: string, paylo
     .returns<Automation[]>();
 
   const outcomes: FireOutcome[] = [];
-  for (const a of automations ?? []) {
-    const delay = a.trigger.type === "event" ? a.trigger.delayMinutes : 0;
-    if (delay > 0) {
-      await db.from("jobs").insert({
-        automation_id: a.id,
-        user_id: userId,
-        run_at: new Date(Date.now() + delay * 60000).toISOString(),
-        context: { event: type },
-      });
-      outcomes.push({ automationId: a.id, status: "skipped", reason: `queued +${delay}m` });
-    } else {
-      outcomes.push(await fireAutomation(db, a));
-    }
-  }
+  const plan = planEvent(automations ?? [], userId, type, new Date());
+  if (plan.jobs.length) await db.from("jobs").insert(plan.jobs);
+  for (const job of plan.jobs) outcomes.push({ automationId: job.automation_id, status: "skipped", reason: `queued for ${job.run_at}` });
+  for (const a of plan.now) outcomes.push(await fireAutomation(db, a));
   // Waking up also sends the day's briefing (once a day).
   if (type === "wake") await sendBriefing(db, userId);
   return outcomes;

@@ -163,6 +163,8 @@ export const en = {
     history: "Recent",
   },
   settings: {
+    testPushTitle: "Your brain is connected!",
+    testPushBody: "This is how your reminders will look.",
     title: "Me",
     profile: "Profile",
     language: "Language",
@@ -359,6 +361,9 @@ export const en = {
     waiting: "Waiting on {name}",
   },
   pets: {
+    foodItem: "Food for {name} 🦴",
+    foodWord: "food",
+    theDog: "the dog",
     title: "Dog",
     add: "Add your dog",
     addHint: "Food stock, weight, vet — and reminders when food runs low.",

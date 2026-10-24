@@ -10,6 +10,7 @@ import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
 import type { CheckinRow, Item } from "@/lib/db-types";
 import type { Member } from "@/components/sections/PropertyInput";
+import { fill } from "@/i18n";
 
 /** How long a just-checked card stays in place (showing ✓) before moving to "done". */
 const SETTLE_MS = 900;
@@ -96,7 +97,7 @@ export function TodayPractice({
       {done.length > 0 && (
         <div className="mt-3">
           <button onClick={() => setShowDone((v) => !v)} className="inline-flex items-center gap-1 px-1 text-sm font-semibold text-muted">
-            ✓ {t.tracker.doneTodayCount.replace("{n}", String(done.length))}
+            ✓ {fill(t.tracker.doneTodayCount, { n: String(done.length) })}
             <ChevronDown className={cn("size-4 transition", showDone && "rotate-180")} />
           </button>
           <AnimatePresence initial={false}>

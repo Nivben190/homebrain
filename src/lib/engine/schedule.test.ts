@@ -52,6 +52,18 @@ describe("nextRunAt", () => {
     expect(before.toISOString()).toBe("2026-10-25T05:00:00.000Z");
   });
 
+  it("fires once, at a sensible time, when the time doesn't exist on the spring-forward day", () => {
+    // Israel skips 02:00-03:00 local on Fri 2027-03-26.
+    const daily = { type: "schedule" as const, days: [0, 1, 2, 3, 4, 5, 6], times: ["02:30"] };
+    const first = nextRunAt(daily, zonedTimeToUtc(2027, 3, 26, 0, 0, TZ), TZ)!;
+    expect(localDateKey(first, TZ)).toBe("2027-03-26");
+    const local = zonedParts(first, TZ);
+    expect(local.hour === 1 || local.hour === 3).toBe(true); // just around the gap, never skipped
+    const second = nextRunAt(daily, first, TZ)!;
+    expect(localDateKey(second, TZ)).toBe("2027-03-27");
+    expect(zonedParts(second, TZ)).toMatchObject({ hour: 2, minute: 30 });
+  });
+
   it("returns null for event triggers", () => {
     expect(nextRunAt({ type: "event", event: "wake", delayMinutes: 0 }, new Date(), TZ)).toBeNull();
   });

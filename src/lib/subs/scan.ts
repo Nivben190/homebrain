@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getDict } from "@/i18n";
+import { getDict, fill } from "@/i18n";
 import { sendPush } from "@/lib/push";
 import { todayKey } from "@/lib/engine/habits";
 import type { Item, Profile } from "@/lib/db-types";
@@ -114,9 +114,9 @@ async function notifyChanges(db: Db, profile: Profile, sectionId: string, c: { a
   const url = `/sections/${sectionId}`;
   for (const x of c.chargedAgain) {
     const amount = x.amount !== null ? new Intl.NumberFormat(profile.locale, { style: "currency", currency: x.currency ?? "ILS" }).format(x.amount) : "";
-    await sendPush(db, profile.user_id, { title: t.subs.chargedAgainTitle.replace("{name}", x.name), body: t.subs.chargedAgainBody.replace("{amount}", amount), url });
+    await sendPush(db, profile.user_id, { title: fill(t.subs.chargedAgainTitle, { name: x.name }), body: fill(t.subs.chargedAgainBody, { amount }), url });
   }
-  if (c.added.length) await sendPush(db, profile.user_id, { title: t.subs.newFoundTitle.replace("{n}", String(c.added.length)), body: c.added.slice(0, 5).join(" · "), url });
+  if (c.added.length) await sendPush(db, profile.user_id, { title: fill(t.subs.newFoundTitle, { n: String(c.added.length) }), body: c.added.slice(0, 5).join(" · "), url });
 }
 
 /** Once a day per connected account, from the engine tick (one account per tick). */

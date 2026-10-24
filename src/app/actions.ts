@@ -14,7 +14,7 @@ import { allowedSections, sectionRefs } from "@/lib/engine/scope";
 import { canSignUp } from "@/lib/signup";
 import { automationDefSchema } from "@/lib/engine/types";
 import { addDays, todayKey } from "@/lib/engine/habits";
-import { getDict } from "@/i18n";
+import { getDict, fill } from "@/i18n";
 import { dueFromProps, type PropertyDef } from "@/lib/registry/properties";
 import { sendPush } from "@/lib/push";
 import { openToken, revokeToken } from "@/lib/subs/gmail";
@@ -330,8 +330,8 @@ export async function savePushSubscription(sub: unknown, deviceLabel: string): P
 export async function sendTestPush(): Promise<Result> {
   const { user, profile } = await requireHome();
   const sent = await sendPush(createSupabaseAdmin(), user.id, {
-    title: `🧠 ${profile.locale === "he" ? "המוח מחובר!" : "Your brain is connected!"}`,
-    body: profile.locale === "he" ? "ככה ייראו התזכורות שלך." : "This is how your reminders will look.",
+    title: `🧠 ${getDict(profile.locale).settings.testPushTitle}`,
+    body: getDict(profile.locale).settings.testPushBody,
     url: "/",
   });
   return sent > 0 ? { ok: true } : { ok: false, error: "No devices registered" };
@@ -340,8 +340,6 @@ export async function sendTestPush(): Promise<Result> {
 // ---------------------------------------------------------------------------
 // Partner requests ("Can you…?")
 // ---------------------------------------------------------------------------
-
-const fillVars = (str: string, vars: Record<string, string>) => str.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 
 export async function sendRequest(input: { to: string; text: string; due: "today" | "tomorrow" | null }): Promise<Result> {
   const { supabase, user, profile, household, members } = await requireHome();
@@ -353,7 +351,7 @@ export async function sendRequest(input: { to: string; text: string; due: "today
   const { data, error } = await supabase.from("requests").insert({ household_id: household.id, to_user: to.user_id, text, due_day }).select("id").single();
   if (error) return { ok: false, error: error.message };
   const t = getDict(to.locale).ask;
-  await sendPush(createSupabaseAdmin(), to.user_id, { title: fillVars(t.pushTitle, { name: `${profile.emoji} ${profile.display_name}` }), body: text, url: `/?request=${data.id}` });
+  await sendPush(createSupabaseAdmin(), to.user_id, { title: fill(t.pushTitle, { name: `${profile.emoji} ${profile.display_name}` }), body: text, url: `/?request=${data.id}` });
   revalidatePath("/");
   return { ok: true };
 }
@@ -366,7 +364,7 @@ export async function setRequestStatus(id: string, status: "doing" | "done" | "d
   const sender = members.find((m) => m.user_id === req.from_user);
   if (sender && sender.user_id !== profile.user_id && (status === "done" || status === "declined")) {
     const t = getDict(sender.locale).ask;
-    const body = status === "done" ? fillVars(t.donePush, { name: `${profile.emoji} ${profile.display_name}`, text: req.text }) : `↩ ${profile.display_name}: ${req.text}`;
+    const body = status === "done" ? fill(t.donePush, { name: `${profile.emoji} ${profile.display_name}`, text: req.text }) : `↩ ${profile.display_name}: ${req.text}`;
     await sendPush(createSupabaseAdmin(), sender.user_id, { title: "Home Brain", body, url: "/" });
   }
   revalidatePath("/");
@@ -448,8 +446,9 @@ export async function reorderFood(petId: string): Promise<Result> {
   const { data: lists } = await supabase.from("sections").select("id,template").eq("household_id", household.id).in("template", ["dog-supplies", "groceries"]);
   const list = lists?.find((l) => l.template === "dog-supplies") ?? lists?.[0];
   if (!list) return { ok: false, error: "No shopping list" };
-  const title = profile.locale === "he" ? `אוכל ל${pet?.name ?? "כלב"} 🦴` : `Food for ${pet?.name ?? "the dog"} 🦴`;
-  const { data: existing } = await supabase.from("items").select("id").eq("section_id", list.id).ilike("title", `%${profile.locale === "he" ? "אוכל" : "food"}%`).limit(1).maybeSingle();
+  const t = getDict(profile.locale).pets;
+  const title = fill(t.foodItem, { name: pet?.name ?? t.theDog });
+  const { data: existing } = await supabase.from("items").select("id").eq("section_id", list.id).ilike("title", `%${t.foodWord}%`).limit(1).maybeSingle();
   if (existing) await supabase.from("items").update({ done: false }).eq("id", existing.id);
   else await supabase.from("items").insert({ section_id: list.id, title, position: Date.now() / 1000 });
   revalidatePath(`/pets/${petId}`);

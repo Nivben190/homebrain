@@ -12,6 +12,7 @@ import { bagDays, foodDaysLeft } from "@/lib/engine/food";
 import { normalizePhone } from "@/lib/engine/render";
 import { PetForm } from "./PetForm";
 import type { Pet, PetWeight } from "@/lib/db-types";
+import { fill } from "@/i18n";
 
 export interface PetRoutine {
   id: string;
@@ -22,8 +23,6 @@ export interface PetRoutine {
   doneToday: number;
   tracker: boolean;
 }
-
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 
 /** Tiny SVG line chart for weight history. */
 function Sparkline({ values }: { values: number[] }) {

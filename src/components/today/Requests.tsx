@@ -9,8 +9,7 @@ import { Button, Chip, Sheet, Textarea } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { RequestRow } from "@/lib/db-types";
 import type { Member } from "@/components/sections/PropertyInput";
-
-const fill = (s: string, vars: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+import { fill } from "@/i18n";
 
 /** "Ask Naomi" sheet: a quick request that lands on her Today screen with a push. */
 export function AskSheet({ open, onClose, partner }: { open: boolean; onClose: () => void; partner: Member }) {

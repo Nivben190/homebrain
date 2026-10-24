@@ -8,13 +8,14 @@ import { diffDays, habitStats, readHabit, todayKey, type HabitStats } from "@/li
 import type { Dict } from "@/i18n";
 import type { CheckinRow, Item } from "@/lib/db-types";
 import type { Member } from "./PropertyInput";
+import { fill } from "@/i18n";
 
 export function describeNext(stats: HabitStats, today: string, t: Dict): string {
   if (!stats.nextDue) return "";
   const n = diffDays(today, stats.nextDue);
   if (n === 0) return t.tracker.today;
   if (n === 1) return t.tracker.tomorrow;
-  return t.tracker.inDays.replace("{n}", String(n));
+  return fill(t.tracker.inDays, { n: String(n) });
 }
 
 export function describeSchedule(item: Item, t: Dict): string {

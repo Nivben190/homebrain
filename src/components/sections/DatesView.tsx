@@ -9,6 +9,7 @@ import { addDays, diffDays, todayKey } from "@/lib/engine/habits";
 import { alertTimes, CARRY_DAYS, occursOn, openOccurrence, readDate, type DateSpec } from "@/lib/engine/dates";
 import { RemoveBadge, SwipeRow } from "./SwipeRow";
 import type { CheckinRow, Item } from "@/lib/db-types";
+import { fill } from "@/i18n";
 
 const asDate = (day: string) => new Date(`${day}T12:00:00Z`);
 
@@ -17,13 +18,13 @@ export function relativeDay(t: ReturnType<typeof useI18n>["t"], today: string, d
   const n = diffDays(today, day);
   if (n === 0) return t.dates.today;
   if (n === 1) return t.dates.tomorrow;
-  return n > 0 ? t.dates.inDays.replace("{n}", String(n)) : t.dates.daysAgo.replace("{n}", String(-n));
+  return n > 0 ? fill(t.dates.inDays, { n: String(n) }) : fill(t.dates.daysAgo, { n: String(-n) });
 }
 
 /** "5× 09:00–21:00" or "09:00". */
 export function alertSummary(t: ReturnType<typeof useI18n>["t"], spec: DateSpec) {
   const times = alertTimes(spec);
-  return times.length > 1 ? t.dates.summary.replace("{n}", String(times.length)).replace("{from}", spec.from).replace("{until}", times.at(-1)!) : t.dates.summaryOnce.replace("{from}", spec.from);
+  return times.length > 1 ? fill(t.dates.summary, { n: String(times.length), from: spec.from, until: times.at(-1)! }) : fill(t.dates.summaryOnce, { from: spec.from });
 }
 
 /** Days each item counts as handled ("No more needed"). */
@@ -192,7 +193,7 @@ export function DatesView({
           <div className="space-y-2">{onDay.map((d) => row(d, occursOn(d.spec, selected) ? selected : openNow(d)!))}</div>
         ) : (
           <p className="rounded-3xl border-2 border-dashed border-card-border px-4 py-5 text-center text-sm text-muted">
-            {t.dates.nothingOn} · {t.dates.addOn.replace("{date}", new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(asDate(selected)))} ↓
+            {t.dates.nothingOn} · {fill(t.dates.addOn, { date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(asDate(selected)) })} ↓
           </p>
         )}
       </div>

@@ -13,6 +13,7 @@ import { readSub, type SubProps } from "@/lib/subs/types";
 import { relativeDay } from "./DatesView";
 import { RemoveBadge, SwipeRow } from "./SwipeRow";
 import type { Item, Section } from "@/lib/db-types";
+import { fill } from "@/i18n";
 
 export interface GmailStatus {
   email: string | null;
@@ -102,7 +103,7 @@ export function SubscriptionsView({
     try {
       const r = (await (await fetch("/api/google/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sectionId: section.id }) })).json()) as { ok: boolean; found?: number; added?: number; error?: string };
       await onReload();
-      if (r.ok) flash(t.subs.scanned.replace("{found}", String(r.found ?? 0)).replace("{added}", String(r.added ?? 0)));
+      if (r.ok) flash(fill(t.subs.scanned, { found: String(r.found ?? 0), added: String(r.added ?? 0) }));
       else if (r.error === "expired") router.refresh();
       else flash(t.subs.resultFailed);
     } catch {
@@ -128,9 +129,9 @@ export function SubscriptionsView({
                 {sub.chargedAfterCancel
                   ? t.subs.chargedAgain
                   : sub.stale && sub.last
-                    ? t.subs.stale.replace("{date}", new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${sub.last}T12:00:00Z`)))
+                    ? fill(t.subs.stale, { date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${sub.last}T12:00:00Z`)) })
                     : sub.status === "active" && sub.next
-                      ? `${sub.remind ? "🔔 " : ""}${t.subs.renews.replace("{when}", relativeDay(t, today, sub.next).toLowerCase())}`
+                      ? `${sub.remind ? "🔔 " : ""}${fill(t.subs.renews, { when: relativeDay(t, today, sub.next).toLowerCase() })}`
                       : sub.source === "gmail"
                         ? `📧 ${t.subs.fromGmail}`
                         : ""}
@@ -176,8 +177,8 @@ export function SubscriptionsView({
         <div className="flex items-center gap-3 px-1">
           <Mail className="size-5 shrink-0 text-muted" />
           <p className="min-w-0 flex-1 text-xs text-muted">
-            <span className="block truncate font-semibold">{t.subs.connectedAs.replace("{email}", gmail.email ?? "")}</span>
-            {scanning ? t.subs.scanning : gmail.lastScanAt ? t.subs.checked.replace("{when}", ago(locale, gmail.lastScanAt)) : t.subs.never}
+            <span className="block truncate font-semibold">{fill(t.subs.connectedAs, { email: gmail.email ?? "" })}</span>
+            {scanning ? t.subs.scanning : gmail.lastScanAt ? fill(t.subs.checked, { when: ago(locale, gmail.lastScanAt) }) : t.subs.never}
           </p>
           <Button size="sm" variant="soft" onClick={scan} disabled={scanning}>
             {scanning ? <Spinner className="size-4" /> : <RefreshCw className="size-4" />} {t.subs.scanNow}
@@ -195,7 +196,7 @@ export function SubscriptionsView({
           }}
           className="-mt-2 px-1 text-xs font-semibold text-muted underline"
         >
-          {confirmDisconnect ? t.subs.disconnectConfirm.replace("{email}", gmail.email ?? "") : t.subs.disconnect}
+          {confirmDisconnect ? fill(t.subs.disconnectConfirm, { email: gmail.email ?? "" }) : t.subs.disconnect}
         </button>
       )}
 
@@ -205,7 +206,7 @@ export function SubscriptionsView({
           <p className="text-[34px] font-extrabold leading-none tracking-tight tabular-nums">{totals(locale, active.map((x) => x.sub), 1)}</p>
           <p className="mt-1 text-sm font-semibold text-muted">{t.subs.perMonth}</p>
           <p className="mt-3 text-xs text-muted">
-            {t.subs.perYear.replace("{amount}", totals(locale, active.map((x) => x.sub), 12))} · {t.subs.active.replace("{n}", String(active.length))}
+            {fill(t.subs.perYear, { amount: totals(locale, active.map((x) => x.sub), 12) })} · {fill(t.subs.active, { n: String(active.length) })}
           </p>
         </div>
       )}
