@@ -52,6 +52,8 @@ interface TemplateItem {
   done?: boolean;
   /** Values keyed by TemplateProp.key; select values are option indexes. */
   props?: Record<string, number | string>;
+  /** "Spin the wheel" spaces: this item is a wheel with these options. */
+  wheel?: { label: L; tag?: L }[];
 }
 
 export interface SectionTemplate {
@@ -651,6 +653,23 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     items: [{ title: { en: "Dentist checkup 🦷", he: "בדיקה אצל רופא שיניים 🦷" } }],
   },
 
+  // Several saved wheels in one space; pick one and spin.
+  {
+    key: "wheels",
+    category: "us",
+    icon: "🎡",
+    color: "pink",
+    view: "wheel",
+    title: { en: "Spin the wheel", he: "גלגל מזל" },
+    desc: { en: "Can't decide? Wheels for food, movies, date nights — add your own options and spin.", he: "לא מצליחים להחליט? גלגלים לאוכל, סרטים, דייטים — מוסיפים אפשרויות ומסובבים." },
+    items: [
+      { title: { en: "Dinner 🍽️", he: "ארוחת ערב 🍽️" }, wheel: [{ label: { en: "Pizza", he: "פיצה" }, tag: { en: "Order in", he: "משלוח" } }, { label: { en: "Sushi", he: "סושי" }, tag: { en: "Order in", he: "משלוח" } }, { label: { en: "Burgers", he: "המבורגר" }, tag: { en: "Out", he: "בחוץ" } }, { label: { en: "Shakshuka", he: "שקשוקה" }, tag: { en: "Home", he: "בבית" } }, { label: { en: "Pasta", he: "פסטה" }, tag: { en: "Home", he: "בבית" } }, { label: { en: "Hummus place", he: "חומוסייה" }, tag: { en: "Out", he: "בחוץ" } }] },
+      { title: { en: "Movie night 🎬", he: "ערב סרט 🎬" }, wheel: [{ label: { en: "Comedy", he: "קומדיה" } }, { label: { en: "Thriller", he: "מותחן" } }, { label: { en: "Rom-com", he: "קומדיה רומנטית" } }, { label: { en: "Animation", he: "אנימציה" } }, { label: { en: "Documentary", he: "דוקו" } }, { label: { en: "Rewatch a favourite", he: "סרט אהוב שוב" } }] },
+      { title: { en: "Date night 💞", he: "דייט 💞" }, wheel: [{ label: { en: "Picnic at sunset", he: "פיקניק בשקיעה" }, tag: { en: "Outdoor", he: "בחוץ" } }, { label: { en: "Cook together", he: "מבשלים יחד" }, tag: { en: "Home", he: "בבית" } }, { label: { en: "Bar & live music", he: "בר והופעה" }, tag: { en: "Out", he: "בחוץ" } }, { label: { en: "Board games", he: "משחקי קופסה" }, tag: { en: "Home", he: "בבית" } }, { label: { en: "Beach walk", he: "הליכה בחוף" }, tag: { en: "Outdoor", he: "בחוץ" } }, { label: { en: "New restaurant", he: "מסעדה חדשה" }, tag: { en: "Out", he: "בחוץ" } }] },
+      { title: { en: "Who does it? 🙋", he: "מי עושה? 🙋" }, wheel: [{ label: { en: "Me", he: "אני" } }, { label: { en: "You", he: "את/ה" } }, { label: { en: "Together", he: "ביחד" } }] },
+    ],
+  },
+
   // ---------------------------------------------------------------- Blank
   { key: "blank", category: "home", icon: "📄", color: "coral", view: "list", title: { en: "", he: "" }, desc: { en: "Start from scratch.", he: "מתחילים מאפס." } },
 ];
@@ -694,6 +713,7 @@ export function instantiateTemplate(t: SectionTemplate, locale: Locale, today: s
       };
       props._habit = habit;
     }
+    if (it.wheel) props._wheel = { options: it.wheel.map((o) => ({ label: o.label[locale], ...(o.tag ? { tag: o.tag[locale] } : {}) })) };
     return { title: it.title[locale], done: !!it.done, position, props, habit };
   });
   return { schema, items };

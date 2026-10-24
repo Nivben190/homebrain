@@ -38,6 +38,8 @@ async function purgeItem(item: Item) {
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import { fill } from "@/i18n";
 import { spaceType } from "@/lib/registry/spaces";
+import { WheelView } from "./WheelView";
+import { WHEEL_PROP } from "@/lib/wheel";
 
 export function SectionScreen({
   initialSection,
@@ -215,6 +217,7 @@ export function SectionScreen({
       updated_at: new Date().toISOString(),
     };
     if (isDates) Object.assign(temp, datePatch(temp, defaultDate(selectedDay), [], timeZone));
+    if (section.view === "wheel") temp.props = { [WHEEL_PROP]: { options: [] } };
     if (isSubs) temp.props = { [SUB_PROP]: manualSub(locale === "he" ? "ILS" : "USD") };
     setItems((p) => [...p, temp]);
     await sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at });
@@ -356,7 +359,9 @@ export function SectionScreen({
 
       {sorted.length === 0 && !kind.ownEmptyState && <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.sections.empty}</p>}
 
-      {isSubs ? (
+      {section.view === "wheel" ? (
+        <WheelView section={section} items={sorted} timeZone={timeZone} onUpdate={update} onDelete={remove} />
+      ) : isSubs ? (
         <SubscriptionsView section={section} items={sorted} gmail={gmail} timeZone={timeZone} editing={editing} onOpen={setOpenItem} onDelete={removeSub} onReload={reload} />
       ) : isDates ? (
         <DatesView

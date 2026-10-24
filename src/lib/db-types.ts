@@ -76,7 +76,7 @@ export interface RequestRow {
   updated_at: string;
 }
 
-export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions";
+export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions" | "wheel";
 
 export interface Section {
   id: string;

@@ -100,6 +100,7 @@ export function SectionSettingsSheet({
                 ["gallery", "📸"],
                 ["dates", "📅"],
                 ["subscriptions", "💳"],
+                ["wheel", "🎡"],
               ] as [SectionView, string][]
             ).map(([view, icon]) => (
               <button
