@@ -100,12 +100,22 @@ export function SubscriptionsView({
 
   async function scan() {
     setScanning(true);
+    const started = Date.now();
     try {
-      const r = (await (await fetch("/api/google/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sectionId: section.id }) })).json()) as { ok: boolean; found?: number; added?: number; error?: string };
-      await onReload();
-      if (r.ok) flash(fill(t.subs.scanned, { found: String(r.found ?? 0), added: String(r.added ?? 0) }));
-      else if (r.error === "expired") router.refresh();
-      else flash(t.subs.resultFailed);
+      const res = await fetch("/api/google/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sectionId: section.id }) });
+      if (!res.ok) throw new Error("start");
+      // The scan runs on the server; check every few seconds until it records a finish.
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const s = (await (await fetch(`/api/google/scan?sectionId=${section.id}`)).json()) as { lastScanAt: string | null; status: string | null; failed: boolean };
+        if (!s.lastScanAt || Date.parse(s.lastScanAt) < started - 5000) continue;
+        await onReload();
+        if (s.status === "expired") router.refresh();
+        else if (s.failed) flash(t.subs.resultFailed);
+        else flash(t.subs.done);
+        return;
+      }
+      flash(t.subs.resultFailed);
     } catch {
       flash(t.subs.resultFailed);
     } finally {

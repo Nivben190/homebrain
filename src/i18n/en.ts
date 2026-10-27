@@ -543,6 +543,7 @@ export const en = {
     never: "not checked yet",
     scanNow: "Scan now",
     scanning: "Reading your receipts…",
+    done: "Updated from Gmail ✓",
     scanned: "Found {found} subscriptions · {added} new",
     expired: "Gmail access ended — reconnect to keep checking",
     reconnect: "Reconnect",

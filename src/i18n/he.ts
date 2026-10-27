@@ -545,6 +545,7 @@ export const he: Dict = {
     never: "עוד לא נבדק",
     scanNow: "לבדוק עכשיו",
     scanning: "קורא את הקבלות שלך…",
+    done: "עודכן מג׳ימייל ✓",
     scanned: "נמצאו {found} מנויים · {added} חדשים",
     expired: "הגישה ל-Gmail הסתיימה — צריך להתחבר מחדש",
     reconnect: "להתחבר מחדש",
