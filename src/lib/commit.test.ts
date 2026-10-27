@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommit, periodEnd, status, summarize, type CommitSpec } from "./commit";
+import { newCommit, parseCommit, periodEnd, status, summarize, type CommitSpec } from "./commit";
 import { zonedParts } from "./engine/time";
 
 const TZ = "Asia/Jerusalem";
@@ -24,6 +24,15 @@ describe("parseCommit", () => {
     expect(parseCommit("commit to put laundry today")).toEqual({ title: "put laundry today", period: "day" });
     expect(parseCommit("להתקשר לסבתא השבוע")).toEqual({ title: "להתקשר לסבתא השבוע", period: "week" });
     expect(parseCommit("gym 3 times")).toEqual({ title: "gym 3 times", period: "day" });
+  });
+});
+
+describe("newCommit", () => {
+  it("lets the form's period and limit win over the words", () => {
+    const c = newCommit("Cibus", now, TZ, "week", 250);
+    expect(c.props._commit).toMatchObject({ period: "week", limit: 250, unit: "₪", log: [] });
+    expect(newCommit("laundry today", now, TZ).props._commit).toMatchObject({ period: "day" });
+    expect(newCommit("laundry today", now, TZ).props._commit).not.toHaveProperty("limit");
   });
 });
 

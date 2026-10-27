@@ -121,9 +121,12 @@ export function summarize(specs: CommitSpec[], now = new Date()): CommitSummary 
   return { total: specs.length, kept, broken, active, rate: kept + broken ? Math.round((kept / (kept + broken)) * 100) : null, streak, byPeriod };
 }
 
-/** A new commitment item from what was typed or said: title, spec, and the end-of-period check. */
-export function newCommit(text: string, now: Date, timeZone: string, period?: Period) {
-  const parsed = parseCommit(text);
+/**
+ * A new commitment item from what was typed or said: title, spec, and the end-of-period check.
+ * A period or limit picked in the form wins over what the words say.
+ */
+export function newCommit(text: string, now: Date, timeZone: string, period?: Period, limit?: number) {
+  const parsed = { ...parseCommit(text), ...(limit ? { limit, unit: "₪" } : {}) };
   const p = period ?? parsed.period;
   const spec: CommitSpec = {
     period: p,

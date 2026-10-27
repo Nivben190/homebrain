@@ -5,7 +5,7 @@ import { RotateCcw } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { cn } from "@/lib/cn";
-import { commitProps, PERIODS, readCommit, spent, status, summarize, type CommitSpec, type Period } from "@/lib/commit";
+import { commitProps, parseCommit, PERIODS, readCommit, spent, status, summarize, type CommitSpec, type Period } from "@/lib/commit";
 import { Button, Input } from "@/components/ui";
 import { RemoveBadge, SwipeRow } from "./SwipeRow";
 import type { Item } from "@/lib/db-types";
@@ -33,7 +33,7 @@ export function CommitView({
   items: Item[];
   onUpdate: (id: string, patch: Partial<Item>) => void;
   onDelete: (id: string) => void;
-  onAdd: (text: string, period: Period) => void;
+  onAdd: (text: string, period: Period, limit?: number) => void;
 }) {
   const { t, locale } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -46,10 +46,17 @@ export function CommitView({
 
   const save = (item: Item, spec: CommitSpec) => onUpdate(item.id, { props: commitProps(item.props, spec), ...(spec.result ? { remind_at: null, done: true } : {}) });
 
-  if (!all.length) return <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.commit.empty}</p>;
+  if (!all.length)
+    return (
+      <div className="space-y-5">
+        <NewCommit onAdd={onAdd} />
+        <p className="glass rounded-3xl px-4 py-10 text-center text-muted">{t.commit.empty}</p>
+      </div>
+    );
 
   return (
     <div className="space-y-5">
+      <NewCommit onAdd={onAdd} />
       {/* Scoreboard */}
       <div className="glass grid grid-cols-3 gap-2 rounded-3xl p-4 text-center">
         <div>
@@ -124,6 +131,50 @@ export function CommitView({
         </section>
       )}
     </div>
+  );
+}
+
+/** New commitment: what, for how long, and optionally a ₪ amount to stay under. */
+function NewCommit({ onAdd }: { onAdd: (text: string, period: Period, limit?: number) => void }) {
+  const { t } = useI18n();
+  const [text, setText] = useState("");
+  const [period, setPeriod] = useState<Period | null>(null);
+  const [limit, setLimit] = useState("");
+  const parsed = text.trim() ? parseCommit(text) : null;
+  // Until a chip is tapped, the length follows the words ("this month").
+  const shown = period ?? parsed?.period ?? "day";
+
+  return (
+    <form
+      className="glass space-y-3 rounded-3xl p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!text.trim()) return;
+        onAdd(text.trim(), shown, Number(limit) > 0 ? Number(limit) : undefined);
+        setText("");
+        setPeriod(null);
+        setLimit("");
+      }}
+    >
+      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={t.commit.addPlaceholder} className="h-11" />
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-muted">{t.commit.period}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {PERIODS.map((p) => (
+            <button key={p} type="button" onClick={() => setPeriod(p)} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", shown === p ? "bg-accent text-accent-fg" : "bg-sunken")}>
+              {t.commit.periods[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-end gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="mb-1.5 block text-xs font-semibold text-muted">{t.commit.limit}</span>
+          <Input inputMode="decimal" value={limit} onChange={(e) => setLimit(e.target.value.replace(/[^\d.]/g, ""))} placeholder={parsed?.limit ? `₪${parsed.limit}` : "₪"} className="h-10" />
+        </label>
+        <Button disabled={!text.trim()}>{t.common.add}</Button>
+      </div>
+    </form>
   );
 }
 

@@ -234,8 +234,8 @@ export function SectionScreen({
   }
 
   /** "Commit again" from a finished commitment, for the same length of time. */
-  async function addCommit(text: string, period: Period) {
-    const c = newCommit(text, new Date(), timeZone, period);
+  async function addCommit(text: string, period: Period, limit?: number) {
+    const c = newCommit(text, new Date(), timeZone, period, limit);
     const row = { id: crypto.randomUUID(), section_id: section.id, title: c.title, props: c.props, remind_at: c.remind_at, position: (sorted.at(-1)?.position ?? 0) + 1 };
     setItems((p) => [...p, { ...row, done: false, due_at: null, assignee_id: null, created_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     await sb.from("items").insert(row);
@@ -388,7 +388,7 @@ export function SectionScreen({
           }}
         />
       ) : section.view === "commit" ? (
-        <CommitView items={sorted} onUpdate={update} onDelete={remove} onAdd={(text, period) => addCommit(text, period)} />
+        <CommitView items={sorted} onUpdate={update} onDelete={remove} onAdd={addCommit} />
       ) : section.view === "wheel" ? (
         <WheelView section={section} items={sorted} timeZone={timeZone} userId={userId} onUpdate={update} onDelete={remove} />
       ) : isSubs ? (
