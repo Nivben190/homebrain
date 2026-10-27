@@ -48,8 +48,11 @@ export async function scanGmail(db: Db, sectionId: string, opts: { notify?: bool
 
   try {
     const access = await refreshAccess(openToken(row.refresh_token));
-    const ids = [...new Set((await Promise.all(QUERIES.map(([q, max]) => listMessageIds(access, q, max)))).flat())].slice(0, 600);
-    const messages = (await pool(ids, 10, (id) => getMessage(access, id).catch(() => null))).filter(Boolean) as MailMessage[];
+    // One search at a time and a few reads at once: Gmail limits how much one mailbox may ask per minute.
+    const hits: string[] = [];
+    for (const [q, max] of QUERIES) hits.push(...(await listMessageIds(access, q, max)));
+    const ids = [...new Set(hits)].slice(0, 600);
+    const messages = (await pool(ids, 4, (id) => getMessage(access, id).catch(() => null))).filter(Boolean) as MailMessage[];
     const today = todayKey(profile.timezone, now);
     const found = summarize(messages.flatMap(chargesFrom), today);
     const changes = await mergeSubs(db, profile, sectionId, found, today, now);

@@ -50,11 +50,19 @@ export async function revokeToken(t: string) {
   await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(t)}`, { method: "POST" }).catch(() => undefined);
 }
 
-async function gmail<T>(access: string, path: string): Promise<T> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const RATE_LIMITED = /quota|rate ?limit|too many/i;
+
+/** One Gmail call; backs off and retries when Google says we're going too fast. */
+async function gmail<T>(access: string, path: string, attempt = 0): Promise<T> {
   const res = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${access}` } });
   if (res.status === 401) throw new GoogleAuthError("unauthorized");
   if (!res.ok) {
     const text = await res.text();
+    if ((res.status === 429 || (res.status === 403 && RATE_LIMITED.test(text))) && attempt < 4) {
+      await sleep(2000 * 2 ** attempt + Math.random() * 1000);
+      return gmail<T>(access, path, attempt + 1);
+    }
     // Step 2 of the setup: the Gmail API must be enabled in the Cloud project.
     if (res.status === 403 && /has not been used|is disabled|SERVICE_DISABLED/i.test(text)) throw new GmailApiDisabled(text.slice(0, 300));
     throw new Error(`gmail ${path.split("?")[0]}: ${res.status} ${text.slice(0, 300)}`);
