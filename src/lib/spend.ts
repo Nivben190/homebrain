@@ -129,3 +129,50 @@ export function matchesCommit(title: string, merchant: string): boolean {
     });
   });
 }
+
+export interface Recurring {
+  key: string;
+  merchant: string;
+  amount: number;
+  currency: string;
+  last: string;
+  /** The next charge, a month after the last (YYYY-MM-DD). */
+  next: string;
+}
+
+export const merchantKey = (m: string) =>
+  m
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} ]/gu, " ")
+    .replace(/\b(www|com|co|il|inc|ltd|בע"מ)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Merchants that charge about the same amount about once a month: a subscription
+ * (Disney+, Audible, the gym) seen on the card even when no receipt is emailed.
+ */
+export function recurringCharges(txs: Tx[]): Recurring[] {
+  const groups = new Map<string, Tx[]>();
+  for (const t of txs) {
+    if (t.refund || !t.merchant) continue;
+    const k = merchantKey(t.merchant);
+    if (k) groups.set(k, [...(groups.get(k) ?? []), t]);
+  }
+  const out: Recurring[] = [];
+  for (const [k, list] of groups) {
+    list.sort((a, b) => a.at.localeCompare(b.at));
+    if (list.length < 2) continue;
+    const days = list.map((t) => Date.parse(t.at) / 86400000);
+    const gaps = days.slice(1).map((d, i) => d - days[i]);
+    if (!gaps.every((g) => g >= 25 && g <= 35)) continue;
+    const amounts = list.map((t) => t.amount).sort((a, b) => a - b);
+    const mid = amounts[Math.floor(amounts.length / 2)];
+    if (!list.every((t) => Math.abs(t.amount - mid) <= mid * 0.15)) continue;
+    const last = list.at(-1)!;
+    const next = new Date(Date.parse(last.at));
+    next.setUTCMonth(next.getUTCMonth() + 1);
+    out.push({ key: `card:${k}`, merchant: last.merchant, amount: last.amount, currency: last.currency, last: last.at.slice(0, 10), next: next.toISOString().slice(0, 10) });
+  }
+  return out;
+}

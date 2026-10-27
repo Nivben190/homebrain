@@ -583,6 +583,8 @@ export const en = {
     hide: "Not a subscription",
     unhide: "Show again",
     emails: "From your email",
+    accountOnly: "Account found · billed elsewhere — tap to add the price",
+    fromCard: "Monthly charge on your card",
     fromGmail: "Found in Gmail",
     newFoundTitle: "💳 {n} new subscriptions found",
     chargedAgainTitle: "⚠️ {name} charged you again",

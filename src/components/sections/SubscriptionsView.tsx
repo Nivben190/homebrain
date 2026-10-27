@@ -142,9 +142,13 @@ export function SubscriptionsView({
                     ? fill(t.subs.stale, { date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${sub.last}T12:00:00Z`)) })
                     : sub.status === "active" && sub.next
                       ? `${sub.remind ? "🔔 " : ""}${fill(t.subs.renews, { when: relativeDay(t, today, sub.next).toLowerCase() })}`
-                      : sub.source === "gmail"
-                        ? `📧 ${t.subs.fromGmail}`
-                        : ""}
+                      : sub.unpriced && sub.amount === null
+                        ? `👤 ${t.subs.accountOnly}`
+                        : sub.source === "gmail"
+                          ? `📧 ${t.subs.fromGmail}`
+                          : sub.source === "card"
+                            ? `💳 ${t.subs.fromCard}`
+                            : ""}
               </span>
             </span>
             <span className="shrink-0 text-end">

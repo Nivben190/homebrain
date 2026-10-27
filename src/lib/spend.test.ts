@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categorize, matchesCommit, parseSpendSms, pickSpendSpace, spendKey, summarizeMonth, type Tx } from "./spend";
+import { categorize, matchesCommit, parseSpendSms, pickSpendSpace, recurringCharges, spendKey, summarizeMonth, type Tx } from "./spend";
 
 describe("parseSpendSms", () => {
   it("reads a Max purchase in Hebrew", () => {
@@ -59,5 +59,17 @@ describe("summaries & commitments", () => {
     expect(matchesCommit("No more than 300 shekel on Cibus this month", "סיבוס")).toBe(true);
     expect(matchesCommit("under 500 on Wolt", "WOLT TLV")).toBe(true);
     expect(matchesCommit("under 500 on Wolt", "שופרסל")).toBe(false);
+  });
+});
+
+describe("recurringCharges", () => {
+  const tx = (merchant: string, amount: number, at: string, refund = false): Tx => ({ amount, currency: "₪", merchant, at, category: "other", refund, key: at + merchant });
+  it("finds a merchant charging about the same each month", () => {
+    const r = recurringCharges([tx("DISNEY PLUS", 39.9, "2026-08-14T09:00:00Z"), tx("Disney Plus", 39.9, "2026-09-14T09:00:00Z"), tx("שופרסל", 230, "2026-09-02T09:00:00Z"), tx("שופרסל", 410, "2026-10-01T09:00:00Z")]);
+    expect(r).toEqual([{ key: "card:disney plus", merchant: "Disney Plus", amount: 39.9, currency: "₪", last: "2026-09-14", next: "2026-10-14" }]);
+  });
+  it("needs a monthly rhythm and steady price", () => {
+    expect(recurringCharges([tx("GYM", 200, "2026-09-01T00:00:00Z"), tx("GYM", 200, "2026-09-08T00:00:00Z")])).toEqual([]);
+    expect(recurringCharges([tx("AUDIBLE", 60, "2026-09-01T00:00:00Z")])).toEqual([]);
   });
 });

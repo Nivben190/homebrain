@@ -33,6 +33,8 @@ export interface Charge {
   cycle: Cycle | null;
   renews: string | null;
   subject: string;
+  /** Not a charge: account mail (logins, passcodes, terms) that shows an account exists. */
+  account?: boolean;
 }
 
 export interface DetectedSub {
@@ -47,6 +49,8 @@ export interface DetectedSub {
   next: string | null;
   /** No charge for much longer than its cycle: maybe already cancelled. */
   stale: boolean;
+  /** An active account with no receipts in this mailbox (billed elsewhere): price unknown. */
+  unpriced?: boolean;
   charges: { id: string; day: string; amount: number | null; currency: Currency | null; subject: string }[];
 }
 
@@ -195,6 +199,13 @@ const SUBSCRIPTIONY = /subscription|renew|membership|monthly|annual|yearly|your 
 const BILLING_SUBJECT = /receipt|invoice|payment|paid|charged|billing|\bbill\b|renew|subscription|membership|your order|your plan|קבלה|חשבונית|תשלום|חיוב|חידוש|מנוי/i;
 /** Failed or paused payments aren't charges. */
 const FAILED = /unsuccessful|failed|declined|couldn['’]t (be )?(process|charge|complete)|unable to (process|charge)|paused|past due|action required|נכשל|לא הצליח|נדחה|לא עבר/i;
+/** Account mail from a known service: proof of an account, though not of a price. */
+const ACCOUNT = /new (login|sign-?in|device)|one-time (passcode|code)|passcode|verification code|subscriber agreement|terms of use|account (has been )?updated|updated your .*account|welcome to|profile|content rating|כניסה חדשה|קוד (חד|אימות)|ברוכים הבאים|החשבון שלך|תנאי (השימוש|המנוי)/i;
+/** Marketing ("פרסומת" is the legally required Israeli ad label) reaches non-subscribers too. */
+const PROMO = /פרסומת|newsletter|\bsale\b|% off|new on|now streaming|coming soon|download the|עכשיו ב/i;
+/** Travel and one-off bookings: a receipt, but never a subscription. */
+const ONE_OFF_DOMAINS = ["booking.com", "airbnb.com", "expedia.com", "agoda.com", "hotels.com", "trip.com", "kiwi.com", "elal.com", "elal.co.il", "ryanair.com", "wizzair.com", "easyjet.com", "gett.com", "wolt.com", "10bis.co.il", "aliexpress.com", "amazon.com", "ebay.com", "etsy.com", "shein.com"];
+const ONE_OFF = /reservation|booking|your stay|check-?in|hotel|flight|itinerary|e-?ticket|boarding|your order|order (#|no|number)|shipped|delivery|הזמנ|טיסה|מלון|כרטיס טיסה|משלוח/i;
 const NOISE = /^(report a problem|write a review|דווח על בעיה|כתוב ביקורת|app store|apple music|icloud)$/i;
 const CYCLE_IN_NAME = /\s*\((monthly|yearly|annual|1 month|1 year|weekly|חודשי|שנתי)\)\s*/i;
 
@@ -248,6 +259,11 @@ export function chargesFrom(msg: MailMessage): Charge[] {
     return [{ ...base, key: `paypal:${norm(merchant)}`, name: merchant, icon: "🅿️", cancel: PAYPAL_CANCEL, known: true, strong: true, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text) }];
   }
 
+  const sender = SERVICES.find((s) => s.domains.some((d) => domainMatches(domain, d)));
+  if (sender && !BILLING_SUBJECT.test(msg.subject) && ACCOUNT.test(msg.subject) && !PROMO.test(msg.subject))
+    return [{ ...base, key: sender.key, name: sender.name, icon: sender.icon, cancel: sender.cancel, known: true, strong: false, account: true, amount: null, currency: null, cycle: null, renews: null }];
+
+  // Several services can share a domain; the receipt's wording picks which.
   const service = SERVICES.find((s) => s.domains.some((d) => domainMatches(domain, d)) && (!s.match || s.match.test(all)));
   if (service) {
     if (!BILLING_SUBJECT.test(msg.subject)) return [];
@@ -257,6 +273,7 @@ export function chargesFrom(msg: MailMessage): Charge[] {
   if (SERVICES.some((s) => s.domains.some((d) => domainMatches(domain, d))) || domainMatches(domain, "google.com") || domainMatches(domain, "apple.com")) return [];
 
   if (!RECEIPT.test(msg.subject) || !amount) return [];
+  if (ONE_OFF_DOMAINS.some((d) => domainMatches(domain, d)) || ONE_OFF.test(msg.subject) || ONE_OFF.test(senderName(msg.from))) return [];
   const labels = domain.split(".");
   const site = labels.slice(/\.(co|org|net|ac|gov)\.[a-z]{2}$/.test(domain) ? -3 : -2).join(".");
   return [{ ...base, key: `mail:${site}`, name: senderName(msg.from), icon: "💳", cancel: null, known: false, strong: SUBSCRIPTIONY.test(all), amount: amount.value, currency: amount.currency, cycle: detectCycle(all), renews: findRenewal(msg.text) }];
@@ -292,6 +309,14 @@ export function summarize(charges: Charge[], today: string): DetectedSub[] {
   const out: DetectedSub[] = [];
   for (const [key, list] of groups) {
     list.sort((a, b) => a.day.localeCompare(b.day));
+    const accountOnly = list.every((c) => c.account);
+    if (accountOnly) {
+      // Logins and passcodes lately, but no receipt here: the account is live and billed somewhere else.
+      const latest = list.at(-1)!;
+      if (diffDays(latest.day, today) <= 60) out.push({ key, name: latest.name, icon: latest.icon, cancel: latest.cancel, amount: null, currency: null, cycle: "monthly", last: latest.day, next: null, stale: false, unpriced: true, charges: [] });
+      continue;
+    }
+    list.splice(0, list.length, ...list.filter((c) => !c.account));
     const paid = list.filter((c) => c.amount !== null);
     // Same-day duplicates (receipt + invoice) count once for the pattern.
     const payDays = [...new Set(paid.map((c) => c.day))];

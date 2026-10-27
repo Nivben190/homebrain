@@ -585,6 +585,8 @@ export const he: Dict = {
     hide: "זה לא מנוי",
     unhide: "להציג שוב",
     emails: "מהמייל שלך",
+    accountOnly: "נמצא חשבון · החיוב במקום אחר — לחצו להוספת מחיר",
+    fromCard: "חיוב חודשי בכרטיס",
     fromGmail: "נמצא ב-Gmail",
     newFoundTitle: "💳 נמצאו {n} מנויים חדשים",
     chargedAgainTitle: "⚠️ {name} חייב אותך שוב",

@@ -82,14 +82,15 @@ async function mergeSubs(db: Db, profile: Profile, sectionId: string, found: Det
   for (const d of found) {
     const existing = byKey.get(d.key);
     if (!existing) {
-      const sub: SubProps = { key: d.key, source: "gmail", status: "active", amount: d.amount, currency: d.currency ?? "ILS", cycle: d.cycle, next: d.next, last: d.last, cancel: d.cancel, icon: d.icon, remind: d.cycle === "yearly", stale: d.stale, charges: d.charges };
+      const sub: SubProps = { key: d.key, source: "gmail", status: "active", amount: d.amount, currency: d.currency ?? "ILS", cycle: d.cycle, next: d.next, last: d.last, cancel: d.cancel, icon: d.icon, remind: d.cycle === "yearly", stale: d.stale, charges: d.charges, ...(d.unpriced ? { unpriced: true } : {}) };
       await db.from("items").insert({ section_id: sectionId, title: d.name, created_by: profile.user_id, position: position++, ...subPatch({}, sub, profile.timezone, new Set(), now) });
       added.push(d.name);
       continue;
     }
     const old = readSub(existing.props)!;
     if (old.status === "hidden") continue;
-    const sub: SubProps = { ...old, last: d.last, stale: d.stale, charges: d.charges, cancel: old.cancel ?? d.cancel };
+    const { unpriced: _was, ...kept } = old; // eslint-disable-line @typescript-eslint/no-unused-vars
+    const sub: SubProps = { ...kept, last: d.last, stale: d.stale, charges: d.charges, cancel: old.cancel ?? d.cancel, ...(d.unpriced && !old.edited ? { unpriced: true } : {}) };
     if (old.edited) sub.next = rollForward(d.last, old.cycle, today);
     else Object.assign(sub, { amount: d.amount, currency: d.currency ?? old.currency, cycle: d.cycle, next: d.next });
     if (old.status === "cancelled" && old.cancelledOn && d.last > old.cancelledOn && !old.chargedAfterCancel) {

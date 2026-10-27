@@ -17,6 +17,28 @@ describe("money", () => {
   });
 });
 
+describe("accounts & one-offs", () => {
+  const today = "2026-10-27";
+  it("lists a known service with a live account but no receipts, price unknown", () => {
+    const mails = [
+      msg("Disney+ <disneyplus@trx.mail2.disneyplus.com>", "We noticed a new login", "…", "2026-10-19", "a"),
+      msg("Disney+ <disneyplus@trx.mail2.disneyplus.com>", "Your one-time passcode for Disney+", "…", "2026-10-23", "b"),
+      msg("Disney+ <news@mailer.apps.disneyplus.com>", "זוטרופוליס 2 נחת בדיסני+ | פרסומת", "…", "2026-10-01", "c"),
+    ];
+    const subs = summarize(mails.flatMap(chargesFrom), today);
+    expect(subs).toHaveLength(1);
+    expect(subs[0]).toMatchObject({ key: "disney", amount: null, unpriced: true, next: null });
+  });
+  it("ignores an old account and promos alone", () => {
+    expect(summarize([msg("x <a@trx.mail2.disneyplus.com>", "We noticed a new login", "…", "2026-05-01")].flatMap(chargesFrom), today)).toEqual([]);
+    expect(chargesFrom(msg("x <a@mailer.apps.disneyplus.com>", "Welcome to the sale | פרסומת", "…", "2026-10-20"))).toEqual([]);
+  });
+  it("never takes hotel or travel bookings for subscriptions", () => {
+    const hotel = (d: string) => msg("Clarion Hotel Helsinki Airport through Booking.com <noreply@mchat.booking.com>", "Your receipt", "Total €129.00", d, d);
+    expect(summarize([hotel("2026-08-01"), hotel("2026-09-01"), hotel("2026-10-01")].flatMap(chargesFrom), today)).toEqual([]);
+  });
+});
+
 describe("dates & cycles", () => {
   it("parses dates in English, Hebrew and numeric (day first)", () => {
     expect(parseLooseDate("Renews 3 November 2026")).toBe("2026-11-03");

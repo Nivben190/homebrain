@@ -19,7 +19,8 @@ export interface SubCharge {
 export interface SubProps {
   /** Detection key (gmail); null for ones added by hand. */
   key: string | null;
-  source: "gmail" | "manual";
+  /** gmail: found in receipts · card: a monthly charge in a Spending space · manual: added by hand. */
+  source: "gmail" | "card" | "manual";
   status: "active" | "cancelled" | "hidden";
   amount: number | null;
   currency: Currency;
@@ -32,6 +33,8 @@ export interface SubProps {
   /** The user changed price/cycle/date: later scans keep their values. */
   edited?: boolean;
   stale?: boolean;
+  /** Account seen in the mailbox but no receipts there: price unknown until set. */
+  unpriced?: boolean;
   cancelledOn?: string | null;
   chargedAfterCancel?: boolean;
   charges?: SubCharge[];
