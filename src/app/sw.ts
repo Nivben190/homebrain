@@ -16,6 +16,10 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: defaultCache,
+  // Pages that can't load without a connection show the precached offline screen.
+  fallbacks: {
+    entries: [{ url: "/~offline", matcher: ({ request }) => request.destination === "document" }],
+  },
 });
 
 serwist.addEventListeners();

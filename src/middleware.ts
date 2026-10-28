@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC = ["/login", "/privacy", "/auth/", "/api/", "/icons/", "/manifest.webmanifest", "/sw.js", "/swe-worker"];
+const PUBLIC = ["/login", "/privacy", "/auth/", "/api/", "/icons/", "/manifest.webmanifest", "/sw.js", "/swe-worker", "/~offline"];
 
 /** Refreshes the Supabase session cookie and sends signed-out users to /login. */
 export async function middleware(request: NextRequest) {

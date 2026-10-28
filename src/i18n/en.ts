@@ -167,6 +167,14 @@ export const en = {
     startIn: "Starts in (min)",
     duration: "Duration (min)",
   },
+  errors: {
+    title: "Something went wrong",
+    body: "This screen hit an error. Your data is safe — try again, or go back to Today.",
+    retry: "Try again",
+    home: "Back to Today",
+    notFoundTitle: "Not here anymore",
+    notFoundBody: "This space or reminder was deleted, or the link is old.",
+  },
   run: {
     markDone: "Mark done",
     completed: "Completed",

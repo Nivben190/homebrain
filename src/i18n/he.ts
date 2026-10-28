@@ -169,6 +169,14 @@ export const he: Dict = {
     startIn: "מתחיל בעוד (דק׳)",
     duration: "משך (דק׳)",
   },
+  errors: {
+    title: "משהו השתבש",
+    body: "קרתה שגיאה במסך הזה. המידע שלכם שמור — נסו שוב, או חזרו ל״היום״.",
+    retry: "נסו שוב",
+    home: "חזרה ל״היום״",
+    notFoundTitle: "זה כבר לא כאן",
+    notFoundBody: "המרחב או התזכורת נמחקו, או שהקישור ישן.",
+  },
   run: {
     markDone: "סימון כבוצע",
     completed: "בוצע",
