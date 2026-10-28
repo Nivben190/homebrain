@@ -13,7 +13,8 @@ select cron.schedule(
       'Content-Type', 'application/json'
     ),
     body := '{}'::jsonb,
-    timeout_milliseconds := 5000
+    -- Matches the route's 300 s limit, so pg_net doesn't hang up on a long scan.
+    timeout_milliseconds := 300000
   );
   $$
 );

@@ -34,7 +34,7 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Camera photos go through a file input (no permission needed); "Use my location" needs geolocation.
+  // The app's own pages may use the camera and location ("Use my location"); nothing embedded may.
   { key: "Permissions-Policy", value: "camera=(self), geolocation=(self), microphone=(), payment=(), usb=()" },
   { key: "Content-Security-Policy-Report-Only", value: csp },
 ];

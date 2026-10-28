@@ -292,8 +292,11 @@ export async function handleDate(itemId: string, handled: boolean) {
   const done = await handledDays(supabase, itemId);
   const occurrence = handled ? currentOccurrence(spec, today, (d) => done.has(d)) : [...done].sort().at(-1);
   if (!occurrence) return;
-  if (handled) await supabase.from("checkins").upsert({ item_id: itemId, day: occurrence, status: "done" }, { onConflict: "item_id,day" });
-  else await supabase.from("checkins").delete().eq("item_id", itemId).eq("day", occurrence);
+  const { error } = handled
+    ? await supabase.from("checkins").upsert({ item_id: itemId, day: occurrence, status: "done" }, { onConflict: "item_id,day" })
+    : await supabase.from("checkins").delete().eq("item_id", itemId).eq("day", occurrence);
+  // Thrown so the space screen undoes its optimistic change and offers Retry.
+  if (error) throw new Error(error.message);
   await afterDateHandled(supabase, itemId, profile.timezone);
   revalidatePath("/");
 }

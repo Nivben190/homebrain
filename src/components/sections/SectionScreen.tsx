@@ -85,7 +85,8 @@ export function SectionScreen({
   const [undoItem, setUndoItem] = useState<Item | null>(null);
   const [syncToast, setSyncToast] = useState<{ ok: boolean; text: string; link?: string } | null>(null);
   // A write that didn't reach the database (e.g. no signal): its change was undone; Retry redoes it.
-  const [failed, setFailed] = useState<{ retry: () => void } | null>(null);
+  // Several can fail in a row (no signal); Retry redoes all of them.
+  const [failed, setFailed] = useState<(() => void)[]>([]);
 
   /** Runs a write; if it fails, undoes the optimistic change and offers Retry. */
   const persist = useCallback(async (write: () => PromiseLike<{ error: unknown }>, revert: () => void, retry: () => void) => {
@@ -98,7 +99,7 @@ export function SectionScreen({
     if (!error) return true;
     console.error("[save] failed", error);
     revert();
-    setFailed({ retry });
+    setFailed((f) => [...f, retry]);
     return false;
   }, []);
 
@@ -246,7 +247,7 @@ export function SectionScreen({
     const save = async (): Promise<boolean> => {
       setItems((p) => [...p, temp]);
       return persist(
-        () => sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at }),
+        () => sb.from("items").upsert({ id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at }),
         () => setItems((p) => p.filter((i) => i.id !== temp.id)),
         () => void save(),
       );
@@ -263,7 +264,7 @@ export function SectionScreen({
     const row = { id: crypto.randomUUID(), section_id: section.id, title: c.title, props: c.props, remind_at: c.remind_at, position: (sorted.at(-1)?.position ?? 0) + 1 };
     const save = async () => {
       setItems((p) => [...p, { ...row, done: false, due_at: null, assignee_id: null, created_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
-      await persist(() => sb.from("items").insert(row), () => setItems((p) => p.filter((i) => i.id !== row.id)), () => void save());
+      await persist(() => sb.from("items").upsert(row), () => setItems((p) => p.filter((i) => i.id !== row.id)), () => void save());
     };
     await save();
   }
@@ -276,7 +277,8 @@ export function SectionScreen({
     const day = handled ? currentOccurrence(spec, todayKey(timeZone), (d) => days.has(d)) : [...days].sort().at(-1);
     if (!day) return;
     const rest = (p: CheckinRow[]) => p.filter((c) => !(c.item_id === item.id && c.day === day));
-    const before = { checkins, done: item.done };
+    const mine = (c: CheckinRow) => c.item_id === item.id && c.day === day;
+    const before = { rows: checkins.filter(mine), done: item.done };
     if (handled) {
       setCheckins((p) => [...rest(p), { id: crypto.randomUUID(), item_id: item.id, user_id: userId, day, status: "done", note: null, created_at: new Date().toISOString() }]);
     } else setCheckins(rest);
@@ -287,7 +289,7 @@ export function SectionScreen({
         return { error: null };
       },
       () => {
-        setCheckins(before.checkins);
+        setCheckins((p) => [...p.filter((c) => !mine(c)), ...before.rows]);
         setItems((p) => p.map((i) => (i.id === item.id ? { ...i, done: before.done } : i)));
       },
       () => void handleDateItem(item, handled),
@@ -299,28 +301,40 @@ export function SectionScreen({
   async function checkIn(item: Item, status: "done" | "skipped" | null) {
     const day = todayKey(timeZone);
     const existing = checkins.find((c) => c.item_id === item.id && c.day === day);
-    const before = checkins;
     const retry = () => void checkIn(item, status);
+    // Undo only today's row for this item, so other pending check-ins survive.
+    const revert = () => setCheckins((p) => [...p.filter((c) => !(c.item_id === item.id && c.day === day)), ...(existing ? [existing] : [])]);
     if (status === null) {
       setCheckins((p) => p.filter((c) => c !== existing));
-      await persist(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", day), () => setCheckins(before), retry);
+      await persist(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", day), revert, retry);
       return;
     }
     const row: CheckinRow = { id: existing?.id ?? crypto.randomUUID(), item_id: item.id, user_id: userId, day, status, note: null, created_at: new Date().toISOString() };
     setCheckins((p) => [...p.filter((c) => c !== existing), row]);
-    const ok = await persist(() => sb.from("checkins").upsert({ id: row.id, item_id: item.id, day, status }, { onConflict: "item_id,day" }), () => setCheckins(before), retry);
+    const ok = await persist(() => sb.from("checkins").upsert({ id: row.id, item_id: item.id, day, status }, { onConflict: "item_id,day" }), revert, retry);
     if (ok && status === "done") celebrate();
   }
 
   const update = useCallback(
-    async function apply(id: string, patch: Partial<Item>) {
-      let old: Item | undefined;
-      setItems((p) => p.map((i) => (i.id === id ? ((old = i), { ...i, ...patch }) : i)));
+    async function updateItem(id: string, patch: Partial<Item>) {
+      let previous: Partial<Item> | undefined;
+      setItems((p) =>
+        p.map((i) => {
+          if (i.id !== id) return i;
+          previous = Object.fromEntries(Object.keys(patch).map((k) => [k, i[k as keyof Item]])) as Partial<Item>;
+          return { ...i, ...patch };
+        }),
+      );
       setOpenItem((o) => (o?.id === id ? { ...o, ...patch } : o));
       await persist(
         () => sb.from("items").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id),
-        () => old && setItems((p) => p.map((i) => (i.id === id ? old! : i))),
-        () => void apply(id, patch),
+        () => {
+          if (!previous) return;
+          const undo = previous;
+          setItems((p) => p.map((i) => (i.id === id ? { ...i, ...undo } : i)));
+          setOpenItem((o) => (o?.id === id ? { ...o, ...undo } : o));
+        },
+        () => void updateItem(id, patch),
       );
     },
     [sb, persist],
@@ -332,21 +346,21 @@ export function SectionScreen({
     const prev = pending.current;
     if (prev) {
       clearTimeout(prev.timer);
-      void purge(prev.item);
+      void deleteForGood(prev.item);
     }
     setItems((p) => p.filter((i) => i.id !== id));
     setOpenItem(null);
     const timer = setTimeout(() => {
       pending.current = null;
       setUndoItem(null);
-      void purge(item);
+      void deleteForGood(item);
     }, 5000);
     pending.current = { item, timer };
     setUndoItem(item);
   }
 
   /** The real delete after the undo window; a failed one puts the item back. */
-  function purge(item: Item) {
+  function deleteForGood(item: Item) {
     return persist(() => purgeItem(item), () => setItems((p) => (p.some((i) => i.id === item.id) ? p : [...p, item])), () => remove(item.id));
   }
 
@@ -572,7 +586,7 @@ export function SectionScreen({
 
       {/* A change that didn't save (no signal?) was undone; Retry redoes it. */}
       <AnimatePresence>
-        {failed && (
+        {failed.length > 0 && (
           <motion.div
             role="alert"
             initial={{ y: -30, opacity: 0 }}
@@ -580,18 +594,21 @@ export function SectionScreen({
             exit={{ y: -30, opacity: 0 }}
             className="fixed inset-x-4 top-[max(env(safe-area-inset-top),1rem)] z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-danger py-2 pe-2 ps-4 text-white shadow-xl"
           >
-            <span className="min-w-0 flex-1 text-sm font-semibold">{t.sections.saveFailed}</span>
+            <span className="min-w-0 flex-1 text-sm font-semibold">
+              {t.sections.saveFailed}
+              {failed.length > 1 && ` (${failed.length})`}
+            </span>
             <button
               onClick={() => {
-                const retry = failed.retry;
-                setFailed(null);
-                retry();
+                const retries = failed;
+                setFailed([]);
+                retries.forEach((retry) => retry());
               }}
               className="h-9 rounded-xl bg-white/20 px-3 text-sm font-bold"
             >
               {t.sections.retry}
             </button>
-            <button onClick={() => setFailed(null)} aria-label={t.common.cancel} className="h-9 w-9 rounded-xl text-lg leading-none">
+            <button onClick={() => setFailed([])} aria-label={t.common.cancel} className="h-9 w-9 rounded-xl text-lg leading-none">
               ×
             </button>
           </motion.div>

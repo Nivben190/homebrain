@@ -8,7 +8,7 @@ export interface PhaseResult {
 }
 
 /** A thrown Error, or a Supabase error object, as one readable line. */
-function describe(e: unknown) {
+function errorText(e: unknown) {
   if (e instanceof Error) return String(e);
   if (e && typeof e === "object" && typeof (e as { message?: unknown }).message === "string") return (e as { message: string }).message;
   return String(e);
@@ -24,7 +24,7 @@ export async function runPhases<T>(list: [name: string, run: () => Promise<T[]>]
       phases.push({ phase, ok: true });
     } catch (e) {
       console.error(`[engine] phase ${phase} failed`, e);
-      phases.push({ phase, ok: false, error: describe(e) });
+      phases.push({ phase, ok: false, error: errorText(e) });
     }
   }
   return { outcomes, phases };
