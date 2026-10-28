@@ -96,6 +96,8 @@ export const he: Dict = {
     hideDone: "הסתרת שבוצעו",
     deleted: "נמחק",
     undo: "ביטול",
+    saveFailed: "לא נשמר. בדקו את החיבור.",
+    retry: "נסו שוב",
     notes: "הערות",
     due: "תאריך יעד",
     addToCalendar: "הוספה ליומן",

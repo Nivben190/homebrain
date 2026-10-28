@@ -29,11 +29,11 @@ import { notesShortcutUrl } from "@/lib/engine/render";
 
 const SYNC_KEY = "hb:notes-sync";
 
-/** Deletes an item for real, including its photos in storage. */
+/** Deletes an item for real, then its photos in storage (only once the row is gone). */
 async function purgeItem(item: Item) {
-  const sb = supabaseBrowser();
-  await sb.from("items").delete().eq("id", item.id);
-  await Promise.all(readPhotos(item.props).map(deleteAttachment));
+  const { error } = await supabaseBrowser().from("items").delete().eq("id", item.id);
+  if (!error) await Promise.all(readPhotos(item.props).map(deleteAttachment));
+  return { error };
 }
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import { fill } from "@/i18n";
@@ -84,6 +84,23 @@ export function SectionScreen({
   const pending = useRef<{ item: Item; timer: ReturnType<typeof setTimeout> } | null>(null);
   const [undoItem, setUndoItem] = useState<Item | null>(null);
   const [syncToast, setSyncToast] = useState<{ ok: boolean; text: string; link?: string } | null>(null);
+  // A write that didn't reach the database (e.g. no signal): its change was undone; Retry redoes it.
+  const [failed, setFailed] = useState<{ retry: () => void } | null>(null);
+
+  /** Runs a write; if it fails, undoes the optimistic change and offers Retry. */
+  const persist = useCallback(async (write: () => PromiseLike<{ error: unknown }>, revert: () => void, retry: () => void) => {
+    let error: unknown;
+    try {
+      ({ error } = await write());
+    } catch (e) {
+      error = e;
+    }
+    if (!error) return true;
+    console.error("[save] failed", error);
+    revert();
+    setFailed({ retry });
+    return false;
+  }, []);
 
   // Back from the Notes Shortcut: reload the list (the socket sleeps while away)
   // and show what the sync did.
@@ -226,8 +243,15 @@ export function SectionScreen({
     if (section.view === "wheel") temp.props = { [WHEEL_PROP]: { options: [] } };
     if (section.view === "commit") Object.assign(temp, newCommit(title, new Date(), timeZone));
     if (isSubs) temp.props = { [SUB_PROP]: manualSub(locale === "he" ? "ILS" : "USD") };
-    setItems((p) => [...p, temp]);
-    await sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at });
+    const save = async (): Promise<boolean> => {
+      setItems((p) => [...p, temp]);
+      return persist(
+        () => sb.from("items").insert({ id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at }),
+        () => setItems((p) => p.filter((i) => i.id !== temp.id)),
+        () => void save(),
+      );
+    };
+    if (!(await save())) return;
     // New tracker items go straight to their schedule; memories to their photos; reminders to their alerts.
     if (kind.opensSheetOnAdd) setOpenItem(temp);
     else inputRef.current?.focus();
@@ -237,8 +261,11 @@ export function SectionScreen({
   async function addCommit(text: string, period: Period, limit?: number) {
     const c = newCommit(text, new Date(), timeZone, period, limit);
     const row = { id: crypto.randomUUID(), section_id: section.id, title: c.title, props: c.props, remind_at: c.remind_at, position: (sorted.at(-1)?.position ?? 0) + 1 };
-    setItems((p) => [...p, { ...row, done: false, due_at: null, assignee_id: null, created_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
-    await sb.from("items").insert(row);
+    const save = async () => {
+      setItems((p) => [...p, { ...row, done: false, due_at: null, assignee_id: null, created_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      await persist(() => sb.from("items").insert(row), () => setItems((p) => p.filter((i) => i.id !== row.id)), () => void save());
+    };
+    await save();
   }
 
   /** "No more needed" (or undo) for a reminder-calendar item's current date. */
@@ -249,36 +276,54 @@ export function SectionScreen({
     const day = handled ? currentOccurrence(spec, todayKey(timeZone), (d) => days.has(d)) : [...days].sort().at(-1);
     if (!day) return;
     const rest = (p: CheckinRow[]) => p.filter((c) => !(c.item_id === item.id && c.day === day));
+    const before = { checkins, done: item.done };
     if (handled) {
       setCheckins((p) => [...rest(p), { id: crypto.randomUUID(), item_id: item.id, user_id: userId, day, status: "done", note: null, created_at: new Date().toISOString() }]);
-      celebrate();
     } else setCheckins(rest);
     if (spec.repeat === "once") setItems((p) => p.map((i) => (i.id === item.id ? { ...i, done: handled } : i)));
-    await handleDate(item.id, handled);
+    const ok = await persist(
+      async () => {
+        await handleDate(item.id, handled);
+        return { error: null };
+      },
+      () => {
+        setCheckins(before.checkins);
+        setItems((p) => p.map((i) => (i.id === item.id ? { ...i, done: before.done } : i)));
+      },
+      () => void handleDateItem(item, handled),
+    );
+    if (ok && handled) celebrate();
   }
 
   /** Check in (or undo) today's session for a tracker item. */
   async function checkIn(item: Item, status: "done" | "skipped" | null) {
     const day = todayKey(timeZone);
     const existing = checkins.find((c) => c.item_id === item.id && c.day === day);
+    const before = checkins;
+    const retry = () => void checkIn(item, status);
     if (status === null) {
       setCheckins((p) => p.filter((c) => c !== existing));
-      await sb.from("checkins").delete().eq("item_id", item.id).eq("day", day);
+      await persist(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", day), () => setCheckins(before), retry);
       return;
     }
     const row: CheckinRow = { id: existing?.id ?? crypto.randomUUID(), item_id: item.id, user_id: userId, day, status, note: null, created_at: new Date().toISOString() };
     setCheckins((p) => [...p.filter((c) => c !== existing), row]);
-    if (status === "done") celebrate();
-    await sb.from("checkins").upsert({ id: row.id, item_id: item.id, day, status }, { onConflict: "item_id,day" });
+    const ok = await persist(() => sb.from("checkins").upsert({ id: row.id, item_id: item.id, day, status }, { onConflict: "item_id,day" }), () => setCheckins(before), retry);
+    if (ok && status === "done") celebrate();
   }
 
   const update = useCallback(
-    async (id: string, patch: Partial<Item>) => {
-      setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    async function apply(id: string, patch: Partial<Item>) {
+      let old: Item | undefined;
+      setItems((p) => p.map((i) => (i.id === id ? ((old = i), { ...i, ...patch }) : i)));
       setOpenItem((o) => (o?.id === id ? { ...o, ...patch } : o));
-      await sb.from("items").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+      await persist(
+        () => sb.from("items").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id),
+        () => old && setItems((p) => p.map((i) => (i.id === id ? old! : i))),
+        () => void apply(id, patch),
+      );
     },
-    [sb],
+    [sb, persist],
   );
 
   function remove(id: string) {
@@ -287,17 +332,22 @@ export function SectionScreen({
     const prev = pending.current;
     if (prev) {
       clearTimeout(prev.timer);
-      void purgeItem(prev.item);
+      void purge(prev.item);
     }
     setItems((p) => p.filter((i) => i.id !== id));
     setOpenItem(null);
     const timer = setTimeout(() => {
       pending.current = null;
       setUndoItem(null);
-      void purgeItem(item);
+      void purge(item);
     }, 5000);
     pending.current = { item, timer };
     setUndoItem(item);
+  }
+
+  /** The real delete after the undo window; a failed one puts the item back. */
+  function purge(item: Item) {
+    return persist(() => purgeItem(item), () => setItems((p) => (p.some((i) => i.id === item.id) ? p : [...p, item])), () => remove(item.id));
   }
 
   /** Subscriptions found in Gmail are hidden instead (a scan would bring them back). */
@@ -516,6 +566,34 @@ export function SectionScreen({
                 🔗 {t.notesSync.linkIt}
               </button>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* A change that didn't save (no signal?) was undone; Retry redoes it. */}
+      <AnimatePresence>
+        {failed && (
+          <motion.div
+            role="alert"
+            initial={{ y: -30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -30, opacity: 0 }}
+            className="fixed inset-x-4 top-[max(env(safe-area-inset-top),1rem)] z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-danger py-2 pe-2 ps-4 text-white shadow-xl"
+          >
+            <span className="min-w-0 flex-1 text-sm font-semibold">{t.sections.saveFailed}</span>
+            <button
+              onClick={() => {
+                const retry = failed.retry;
+                setFailed(null);
+                retry();
+              }}
+              className="h-9 rounded-xl bg-white/20 px-3 text-sm font-bold"
+            >
+              {t.sections.retry}
+            </button>
+            <button onClick={() => setFailed(null)} aria-label={t.common.cancel} className="h-9 w-9 rounded-xl text-lg leading-none">
+              ×
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

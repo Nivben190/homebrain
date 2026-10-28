@@ -94,6 +94,8 @@ export const en = {
     hideDone: "Hide done",
     deleted: "Deleted",
     undo: "Undo",
+    saveFailed: "Couldn't save. Check your connection.",
+    retry: "Retry",
     notes: "Notes",
     due: "Due",
     addToCalendar: "Add to calendar",
