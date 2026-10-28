@@ -1,0 +1,40 @@
+name: Nightly backup
+
+# Free backups (roadmap 0.10): a pg_dump of the Supabase database, encrypted
+# with BACKUP_PASSPHRASE and kept as a workflow artifact for 30 days.
+# Secrets: SUPABASE_DB_URL (Project Settings → Database → Session pooler URI,
+# with the password) and BACKUP_PASSPHRASE (a long random string you keep safe).
+# Restore: download the artifact, then
+#   gpg --decrypt homebrain.dump.gpg > homebrain.dump
+#   pg_restore --no-owner --dbname "<target db url>" homebrain.dump
+
+on:
+  schedule:
+    - cron: "30 1 * * *" # 01:30 UTC, the middle of the night in Israel
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install pg_dump 17 (matches the database)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+      - name: Dump and encrypt
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --schema=public --schema=auth --schema=storage --file=homebrain.dump
+          gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_PASSPHRASE" --output homebrain.dump.gpg homebrain.dump
+          rm homebrain.dump
+          ls -la homebrain.dump.gpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: homebrain-${{ github.run_id }}
+          path: homebrain.dump.gpg
+          retention-days: 30
