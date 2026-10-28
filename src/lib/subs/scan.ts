@@ -123,7 +123,7 @@ async function notifyChanges(db: Db, profile: Profile, sectionId: string, c: { a
   if (c.added.length) await sendPush(db, profile.user_id, { title: fill(t.subs.newFoundTitle, { n: String(c.added.length) }), body: c.added.slice(0, 5).join(" · "), url });
 }
 
-/** Once a day per connected account, from the engine tick (one account per tick). */
+/** Once a day per connected account, from /api/cron/gmail (one account per call). */
 export async function scanDueGmail(db: Db, now = new Date()) {
   const cutoff = new Date(now.getTime() - 20 * 3600000).toISOString();
   const stale = `last_scan_at.is.null,last_scan_at.lt.${cutoff}`;
