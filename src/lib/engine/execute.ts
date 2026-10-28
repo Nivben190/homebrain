@@ -21,6 +21,7 @@ import { commitProps, readCommit, status, type CommitSpec } from "@/lib/commit";
 import { giftLine, wantsGift } from "@/lib/gifts";
 import { calendarAccess, upsertEvent } from "@/lib/gcal";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
+import { claimWithRetry, runPhases } from "./phases";
 
 /** Schedules more than this late (e.g. after downtime) are skipped instead of fired. */
 const MAX_LATENESS_MS = 30 * 60 * 1000;
@@ -174,13 +175,22 @@ export async function reschedule(db: Admin, automation: Automation, after = new 
   return next;
 }
 
-/** One engine heartbeat: fire due schedules and due delayed jobs. */
+/** One engine heartbeat. Each phase runs on its own, so one failure can't cancel the rest. */
 export async function tick(db: Admin, now = new Date()) {
-  const outcomes: FireOutcome[] = [];
+  return runPhases<FireOutcome>([
+    ["schedules", () => fireDueSchedules(db, now)],
+    ["fixed wakes", () => emitFixedWakes(db, now)],
+    // Briefing fallback, wrap-up, Shabbat shopping, dog food.
+    ["daily", async () => (await dailyJobs(db, now)).map((job) => ({ automationId: job, status: "fired" as const, reason: "daily" }))],
+    ["item reminders", () => fireDueItems(db, now)],
+    ["queued jobs", () => runDueJobs(db, now)],
+  ]);
+}
 
-  const { data: due, error: dueErr } = await db.rpc("claim_due_schedules", { p_limit: 50 });
-  if (dueErr) throw dueErr;
-  for (const { automation_id, due_at } of (due ?? []) as { automation_id: string; due_at: string }[]) {
+async function fireDueSchedules(db: Admin, now: Date) {
+  const outcomes: FireOutcome[] = [];
+  const due = await claimWithRetry<{ automation_id: string; due_at: string }>(() => db.rpc("claim_due_schedules", { p_limit: 50 }));
+  for (const { automation_id, due_at } of due) {
     const { data: a } = await db.from("automations").select("*").eq("id", automation_id).single<Automation>();
     if (!a) continue;
     try {
@@ -194,24 +204,26 @@ export async function tick(db: Admin, now = new Date()) {
     }
     await reschedule(db, a, now);
   }
+  return outcomes;
+}
 
-  outcomes.push(...(await emitFixedWakes(db, now)));
-  // Briefing fallback, wrap-up, Shabbat shopping, dog food.
-  for (const job of await dailyJobs(db, now)) outcomes.push({ automationId: job, status: "fired", reason: "daily" });
-
-  const { data: dueItems, error: itemsErr } = await db.rpc("claim_due_items", { p_limit: 50 });
-  if (itemsErr) throw itemsErr;
-  for (const { item_id, due_at } of (dueItems ?? []) as { item_id: string; due_at: string }[]) {
+async function fireDueItems(db: Admin, now: Date) {
+  const outcomes: FireOutcome[] = [];
+  const dueItems = await claimWithRetry<{ item_id: string; due_at: string }>(() => db.rpc("claim_due_items", { p_limit: 50 }));
+  for (const { item_id, due_at } of dueItems) {
     try {
       outcomes.push(await fireItemReminder(db, item_id, new Date(due_at), now));
     } catch (e) {
       outcomes.push({ automationId: item_id, status: "error", reason: String(e) });
     }
   }
+  return outcomes;
+}
 
-  const { data: jobs, error: jobsErr } = await db.rpc("claim_due_jobs", { p_limit: 50 });
-  if (jobsErr) throw jobsErr;
-  for (const job of (jobs ?? []) as Job[]) {
+async function runDueJobs(db: Admin, now: Date) {
+  const outcomes: FireOutcome[] = [];
+  const jobs = await claimWithRetry<Job>(() => db.rpc("claim_due_jobs", { p_limit: 50 }));
+  for (const job of jobs) {
     try {
       const { data: a } = await db.from("automations").select("*").eq("id", job.automation_id).single<Automation>();
       if (a?.enabled) outcomes.push(await fireAutomation(db, a, now));

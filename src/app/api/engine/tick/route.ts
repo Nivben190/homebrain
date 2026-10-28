@@ -13,8 +13,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const db = createSupabaseAdmin();
-  const outcomes = await tick(db);
+  // Always 200: a failed phase is reported in `phases` and the next minute tries again.
+  const { outcomes, phases } = await tick(db);
   // The daily Gmail check runs after the response, so reminders never wait on it.
   after(() => scanDueGmail(db).catch((e) => console.error("[gmail] daily scan", e)));
-  return NextResponse.json({ ok: true, outcomes });
+  return NextResponse.json({ ok: phases.every((p) => p.ok), phases, outcomes });
 }
