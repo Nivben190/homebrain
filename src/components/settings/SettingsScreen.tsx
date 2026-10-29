@@ -14,6 +14,8 @@ import type { Profile } from "@/lib/db-types";
 import { DailyBrainSettings, type DailyPrefs } from "./DailyBrainSettings";
 import { BrainStatusCard, type BrainStatus } from "./BrainStatusCard";
 import { YourDataCard } from "./YourDataCard";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 import { InviteLinkButton } from "@/components/InviteLinkButton";
 
 type ProfileForm = Pick<Profile, "display_name" | "emoji" | "timezone" | "wake_mode"> & { phone: string; wake_time: string; email: string };
@@ -57,8 +59,8 @@ export function SettingsScreen({
   const [p, setP] = useState(profile);
   const [emojiSheet, setEmojiSheet] = useState(false);
   const [push, setPush] = useState<PushState | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [saving, start] = useTransition();
+  const [, start] = useTransition();
+  const toast = useToast();
   const { copied, copy } = useCopy();
   const timezones = useMemo(() => (typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [p.timezone]), [p.timezone]);
 
@@ -66,10 +68,7 @@ export function SettingsScreen({
     getPushState().then(setPush);
   }, []);
 
-  const flash = (m: string) => {
-    setMsg(m);
-    setTimeout(() => setMsg(null), 2000);
-  };
+  const flash = (ok: boolean, error?: string) => (ok ? toast.success(t.settings.saved) : toast.error(t.failures[errorKey(error)]));
 
   const save = (patch: Partial<ProfileForm>) => {
     const next = { ...p, ...patch };
@@ -83,7 +82,7 @@ export function SettingsScreen({
         wake_mode: next.wake_mode,
         wake_time: next.wake_mode === "fixed" ? next.wake_time : null,
       });
-      flash(res.ok ? `✓ ${t.settings.saved}` : res.error);
+      flash(res.ok, res.ok ? undefined : res.error);
     });
   };
 
@@ -136,7 +135,7 @@ export function SettingsScreen({
           <p className="text-sm text-muted">{push === "granted" ? t.settings.enabled : push === "needs-install" ? t.today.installHint : push === "denied" ? "⛔" : t.today.enablePushHint}</p>
         </div>
         {push === "granted" ? (
-          <Button size="sm" variant="soft" onClick={async () => { const r = await sendTestPush(); flash(r.ok ? "🔔" : r.error); }}>
+          <Button size="sm" variant="soft" onClick={async () => { const r = await sendTestPush(); if (r.ok) toast.success("🔔"); else toast.error(r.error); }}>
             {t.settings.testPush}
           </Button>
         ) : (
@@ -226,9 +225,6 @@ export function SettingsScreen({
         </Button>
       </form>
 
-      {(msg || saving) && (
-        <div className="fixed inset-x-4 bottom-28 z-50 mx-auto max-w-xs rounded-2xl bg-fg px-4 py-2.5 text-center text-sm font-semibold text-bg shadow-xl">{saving ? t.common.loading : msg}</div>
-      )}
 
       <Sheet open={emojiSheet} onClose={() => setEmojiSheet(false)} title={t.onboarding.emoji}>
         <div className="pb-4">

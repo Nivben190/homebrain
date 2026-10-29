@@ -2,6 +2,14 @@ import type { Dict } from "./en";
 
 export const he: Dict = {
   app: { name: "המוח של הבית", tagline: "הבית שלכם, חושב קדימה." },
+  failures: {
+    offline: "אין חיבור. בדקו את הקליטה ונסו שוב.",
+    denied: "אין לכם גישה לזה יותר. נסו לרענן.",
+    invalidLogin: "אימייל או סיסמה שגויים.",
+    unconfirmed: "קודם אשרו את האימייל. בדקו את תיבת הדואר.",
+    tooMany: "יותר מדי ניסיונות. חכו קצת ונסו שוב.",
+    generic: "משהו השתבש. נסו שוב.",
+  },
   common: {
     save: "שמירה",
     cancel: "ביטול",

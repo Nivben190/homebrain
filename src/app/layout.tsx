@@ -4,6 +4,7 @@ import { I18nProvider } from "@/i18n/client";
 import { dirFor, getDict } from "@/i18n";
 import { getLocale } from "@/lib/session";
 import { MotionRoot } from "@/components/MotionRoot";
+import { Toaster } from "@/components/Toaster";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
@@ -35,7 +36,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <span />
         </div>
         <I18nProvider t={getDict(locale)} locale={locale}>
-          <MotionRoot>{children}</MotionRoot>
+          <MotionRoot>
+            <Toaster>{children}</Toaster>
+          </MotionRoot>
         </I18nProvider>
       </body>
     </html>

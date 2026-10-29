@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { requireHome, getT } from "@/lib/session";
 import { zonedParts } from "@/lib/engine/time";
-import { Card, IconTile, SectionTitle } from "@/components/ui";
+import { Card, IconTile, SectionTitle, Skeleton } from "@/components/ui";
 import { RunCard } from "@/components/today/RunCard";
 import { AwakeButton } from "@/components/today/AwakeButton";
 import { PushPrompt } from "@/components/today/PushPrompt";
@@ -231,7 +231,7 @@ export default async function TodayPage() {
           <InviteLinkButton variant="primary" />
         </div>
       )}
-      <Suspense fallback={<div className="glass mb-3 h-36 animate-pulse rounded-3xl" />}>
+      <Suspense fallback={<Skeleton className="mb-3 h-36" />}>
         <Day />
       </Suspense>
 

@@ -1,5 +1,13 @@
 export const en = {
   app: { name: "Home Brain", tagline: "Your home, thinking ahead." },
+  failures: {
+    offline: "No connection. Check your signal and try again.",
+    denied: "You don't have access to that anymore. Try reloading.",
+    invalidLogin: "Wrong email or password.",
+    unconfirmed: "Confirm your email first. Check your inbox.",
+    tooMany: "Too many tries. Wait a little, then try again.",
+    generic: "Something went wrong. Try again.",
+  },
   common: {
     save: "Save",
     cancel: "Cancel",

@@ -10,6 +10,8 @@ import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { Button, Input, Sheet } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 
 export type QuickSpace = CaptureSpace & { icon: string };
 export type QuickMember = { id: string; name: string; emoji: string };
@@ -46,7 +48,7 @@ export function QuickAdd({ spaces, members, timeZone }: { spaces: QuickSpace[]; 
   const [time, setTime] = useState<string | null | undefined>(undefined);
   const [who, setWho] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
 
   const parsed = useMemo(() => {
@@ -78,10 +80,9 @@ export function QuickAdd({ spaces, members, timeZone }: { spaces: QuickSpace[]; 
     setBusy(true);
     const res = await quickAdd({ sectionId: space.id, title: parsed.text, day: finalDay, time: finalDay ? finalTime : null, assigneeId: who });
     setBusy(false);
-    if (!res.ok) return setFlash(res.error);
+    if (!res.ok) return toast.error(t.failures[errorKey(res.error)]);
     if (spaceId) remember(parsed.text, spaceId);
-    setFlash(fill(t.quickAdd.added, { space: `${space.icon} ${space.title}` }));
-    setTimeout(() => setFlash(null), 1800);
+    toast.success(fill(t.quickAdd.added, { space: `${space.icon} ${space.title}` }));
     reset();
     router.refresh();
   }
@@ -136,7 +137,6 @@ export function QuickAdd({ spaces, members, timeZone }: { spaces: QuickSpace[]; 
               </label>
             )}
           </div>
-          {flash && <p className="text-sm font-semibold text-accent">{flash}</p>}
           <Button className="w-full" loading={busy} disabled={!space || !parsed.text}>
             {t.quickAdd.add}
           </Button>

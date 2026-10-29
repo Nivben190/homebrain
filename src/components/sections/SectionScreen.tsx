@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, Check, ChevronLeft, Lock, RefreshCw, Settings2, Undo2 } from "lucide-react";
+import { ArrowUp, Check, ChevronLeft, Lock, RefreshCw, Settings2 } from "lucide-react";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { useI18n } from "@/i18n/client";
@@ -36,6 +36,7 @@ async function purgeItem(item: Item) {
   return { error };
 }
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
+import { useToast } from "@/components/Toaster";
 import { idbQueue, isNetworkError, type QueuedWrite } from "@/lib/offline-queue";
 import { fill } from "@/i18n";
 import { spaceType } from "@/lib/registry/spaces";
@@ -84,11 +85,22 @@ export function SectionScreen({
   const [editing, setEditing] = useState(false);
   // Deletes wait a few seconds so they can be undone.
   const pending = useRef<{ item: Item; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const [undoItem, setUndoItem] = useState<Item | null>(null);
   const [syncToast, setSyncToast] = useState<{ ok: boolean; text: string; link?: string } | null>(null);
   // A write that didn't reach the database (e.g. no signal): its change was undone; Retry redoes it.
   // Several can fail in a row (no signal); Retry redoes all of them.
   const [failed, setFailed] = useState<(() => void)[]>([]);
+  const toast = useToast();
+  useEffect(() => {
+    if (!failed.length) return toast.dismiss("save-failed");
+    toast.error(
+      failed.length > 1 ? `${t.sections.saveFailed} (${failed.length})` : t.sections.saveFailed,
+      () => {
+        setFailed([]);
+        failed.forEach((retry) => retry());
+      },
+      "save-failed",
+    );
+  }, [failed, toast, t]);
 
   /** Runs a write; if it fails, undoes the optimistic change and offers Retry. */
   // With `queued`, a write made without signal keeps its change and waits in the offline queue instead.
@@ -368,11 +380,11 @@ export function SectionScreen({
     setOpenItem(null);
     const timer = setTimeout(() => {
       pending.current = null;
-      setUndoItem(null);
+      toast.dismiss("undo");
       void deleteForGood(item);
     }, 5000);
     pending.current = { item, timer };
-    setUndoItem(item);
+    toast.undo(`${t.sections.deleted}: ${item.title}`, undoRemove, section.notes_link ? t.notesSync.deleteHint : undefined);
   }
 
   /** The real delete after the undo window; a failed one puts the item back. */
@@ -400,7 +412,6 @@ export function SectionScreen({
     clearTimeout(p.timer);
     pending.current = null;
     setItems((prev) => [...prev, p.item]);
-    setUndoItem(null);
   }
 
   return (
@@ -596,59 +607,6 @@ export function SectionScreen({
                 🔗 {t.notesSync.linkIt}
               </button>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* A change that didn't save (no signal?) was undone; Retry redoes it. */}
-      <AnimatePresence>
-        {failed.length > 0 && (
-          <motion.div
-            role="alert"
-            initial={{ y: -30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -30, opacity: 0 }}
-            className="fixed inset-x-4 top-[max(env(safe-area-inset-top),1rem)] z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-danger py-2 pe-2 ps-4 text-white shadow-xl"
-          >
-            <span className="min-w-0 flex-1 text-sm font-semibold">
-              {t.sections.saveFailed}
-              {failed.length > 1 && ` (${failed.length})`}
-            </span>
-            <button
-              onClick={() => {
-                const retries = failed;
-                setFailed([]);
-                retries.forEach((retry) => retry());
-              }}
-              className="h-9 rounded-xl bg-white/20 px-3 text-sm font-bold"
-            >
-              {t.sections.retry}
-            </button>
-            <button onClick={() => setFailed([])} aria-label={t.common.cancel} className="h-9 w-9 rounded-xl text-lg leading-none">
-              ×
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Undo bar for the last delete */}
-      <AnimatePresence>
-        {undoItem && (
-          <motion.div
-            initial={{ y: 30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 30, opacity: 0 }}
-            className="fixed inset-x-4 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+9.75rem)] z-40 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-fg py-2 pe-2 ps-4 text-bg shadow-xl"
-          >
-            <span className="min-w-0 flex-1 text-sm font-semibold">
-              <span className="block truncate">
-                {t.sections.deleted}: {undoItem.title}
-              </span>
-              {section.notes_link && <span className="block text-xs font-medium opacity-70">{t.notesSync.deleteHint}</span>}
-            </span>
-            <button onClick={undoRemove} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-bg/15 px-3 text-sm font-bold">
-              <Undo2 className="size-4" /> {t.sections.undo}
-            </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { createAccount } from "@/app/actions";
+import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/i18n/client";
 import { Button, Input, Segmented } from "@/components/ui";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
@@ -47,12 +48,12 @@ export default function LoginPage() {
           return setError(t.login.exists);
         }
         const known: Record<string, string> = { not_invited: t.login.notInvited, too_many: t.login.tooMany };
-        return setError(known[res.error] ?? res.error);
+        return setError(known[res.error] ?? t.failures[errorKey(res.error)]);
       }
     }
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     setBusy(false);
-    if (error) return setError(/invalid/i.test(error.message) ? t.login.invalid : error.message);
+    if (error) return setError(t.failures[errorKey(error)]);
     // From an invite link: back to it, which sends a new account on to onboarding.
     router.replace(/^[0-9a-f]{32}$/.test(invite) ? `/join/${invite}` : "/");
     router.refresh();

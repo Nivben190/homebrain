@@ -4,6 +4,8 @@ import { LocateFixed, Search } from "lucide-react";
 import { updateProfile } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
 import { Button, Card, Input, SectionTitle, Toggle } from "@/components/ui";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 
 export interface DailyPrefs {
   place: string | null;
@@ -24,15 +26,16 @@ export function DailyBrainSettings({ initial, spaces }: { initial: DailyPrefs; s
   const s = t.settings;
   const [p, setP] = useState(initial);
   const [city, setCity] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
+  const toast = useToast();
+  const setStatus = (m: string) => toast.error(m);
   const [pending, start] = useTransition();
 
   const save = (patch: Partial<DailyPrefs> & { lat?: number; lon?: number }) => {
     setP((x) => ({ ...x, ...patch }));
     start(async () => {
       const res = await updateProfile(patch);
-      setStatus(res.ok ? `✓ ${s.saved}` : res.error);
-      setTimeout(() => setStatus(null), 1500);
+      if (res.ok) toast.success(s.saved);
+      else toast.error(t.failures[errorKey(res.error)]);
     });
   };
 
@@ -127,7 +130,6 @@ export function DailyBrainSettings({ initial, spaces }: { initial: DailyPrefs; s
             </div>
           )}
         </div>
-        {status && <p className="text-sm font-semibold text-accent">{status}</p>}
       </Card>
     </>
   );

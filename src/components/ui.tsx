@@ -389,3 +389,8 @@ export function IconTile({ icon, color, className }: { icon: string; color: stri
     </span>
   );
 }
+
+/** The one loading placeholder for cards. */
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden className={cn("glass animate-pulse rounded-3xl motion-reduce:animate-none", className)} />;
+}
