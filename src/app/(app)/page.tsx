@@ -153,7 +153,6 @@ export default async function TodayPage() {
   const now3 = pending.slice(0, 3);
   const incoming = requests.filter((r) => r.to_user === user.id);
   const dateShort = new Intl.DateTimeFormat(profile.locale, { day: "numeric", month: "short" });
-  const hasTimeline = practice.length > 0 || (dueQ.data?.length ?? 0) > 0 || upcoming.length > 0;
 
   return (
     <>
@@ -191,7 +190,7 @@ export default async function TodayPage() {
       )}
 
       {/* Today */}
-      {hasTimeline && <SectionTitle>{t.today.bandToday}</SectionTitle>}
+      <SectionTitle action={<Link href="/calendar" className="text-sm font-semibold text-accent">📅 {t.calendar.open} →</Link>}>{t.today.bandToday}</SectionTitle>
       {practice.length > 0 && <Suspense fallback={practiceList({})}><PracticeWithWeather /></Suspense>}
       {((dueQ.data?.length ?? 0) > 0 || upcoming.length > 0) && (
         <Card className="mt-3 divide-y divide-card-border p-0">

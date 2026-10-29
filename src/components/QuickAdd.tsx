@@ -17,6 +17,8 @@ export type QuickSpace = CaptureSpace & { icon: string };
 export type QuickMember = { id: string; name: string; emoji: string };
 
 const MEMORY = "quickadd-memory";
+/** Window event that opens quick-add from elsewhere, e.g. a calendar day: detail { day }. */
+export const QUICK_ADD_OPEN = "quickadd:open";
 const norm = (s: string) => s.trim().toLowerCase();
 
 /** Where the person last put this text, per device (a convenience, not shared state). */
@@ -65,6 +67,15 @@ export function QuickAdd({ spaces, members, timeZone }: { spaces: QuickSpace[]; 
   useEffect(() => {
     if (open) setTimeout(() => input.current?.focus(), 50);
   }, [open]);
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const day = (e as CustomEvent<{ day?: string }>).detail?.day;
+      if (day) setDay(day);
+      setOpen(true);
+    };
+    window.addEventListener(QUICK_ADD_OPEN, onOpen);
+    return () => window.removeEventListener(QUICK_ADD_OPEN, onOpen);
+  }, []);
 
   const reset = () => {
     setRaw("");

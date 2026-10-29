@@ -143,6 +143,17 @@ export const en = {
     revoke: "Revoke",
     shareTitle: "Our home on Home Brain",
   },
+  calendar: {
+    title: "Calendar",
+    prev: "Previous week",
+    next: "Next week",
+    thisWeek: "This week",
+    free: "Nothing planned",
+    allDay: "All day",
+    add: "Add to this day",
+    connectGoogle: "Connect Google Calendar",
+    open: "Calendar",
+  },
   onboarding: {
     title: "Let's set up your brain",
     name: "What should we call you?",

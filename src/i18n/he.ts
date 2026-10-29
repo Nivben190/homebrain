@@ -145,6 +145,17 @@ export const he: Dict = {
     revoke: "ביטול",
     shareTitle: "הבית שלנו ב-Home Brain",
   },
+  calendar: {
+    title: "לוח שנה",
+    prev: "השבוע הקודם",
+    next: "השבוע הבא",
+    thisWeek: "השבוע",
+    free: "אין תוכניות",
+    allDay: "כל היום",
+    add: "הוספה ליום הזה",
+    connectGoogle: "חיבור Google Calendar",
+    open: "לוח שנה",
+  },
   onboarding: {
     title: "בואו נגדיר את המוח שלכם",
     name: "איך לקרוא לך?",

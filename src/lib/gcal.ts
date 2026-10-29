@@ -74,3 +74,10 @@ export async function upsertEvent(access: string, e: CalendarEvent, eventId?: st
 export async function deleteEvent(access: string, eventId: string) {
   await call(access, "DELETE", `/events/${encodeURIComponent(eventId)}`);
 }
+
+/** Events on the primary calendar between two instants (roadmap 3.4); all-day ones carry a date. */
+export async function listEvents(access: string, timeMin: Date, timeMax: Date) {
+  const q = new URLSearchParams({ timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "100" });
+  const res = await call<{ items?: { summary?: string; start?: { date?: string; dateTime?: string } }[] } | null>(access, "GET", `/events?${q}`);
+  return (res?.items ?? []).flatMap((e) => (e.start?.date || e.start?.dateTime ? [{ title: e.summary ?? "", date: e.start.date ?? null, dateTime: e.start.dateTime ?? null }] : []));
+}
