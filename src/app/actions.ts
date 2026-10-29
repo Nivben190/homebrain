@@ -27,6 +27,8 @@ import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
 import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib/guest-links";
+import { INGREDIENTS_PROP, parseIngredients, readIngredients, shoppingFor } from "@/lib/meals";
+import { AMOUNT_PROP } from "@/lib/money";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
@@ -180,6 +182,78 @@ export async function saveHomeSecrets(text: string): Promise<Result> {
   const { profile, household } = await requireHome();
   if (profile.role !== "owner") return { ok: false, error: "owner only" };
   const { error } = await createSupabaseAdmin().from("home_info").upsert({ household_id: household.id, secrets: text.trim() ? sealToken(text.slice(0, 4000)) : null, updated_at: new Date().toISOString() });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Meal plan (roadmap 3.5)
+// ---------------------------------------------------------------------------
+
+export async function planMeal(day: string, itemId: string | null): Promise<Result> {
+  const { supabase, household } = await requireHome();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, error: "bad day" };
+  const q = itemId
+    ? supabase.from("meal_plan").upsert({ household_id: household.id, day, item_id: itemId })
+    : supabase.from("meal_plan").delete().eq("household_id", household.id).eq("day", day);
+  const { error } = await q;
+  revalidatePath("/meals");
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function saveIngredients(itemId: string, text: string): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { data: item } = await supabase.from("items").select("props").eq("id", itemId).single();
+  if (!item) return { ok: false, error: "not found" };
+  const { error } = await supabase.from("items").update({ props: { ...item.props, [INGREDIENTS_PROP]: parseIngredients(text) } }).eq("id", itemId);
+  revalidatePath("/meals");
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** One tap: the week's missing ingredients onto Groceries, checking the Fridge first. */
+export async function shopForPlan(from: string, to: string): Promise<Result<{ added: string[] }>> {
+  const { supabase } = await requireHome();
+  const [{ data: plan }, { data: spaces }] = await Promise.all([
+    supabase.from("meal_plan").select("items(props)").gte("day", from).lte("day", to).returns<{ items: { props: Record<string, unknown> } | null }[]>(),
+    supabase.from("sections").select("id,view,template").is("owner_id", null),
+  ]);
+  const groceries = (spaces ?? []).find((s) => s.template === "groceries") ?? (spaces ?? []).find((s) => s.view === "checklist" || s.view === "list");
+  if (!groceries) return { ok: false, error: "no list" };
+  const fridgeIds = (spaces ?? []).filter((s) => s.view === "fridge").map((s) => s.id);
+  const [{ data: fridge }, { data: onList }] = await Promise.all([
+    fridgeIds.length ? supabase.from("items").select("title,props").in("section_id", fridgeIds) : Promise.resolve({ data: [] as { title: string; props: Record<string, unknown> }[] }),
+    supabase.from("items").select("title").eq("section_id", groceries.id).eq("done", false),
+  ]);
+  const ingredients = (plan ?? []).flatMap((p) => (p.items ? readIngredients(p.items.props) : []));
+  const added = shoppingFor(ingredients, fridge ?? [], (onList ?? []).map((i) => i.title));
+  if (added.length) {
+    const base = Date.now() / 1000;
+    const { error } = await supabase.from("items").insert(added.map((title, n) => ({ section_id: groceries.id, title, position: base + n })));
+    if (error) return { ok: false, error: error.message };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, data: { added } };
+}
+
+// ---------------------------------------------------------------------------
+// Household money (roadmap 3.6)
+// ---------------------------------------------------------------------------
+
+export async function setBudget(category: string, amount: number | null): Promise<Result> {
+  const { supabase, household } = await requireHome();
+  if (!/^[a-z_]{1,30}$/.test(category) || (amount !== null && !(amount >= 0))) return { ok: false, error: "bad input" };
+  const { error } =
+    amount === null
+      ? await supabase.from("money_budgets").delete().eq("household_id", household.id).eq("category", category)
+      : await supabase.from("money_budgets").upsert({ household_id: household.id, category, amount });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function setBillAmount(itemId: string, amount: number | null): Promise<Result> {
+  const { supabase } = await requireHome();
+  if (amount !== null && !(amount >= 0)) return { ok: false, error: "bad input" };
+  const { data: item } = await supabase.from("items").select("props").eq("id", itemId).single();
+  if (!item) return { ok: false, error: "not found" };
+  const { error } = await supabase.from("items").update({ props: { ...item.props, [AMOUNT_PROP]: amount } }).eq("id", itemId);
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 

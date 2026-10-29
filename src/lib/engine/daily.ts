@@ -4,6 +4,7 @@ import type { Pet, Profile } from "@/lib/db-types";
 import type { PropertyDef } from "@/lib/registry/properties";
 import { EXPIRY_PROP, expiryStage, type ExpirySent } from "@/lib/expiry";
 import { pushAllowed } from "@/lib/calm";
+import { loadMonth } from "@/lib/money-data";
 import { getDict, fill } from "@/i18n";
 import { sendPush } from "@/lib/push";
 import { buildDay, dayScore, openTitles } from "@/lib/day";
@@ -157,6 +158,31 @@ export async function dailyJobs(db: Admin, now = new Date()) {
 
   sent.push(...(await foodAlerts(db, people ?? [], now)));
   sent.push(...(await expiryAlerts(db, people ?? [], now)));
+  sent.push(...(await monthEndSummary(db, people ?? [], now)));
+  return sent;
+}
+
+/** Last day of the month at 20:00: where the month's money went, once per person (roadmap 3.6). */
+async function monthEndSummary(db: Admin, people: Profile[], now: Date) {
+  const sent: string[] = [];
+  const homes = new Map<string, Profile[]>();
+  for (const p of people) if (p.household_id) homes.set(p.household_id, [...(homes.get(p.household_id) ?? []), p]);
+  for (const [home, members] of homes) {
+    const tz = members[0].timezone;
+    const today = todayKey(tz, now);
+    if (addDays(today, 1).slice(5, 7) === today.slice(5, 7) || !inWindow(minuteOfDay(zonedParts(now, tz)), "20:00")) continue;
+    const month = await loadMonth(db, home, today.slice(0, 7), tz);
+    if (month.total <= 0) continue;
+    for (const m of members) {
+      if (await sentToday(db, m, "money", now)) continue;
+      await markSent(db, m, "money");
+      const t = getDict(m.locale).daily;
+      const top = month.byCategory[0];
+      const cats = getDict(m.locale).spend.categories;
+      await sendPush(db, m.user_id, { title: fill(t.moneyTitle, { total: `₪${Math.round(month.total)}` }), body: top ? fill(t.moneyBody, { category: cats[top.category] ?? top.category, amount: `₪${Math.round(top.amount)}` }) : "", url: "/money" });
+      sent.push(`money:${m.user_id}`);
+    }
+  }
   return sent;
 }
 
