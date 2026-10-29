@@ -76,7 +76,7 @@ export function PhotoField({ photos, target, onChange }: { photos: Photo[]; targ
             <Spinner />
           </div>
         ))}
-        <button type="button" onClick={() => setMenu((m) => !m)} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-faint text-muted transition active:scale-95">
+        <button type="button" onClick={() => setMenu((m) => !m)} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-faint-deco text-muted transition active:scale-95">
           <Camera className="size-6" />
           <span className="text-[11px] font-semibold">{t.photos.add}</span>
         </button>

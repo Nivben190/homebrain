@@ -742,7 +742,7 @@ function ItemRow({
           aria-label="Toggle"
           className={cn(
             "flex size-7 shrink-0 items-center justify-center rounded-full border-2 transition",
-            item.done ? "border-success bg-success text-white" : "border-faint",
+            item.done ? "border-success bg-success text-white" : "border-faint-deco",
           )}
         >
           {item.done && <Check className="size-4" strokeWidth={3.5} />}

@@ -92,7 +92,7 @@ export function SettingsScreen({
       <PageHeader title={t.settings.title} action={<LanguageSwitch />} />
 
       <Card className="flex items-center gap-4">
-        <button onClick={() => setEmojiSheet(true)} className="flex size-16 shrink-0 items-center justify-center rounded-[1.4rem] bg-accent-soft text-4xl transition active:scale-90">
+        <button onClick={() => setEmojiSheet(true)} aria-label={t.onboarding.emoji} className="flex size-16 shrink-0 items-center justify-center rounded-[1.4rem] bg-accent-soft text-4xl transition active:scale-90">
           {p.emoji}
         </button>
         <div className="min-w-0 flex-1 space-y-2">

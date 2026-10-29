@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion, useDragControls } from "motion/react";
-import { forwardRef, useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useI18n } from "@/i18n/client";
@@ -204,17 +204,46 @@ export function Sheet({
   children: ReactNode;
 }) {
   const drag = useDragControls();
+  const panel = useRef<HTMLDivElement>(null);
+  // Callers pass inline onClose; keep the effect tied to `open` so focus isn't reset on every render.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
+    const opener = document.activeElement as HTMLElement | null;
     document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Focus moves into the sheet, stays there while it's open, and goes back to the opener on close.
+    const focusables = () =>
+      [...(panel.current?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])') ?? [])].filter((el) => el.offsetParent !== null);
+    const raf = requestAnimationFrame(() => {
+      if (!panel.current?.contains(document.activeElement)) (focusables()[0] ?? panel.current)?.focus();
+    });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return close.current();
+      if (e.key !== "Tab") return;
+      const list = focusables();
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => {
+      cancelAnimationFrame(raf);
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
+      opener?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>
@@ -228,8 +257,11 @@ export function Sheet({
             onClick={onClose}
           />
           <motion.div
+            ref={panel}
+            tabIndex={-1}
             role="dialog"
             aria-modal
+            aria-label={typeof title === "string" ? title : undefined}
             className={cn(
               "absolute inset-x-0 bottom-0 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-[2rem] bg-card-solid shadow-2xl",
               !footer && "safe-bottom",

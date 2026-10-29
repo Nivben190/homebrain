@@ -108,7 +108,7 @@ export function FridgeView({
                 </div>
               ))}
               {shots.length < 4 && !busy && (
-                <button onClick={() => input.current?.click()} className="flex size-16 items-center justify-center rounded-2xl border-2 border-dashed border-faint text-muted" aria-label={t.fridge.another}>
+                <button onClick={() => input.current?.click()} className="flex size-16 items-center justify-center rounded-2xl border-2 border-dashed border-faint-deco text-muted" aria-label={t.fridge.another}>
                   <Plus className="size-5" />
                 </button>
               )}
