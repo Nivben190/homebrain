@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { presentedToken } from "@/lib/hook-keys";
-import { authenticateHook } from "@/lib/hook-auth";
+import { authenticateHook, hookThrottle } from "@/lib/hook-auth";
+import { allow, tooMany } from "@/lib/rate-limit";
 import { createSupabaseAdmin, createSupabaseServer } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push";
 import { seeFridge } from "@/lib/fridge-vision";
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
 
   let userId: string | null = null;
   if (token) {
+    const limited = await hookThrottle(db, request, token);
+    if (limited) return limited;
     userId = await authenticateHook(db, token, "fridge");
   } else {
     const { data } = await (await createSupabaseServer()).auth.getUser();
@@ -63,6 +66,11 @@ export async function POST(request: Request) {
     .or(`settings->>scanningAt.is.null,settings->>scanningAt.lt.${new Date(started.getTime() - 130_000).toISOString()}`)
     .select("id");
   if (!claimed?.length) return NextResponse.json({ error: "already scanning" }, { status: 409 });
+  // Counted only once this request holds the scan, so losing the race costs nothing.
+  if (!(await allow(db, "fridgeScan", userId))) {
+    await db.from("sections").update({ settings: { lastScan: space.settings?.lastScan } }).eq("id", space.id);
+    return tooMany("fridgeScan");
+  }
   try {
     return await scan(space, images, me, token);
   } finally {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { presentedToken } from "@/lib/hook-keys";
-import { authenticateHook } from "@/lib/hook-auth";
+import { authenticateHook, hookThrottle } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { mergeNote, noteLines, type NoteState } from "@/lib/notes-sync";
 import type { Profile, Section } from "@/lib/db-types";
@@ -79,6 +79,8 @@ export async function POST(request: Request) {
   }
 
   const db = createSupabaseAdmin();
+  const limited = await hookThrottle(db, request, token);
+  if (limited) return reply("", await limited.json(), 429);
   const userId = await authenticateHook(db, token, "notes");
   const { data: me } = userId ? await db.from("profiles").select("*").eq("user_id", userId).maybeSingle<Profile>() : { data: null };
   if (!me?.household_id) return reply("", { error: "invalid token" }, 401);

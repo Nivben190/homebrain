@@ -72,6 +72,7 @@ export function FridgeView({
       form.append("space", section.id);
       const res = await fetch("/api/fridge/scan", { method: "POST", body: form });
       const data = await res.json();
+      if (res.status === 429) return setResult(t.fridge.limit);
       if (!res.ok) throw new Error(data.error);
       setResult(fill(t.fridge.result, { seen: data.seen, added: data.added.length, buy: data.toBuy.length }));
       shots.forEach((s) => URL.revokeObjectURL(s.url));

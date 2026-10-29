@@ -39,6 +39,7 @@ export const en = {
     exists: "You already have an account — sign in with your password.",
     inviteCode: "Invite code (from your partner's Me tab)",
     notInvited: "Sign-up is invite only. Ask your partner for the home's invite code.",
+    tooMany: "Too many tries. Wait an hour, then try again.",
   },
   onboarding: {
     title: "Let's set up your brain",
@@ -659,6 +660,7 @@ export const en = {
     lastScan: "Last scan {when}",
     result: "Saw {seen} products · {added} new · {buy} added to the shopping list",
     failed: "Couldn't scan this time. Try again with more light.",
+    limit: "That's the scan limit for today. Try again later.",
     missing: "Missing",
     onList: "Tap 🛒 to put it on the shopping list. Starred ones go there by themselves.",
     inside: "In the fridge",

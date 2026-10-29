@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
@@ -21,6 +21,7 @@ import { sendPush } from "@/lib/push";
 import { openToken, revokeToken } from "@/lib/subs/gmail";
 import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
 import type { Automation, RequestRow } from "@/lib/db-types";
+import { allow, clientIp } from "@/lib/rate-limit";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -47,6 +48,8 @@ export async function createAccount(input: { email: string; password: string; in
   const { email, password } = parsed.data;
 
   const admin = createSupabaseAdmin();
+  // Counted per IP before any lookup, so invite codes can't be guessed in bulk.
+  if (!(await allow(admin, "signUp", clientIp(await headers())))) return { ok: false, error: "too_many" };
   const code = input.inviteCode?.trim().toUpperCase() ?? "";
   const [{ data: invited }, { count }] = await Promise.all([
     code ? admin.from("households").select("id").eq("invite_code", code).maybeSingle() : Promise.resolve({ data: null }),

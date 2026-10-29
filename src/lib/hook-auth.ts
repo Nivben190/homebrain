@@ -1,12 +1,20 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { hashKey, legacyAccepted, signLaunch, verifyLaunch, type HookPurpose } from "./hook-keys";
+import { allow, clientIp, tooMany } from "./rate-limit";
 
 const launchSecret = () => process.env.HOOK_LAUNCH_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 /** A token the app can hand a Shortcut it launches (the Notes 🔄 button). */
 export function launchTokenFor(userId: string, purpose: HookPurpose) {
   return signLaunch(userId, purpose, launchSecret());
+}
+
+/** A 429 once this IP or this key has called too often, before any lookup or AI call; otherwise null. */
+export async function hookThrottle(db: SupabaseClient, request: Request, token: string) {
+  const [ipOk, keyOk] = await Promise.all([allow(db, "hookIp", clientIp(request.headers)), allow(db, "hookKey", hashKey(token))]);
+  if (!ipOk) return tooMany("hookIp");
+  return keyOk ? null : tooMany("hookKey");
 }
 
 /**

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { presentedToken } from "@/lib/hook-keys";
-import { authenticateHook } from "@/lib/hook-auth";
+import { authenticateHook, hookThrottle } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { handleEvent } from "@/lib/engine/execute";
 import { EVENT_TYPES } from "@/lib/engine/types";
@@ -31,6 +31,8 @@ export async function POST(request: Request) {
   if (!(EVENT_TYPES as readonly string[]).includes(type)) return NextResponse.json({ error: "unknown event type" }, { status: 400 });
 
   const db = createSupabaseAdmin();
+  const limited = await hookThrottle(db, request, token);
+  if (limited) return limited;
   const userId = await authenticateHook(db, token, "event");
   if (!userId) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 

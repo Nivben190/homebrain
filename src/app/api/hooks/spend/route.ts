@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { presentedToken } from "@/lib/hook-keys";
-import { authenticateHook } from "@/lib/hook-auth";
+import { authenticateHook, hookThrottle } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push";
 import { categorize, matchesCommit, parseSpendSms, merchantKey, pickSpendSpace, readTx, recurringCharges, spendKey, TX_PROP, type Tx } from "@/lib/spend";
@@ -31,6 +31,8 @@ export async function POST(request: Request) {
   text = text?.trim().slice(0, 1000) ?? "";
 
   const db = createSupabaseAdmin();
+  const limited = await hookThrottle(db, request, token);
+  if (limited) return limited;
   const userId = await authenticateHook(db, token, "spend");
   const { data: me } = userId ? await db.from("profiles").select("user_id,household_id,locale,timezone").eq("user_id", userId).maybeSingle() : { data: null };
   if (!me?.household_id) return NextResponse.json({ error: "invalid token" }, { status: 401 });

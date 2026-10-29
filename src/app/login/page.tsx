@@ -40,7 +40,8 @@ export default function LoginPage() {
           setMode("signin");
           return setError(t.login.exists);
         }
-        return setError(res.error === "not_invited" ? t.login.notInvited : res.error);
+        const known: Record<string, string> = { not_invited: t.login.notInvited, too_many: t.login.tooMany };
+        return setError(known[res.error] ?? res.error);
       }
     }
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
