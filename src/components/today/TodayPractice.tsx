@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown } from "lucide-react";
@@ -41,6 +41,25 @@ export function TodayPractice({
   const [showDone, setShowDone] = useState(false);
   const { node, celebrate } = useCelebrate();
   const today = todayKey(timeZone);
+
+  useEffect(() => {
+    const ids = new Set(items.map((i) => i.id));
+    const sb = supabaseBrowser();
+    const channel = sb
+      .channel("today-checkins")
+      .on("postgres_changes", { event: "*", schema: "public", table: "checkins" }, (p: { eventType: string; new: unknown; old: unknown }) => {
+        const row = (p.eventType === "DELETE" ? p.old : p.new) as Partial<CheckinRow>;
+        if (!row.item_id || !ids.has(row.item_id)) return;
+        setCheckins((list) => {
+          const rest = list.filter((c) => !(c.item_id === row.item_id && c.day === row.day));
+          return p.eventType === "DELETE" ? rest : [...rest, p.new as CheckinRow];
+        });
+      })
+      .subscribe();
+    return () => {
+      sb.removeChannel(channel);
+    };
+  }, [items]);
 
   const handled = (id: string) => checkins.some((c) => c.item_id === id && c.day === today);
   const todo = items.filter((i) => !handled(i.id) || settling.has(i.id));

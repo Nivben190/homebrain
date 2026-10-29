@@ -76,6 +76,9 @@ export const he: Dict = {
     starter: "להוסיף מוח התחלתי (מילים טובות בבוקר, מתיחות, אימון, רשימות לבית)",
   },
   today: {
+    bandNow: "עכשיו",
+    bandToday: "היום",
+    bandHome: "בבית",
     awake: "התעוררתי",
     awakeHint: "מתחיל את שגרת הבוקר",
     awakeDone: "הבוקר התחיל ☀️",

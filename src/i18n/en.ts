@@ -74,6 +74,9 @@ export const en = {
     starter: "Add the starter brain (morning love, stretch, workout, house lists)",
   },
   today: {
+    bandNow: "Now",
+    bandToday: "Today",
+    bandHome: "Home",
     awake: "I'm awake",
     awakeHint: "Starts your morning routine",
     awakeDone: "Morning started ☀️",
