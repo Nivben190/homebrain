@@ -10,6 +10,8 @@ import { NotesSyncHelp } from "@/components/settings/NotesSyncHelp";
 import { HookKeyField, type KeyInfo } from "@/components/settings/HookKey";
 import { ALARM_SHORTCUT_NAME, alarmShortcutUrl } from "@/lib/engine/render";
 import { legacyAccepted, type HookPurpose } from "@/lib/hook-keys";
+import { setupLight, type Light } from "@/lib/health";
+import { RecheckButton } from "@/components/settings/RecheckButton";
 
 function Steps({ steps }: { steps: string[] }) {
   return (
@@ -28,15 +30,29 @@ export default async function IphonePage() {
   const { supabase, user, profile } = await requireHome();
   const t = await getT();
   const origin = await appOrigin();
-  const [{ data: keys }, { data: legacy }] = await Promise.all([
+  const lastEvent = (type: string) => supabase.from("events").select("created_at").eq("user_id", user.id).eq("type", type).order("created_at", { ascending: false }).limit(1).maybeSingle<{ created_at: string }>();
+  const [{ data: keys }, { data: legacy }, { data: wake }, { data: store }] = await Promise.all([
     supabase.from("hook_keys").select("purpose,last_used_at").is("revoked_at", null).returns<{ purpose: HookPurpose; last_used_at: string | null }[]>(),
     createSupabaseAdmin().from("profiles").select("hook_token_used_at").eq("user_id", user.id).maybeSingle<{ hook_token_used_at: string | null }>(),
+    lastEvent("wake"),
+    lastEvent("arrive_store"),
   ]);
   const info = (purpose: HookPurpose): KeyInfo => {
     const key = keys?.find((k) => k.purpose === purpose);
     return { exists: !!key, lastUsedAt: key?.last_used_at ?? null };
   };
   const legacyUsedAt = legacyAccepted() ? legacy?.hook_token_used_at : null;
+  // A status light per integration from its key's last use or its latest event (roadmap 2.8).
+  const status = (last: string | null | undefined, quietDays: number) => {
+    const light: Light = setupLight(last, quietDays);
+    const dot = { green: "bg-[#22c55e]", amber: "bg-warn", red: "bg-danger" }[light];
+    return (
+      <span className="ms-auto flex items-center gap-1.5 text-xs font-semibold text-muted">
+        <span className={`size-2.5 rounded-full ${dot}`} aria-hidden />
+        {last ? fill(t.iphone.lastSeen, { when: when(last) }) : t.iphone.never}
+      </span>
+    );
+  };
   const when = (iso: string) => new Date(iso).toLocaleString(profile.locale === "he" ? "he-IL" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: profile.timezone });
 
   return (
@@ -46,6 +62,7 @@ export default async function IphonePage() {
       </Link>
       <h1 className="text-[30px] font-extrabold tracking-tight">📱 {t.iphone.title}</h1>
       <p className="mt-1 text-muted">{t.iphone.intro}</p>
+      <RecheckButton />
 
       {legacyUsedAt && (
         <p role="alert" className="mt-4 rounded-2xl bg-warn/15 p-3 text-sm font-semibold">
@@ -54,7 +71,7 @@ export default async function IphonePage() {
       )}
 
       <Card className="mt-6">
-        <h2 className="mb-3 text-lg font-extrabold">☀️ {t.iphone.wakeTitle}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold">☀️ {t.iphone.wakeTitle} {status(wake?.created_at, 2)}</h2>
         <Steps steps={t.iphone.wakeSteps} />
         <div className="mt-4 space-y-3">
           <CopyField label={t.iphone.hookUrl} value={`${origin}/api/hooks/event?type=wake`} />
@@ -63,7 +80,7 @@ export default async function IphonePage() {
       </Card>
 
       <Card className="mt-4">
-        <h2 className="mb-3 text-lg font-extrabold">🎙️ {t.iphone.siriTitle}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold">🎙️ {t.iphone.siriTitle} {status(info("capture").lastUsedAt, 14)}</h2>
         <Steps steps={t.iphone.siriSteps} />
         <p className="mt-3 text-sm text-muted">{t.iphone.siriHebrew}</p>
         <p className="mt-2 text-sm text-muted">🤝 {t.iphone.siriCommit}</p>
@@ -75,7 +92,7 @@ export default async function IphonePage() {
       </Card>
 
       <Card className="mt-4">
-        <h2 className="mb-3 text-lg font-extrabold">💸 {t.iphone.spendTitle}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold">💸 {t.iphone.spendTitle} {status(info("spend").lastUsedAt, 14)}</h2>
         <Steps steps={t.iphone.spendSteps} />
         <div className="mt-4 space-y-3">
           <CopyField label={t.iphone.spendUrl} value={`${origin}/api/hooks/spend`} />
@@ -84,7 +101,7 @@ export default async function IphonePage() {
       </Card>
 
       <Card className="mt-4">
-        <h2 className="mb-3 text-lg font-extrabold">🛒 {t.iphone.storeTitle}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold">🛒 {t.iphone.storeTitle} {status(store?.created_at, 14)}</h2>
         <Steps steps={t.iphone.storeSteps} />
         <div className="mt-4 space-y-2">
           <CopyField label={t.iphone.storeUrl} value={`${origin}/api/hooks/event?type=arrive_store`} />

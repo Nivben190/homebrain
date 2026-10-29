@@ -315,6 +315,9 @@ export const en = {
     saved: "Saved",
   },
   iphone: {
+    lastSeen: "{when}",
+    never: "Never received",
+    recheck: "Check again",
     siriTitle: "Siri: add to any space",
     siriPhrase: "Brain add",
     siriSteps: [

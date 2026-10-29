@@ -317,6 +317,9 @@ export const he: Dict = {
     saved: "נשמר",
   },
   iphone: {
+    lastSeen: "{when}",
+    never: "לא התקבל אף פעם",
+    recheck: "בדיקה חוזרת",
     siriTitle: "סירי: הוספה לכל מרחב",
     siriPhrase: "מוח תוסיף",
     siriSteps: [

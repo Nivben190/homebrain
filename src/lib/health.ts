@@ -15,3 +15,11 @@ export function tickHealth(status: EngineStatus | null, now = new Date()) {
   // A failing phase is retried next minute, so only a silent engine is "down".
   return { ok: ageSeconds <= MAX_TICK_AGE_SECONDS, ageSeconds, failedPhases: status.failed_phases };
 }
+
+export type Light = "green" | "amber" | "red";
+
+/** Setup status light for an iPhone integration (roadmap 2.8): red until it has ever reported, amber once it goes quiet. */
+export function setupLight(lastIso: string | null | undefined, quietDays: number, now = new Date()): Light {
+  if (!lastIso) return "red";
+  return now.getTime() - new Date(lastIso).getTime() > quietDays * 86_400_000 ? "amber" : "green";
+}
