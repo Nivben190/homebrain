@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MessageCircle, Pencil, Phone, Trash2 } from "lucide-react";
-import { deletePet, logPetWeight, newFoodBag, reorderFood } from "@/app/actions";
+import { deletePet, linkRoutine, logPetWeight, newFoodBag, reorderFood } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
 import { Button, Card, IconButton, IconTile, Input, SectionTitle, Sheet } from "@/components/ui";
@@ -22,6 +22,8 @@ export interface PetRoutine {
   open: string[];
   doneToday: number;
   tracker: boolean;
+  /** The pet this routine belongs to; null shows it for every pet. */
+  petId: string | null;
 }
 
 /** Tiny SVG line chart for weight history. */
@@ -45,7 +47,7 @@ function age(birthday: string, today: string, t: { years: string; months: string
   return months >= 12 ? fill(t.years, { n: Math.floor(months / 12) }) : fill(t.months, { n: Math.max(0, months) });
 }
 
-export function PetScreen({ pet, weights, routines, today }: { pet: Pet; weights: PetWeight[]; routines: PetRoutine[]; today: string }) {
+export function PetScreen({ pet, pets, weights, routines, today }: { pet: Pet; pets: Pick<Pet, "id" | "name" | "emoji">[]; weights: PetWeight[]; routines: PetRoutine[]; today: string }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -86,6 +88,18 @@ export function PetScreen({ pet, weights, routines, today }: { pet: Pet; weights
           <p className="text-muted">{[pet.breed, pet.birthday ? age(pet.birthday, today, t.pets) : null].filter(Boolean).join(" · ")}</p>
         </div>
       </div>
+
+      {/* Pet switcher (roadmap 3.10) */}
+      <nav aria-label={t.pets.switch} className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
+        {pets.map((p) => (
+          <Link key={p.id} href={`/pets/${p.id}`} aria-current={p.id === pet.id ? "page" : undefined} className={p.id === pet.id ? "shrink-0 rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-accent-fg" : "shrink-0 rounded-full bg-sunken px-3 py-1.5 text-sm font-semibold"}>
+            {p.emoji} {p.name}
+          </Link>
+        ))}
+        <Link href="/pets/new" className="shrink-0 rounded-full bg-sunken px-3 py-1.5 text-sm font-semibold">
+          + {t.pets.add}
+        </Link>
+      </nav>
 
       {/* Food */}
       <SectionTitle>🦴 {t.pets.food}</SectionTitle>
@@ -168,7 +182,8 @@ export function PetScreen({ pet, weights, routines, today }: { pet: Pet; weights
           <SectionTitle>🐾 {t.pets.routines}</SectionTitle>
           <div className="space-y-2">
             {routines.map((r) => (
-              <Link key={r.id} href={`/sections/${r.id}`} className="glass flex items-center gap-3 rounded-3xl p-3">
+              <div key={r.id} className="glass flex items-center gap-1 rounded-3xl pe-2">
+              <Link href={`/sections/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3 p-3">
                 <IconTile icon={r.icon} color={r.color} />
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold">{r.title}</span>
@@ -179,6 +194,21 @@ export function PetScreen({ pet, weights, routines, today }: { pet: Pet; weights
                 </span>
                 <ChevronRight className="size-5 text-faint rtl:rotate-180" />
               </Link>
+              {pets.length > 1 && (
+                <button
+                  aria-pressed={r.petId === pet.id}
+                  aria-label={fill(t.pets.onlyFor, { name: pet.name })}
+                  title={fill(t.pets.onlyFor, { name: pet.name })}
+                  onClick={async () => {
+                    await linkRoutine(r.id, r.petId === pet.id ? null : pet.id);
+                    router.refresh();
+                  }}
+                  className={r.petId === pet.id ? "rounded-full bg-accent-soft px-2 py-1 text-sm" : "rounded-full px-2 py-1 text-sm opacity-50"}
+                >
+                  {pet.emoji}📌
+                </button>
+              )}
+              </div>
             ))}
           </div>
         </>

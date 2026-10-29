@@ -530,6 +530,8 @@ export const en = {
     waiting: "Waiting on {name}",
   },
   pets: {
+    onlyFor: "Only for {name}",
+    switch: "Your pets",
     foodItem: "Food for {name} 🦴",
     foodWord: "food",
     theDog: "the dog",

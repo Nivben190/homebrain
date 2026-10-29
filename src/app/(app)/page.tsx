@@ -77,12 +77,12 @@ export default async function TodayPage() {
     // Memory-space items, for "On this day".
     supabase.from("items").select("id,title,props,section_id, sections!inner(view,schema,icon,color)").eq("sections.view", "gallery").returns<(Pick<Item, "id" | "title" | "props" | "section_id"> & { sections: Pick<Section, "schema" | "icon" | "color"> })[]>(),
     supabase.from("requests").select("*").in("status", ["open", "doing"]).order("created_at").returns<RequestRow[]>(),
-    supabase.from("pets").select("*").order("created_at").limit(1).returns<Pet[]>(),
+    supabase.from("pets").select("*").order("created_at").returns<Pet[]>(),
     supabase.from("activity").select("id,actor,kind,title,at").gte("at", dayAgo).order("at", { ascending: false }).limit(50).returns<ActivityRow[]>(),
   ]);
   const memberList = members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }));
   const otherMembers = memberList.filter((m) => m.id !== user.id);
-  const pet = petsQ.data?.[0] ?? null;
+  const pets = petsQ.data ?? [];
   const requests = requestsQ.data ?? [];
   const pending = pendingQ.data ?? [];
   const sectionById0 = new Map((sectionsQ.data ?? []).map((s) => [s.id, s]));
@@ -233,7 +233,7 @@ export default async function TodayPage() {
         <Day />
       </Suspense>
 
-      <QuickActions others={otherMembers} pet={pet ? { id: pet.id, name: pet.name, emoji: pet.emoji, daysLeft: foodDaysLeft(pet, today) } : null} />
+      <QuickActions others={otherMembers} pets={pets.map((pet) => ({ id: pet.id, name: pet.name, emoji: pet.emoji, daysLeft: foodDaysLeft(pet, today) }))} />
 
       {streaks.length > 0 && (
         <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">

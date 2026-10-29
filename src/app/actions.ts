@@ -135,6 +135,13 @@ export async function quickAdd(input: { sectionId: string; title: string; day: s
   return { ok: true };
 }
 
+/** Ties a routine space to one pet, or (null) shares it across all of them (roadmap 3.10). */
+export async function linkRoutine(sectionId: string, petId: string | null): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { error } = await supabase.from("sections").update({ pet_id: petId }).eq("id", sectionId);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Members and roles (roadmap 3.1)
 // ---------------------------------------------------------------------------

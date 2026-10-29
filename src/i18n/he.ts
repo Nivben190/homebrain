@@ -532,6 +532,8 @@ export const he: Dict = {
     waiting: "מחכה ל{name}",
   },
   pets: {
+    onlyFor: "רק עבור {name}",
+    switch: "החיות שלכם",
     foodItem: "אוכל ל{name} 🦴",
     foodWord: "אוכל",
     theDog: "כלב",

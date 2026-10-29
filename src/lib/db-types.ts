@@ -86,6 +86,7 @@ export interface RequestRow {
 export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions" | "wheel" | "commit" | "spend" | "fridge";
 
 export interface Section {
+  pet_id?: string | null;
   id: string;
   household_id: string;
   owner_id: string | null;
