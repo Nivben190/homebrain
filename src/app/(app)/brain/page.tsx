@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireHome, getT } from "@/lib/session";
-import { Card, PageHeader } from "@/components/ui";
+import { Card, PageHeader, SectionTitle } from "@/components/ui";
+import { RecipeGallery } from "@/components/brain/RecipeGallery";
 import { AutomationToggle } from "@/components/brain/AutomationToggle";
 import { ACTION_META, describeTrigger } from "@/lib/registry/automation";
 import type { Automation } from "@/lib/db-types";
@@ -9,7 +10,10 @@ import type { Automation } from "@/lib/db-types";
 export default async function BrainPage() {
   const { supabase, user, profile, members } = await requireHome();
   const t = await getT();
-  const { data } = await supabase.from("automations").select("*").order("created_at").returns<Automation[]>();
+  const [{ data }, { data: log }] = await Promise.all([
+    supabase.from("automations").select("*").order("created_at").returns<Automation[]>(),
+    supabase.from("automation_log").select("id,automation_id,status,reason,at").order("at", { ascending: false }).limit(20),
+  ]);
   const automations = data ?? [];
   const fmt = new Intl.DateTimeFormat(profile.locale, { timeZone: profile.timezone, weekday: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -24,6 +28,9 @@ export default async function BrainPage() {
           </Link>
         }
       />
+      <SectionTitle>{t.brain.recipes}</SectionTitle>
+      <RecipeGallery />
+      <SectionTitle>{t.brain.title}</SectionTitle>
       {automations.length === 0 && <Card className="py-10 text-center text-muted">{t.brain.empty}</Card>}
       <div className="space-y-3">
         {automations.map((a) => {
@@ -54,6 +61,31 @@ export default async function BrainPage() {
           );
         })}
       </div>
+
+      <SectionTitle>{t.brain.activity}</SectionTitle>
+      {(log ?? []).length === 0 ? (
+        <Card className="py-6 text-center text-sm text-muted">{t.brain.activityEmpty}</Card>
+      ) : (
+        <Card className="divide-y divide-card-border p-0">
+          {(log ?? []).map((l) => {
+            const a = automations.find((x) => x.id === l.automation_id);
+            const icon = l.status === "fired" ? "✅" : l.status === "skipped" ? "⏭️" : "⚠️";
+            return (
+              <div key={l.id} className="flex items-center gap-3 px-4 py-3">
+                <span>{a?.icon ?? "⚡"}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{a?.name ?? "—"}</span>
+                  <span className="block truncate text-xs text-muted">
+                    {icon} {t.brain.status[l.status] ?? l.status}
+                    {l.reason && l.status !== "fired" ? ` · ${t.brain.reasons[l.reason] ?? l.reason}` : ""}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-muted">{fmt.format(new Date(l.at))}</span>
+              </div>
+            );
+          })}
+        </Card>
+      )}
     </>
   );
 }

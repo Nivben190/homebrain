@@ -25,6 +25,7 @@ import type { Automation, RequestRow } from "@/lib/db-types";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
+import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
@@ -294,6 +295,21 @@ export async function saveAutomation(id: string | null, raw: unknown, targetUser
   if (error) return { ok: false, error: error.message };
   revalidatePath("/brain");
   return { ok: true, id: data.id };
+}
+
+/** One-tap Brain recipe (roadmap 2.7): one automation, or one each when it's for you both. */
+export async function addRecipe(id: RecipeId): Promise<Result> {
+  const { supabase, user, profile, members } = await requireHome();
+  const recipe = RECIPES.find((r) => r.id === id);
+  if (!recipe) return { ok: false, error: "unknown recipe" };
+  const { data: spaces } = await supabase.from("sections").select("id,view,template").order("position");
+  const def = recipe.build({ locale: isLocale(profile.locale) ? profile.locale : "en", spaces: spaces ?? [], hasPartner: members.length > 1 });
+  if (!def) return { ok: false, error: "missing" };
+  for (const target of recipe.forBoth ? members.map((m) => m.user_id) : [user.id]) {
+    const res = await saveAutomation(null, def, target);
+    if (!res.ok) return res;
+  }
+  return { ok: true };
 }
 
 export async function toggleAutomation(id: string, enabled: boolean): Promise<Result> {

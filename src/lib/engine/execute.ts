@@ -72,7 +72,25 @@ async function prefetchPicks(db: Admin, sectionIds: string[]) {
 }
 
 /** Fires one automation for its target user right now. */
+/** Fires an automation and writes the outcome to the Brain activity log (roadmap 2.7). */
 export async function fireAutomation(db: Admin, automation: Automation, now = new Date()): Promise<FireOutcome> {
+  let outcome: FireOutcome;
+  try {
+    outcome = await fireAutomationOnce(db, automation, now);
+  } catch (e) {
+    outcome = { automationId: automation.id, status: "error", reason: String(e) };
+  }
+  await logOutcome(db, automation, outcome, now);
+  if (outcome.status === "error") throw new Error(outcome.reason);
+  return outcome;
+}
+
+export async function logOutcome(db: Admin, automation: Pick<Automation, "id" | "household_id">, o: FireOutcome, now = new Date()) {
+  const { error } = await db.from("automation_log").insert({ automation_id: automation.id, household_id: automation.household_id, status: o.status, reason: o.reason ?? null, run_id: o.runId ?? null, at: now.toISOString() });
+  if (error) console.error("[brain log]", error.message);
+}
+
+async function fireAutomationOnce(db: Admin, automation: Automation, now: Date): Promise<FireOutcome> {
   const parsed = automationDefSchema.safeParse(automation);
   if (!parsed.success) {
     return { automationId: automation.id, status: "invalid", reason: parsed.error.issues[0]?.message };
@@ -196,7 +214,9 @@ async function fireDueSchedules(db: Admin, now: Date) {
     if (!a) continue;
     try {
       if (now.getTime() - new Date(due_at).getTime() > MAX_LATENESS_MS) {
-        outcomes.push({ automationId: a.id, status: "skipped", reason: "too late" });
+        const late: FireOutcome = { automationId: a.id, status: "skipped", reason: "too late" };
+        await logOutcome(db, a, late, now);
+        outcomes.push(late);
       } else {
         outcomes.push(await fireAutomation(db, a, now));
       }
