@@ -34,11 +34,14 @@ export interface Profile {
   quiet_to: string | null;
   muted_sections: string[];
   digest: boolean;
+  role: Role;
 }
+
+export type Role = "owner" | "adult" | "teen" | "child" | "guest";
 
 /** Columns any household member may read (everything but the secret tokens). */
 export const PUBLIC_PROFILE_COLUMNS =
-  "user_id,household_id,display_name,emoji,locale,timezone,phone,email,wake_mode,wake_time,lat,lon,place,briefing,wrapup,wrapup_time,quiet_shabbat,shabbat_shop,quiet_from,quiet_to,muted_sections,digest";
+  "user_id,household_id,display_name,emoji,locale,timezone,phone,email,wake_mode,wake_time,lat,lon,place,briefing,wrapup,wrapup_time,quiet_shabbat,shabbat_shop,quiet_from,quiet_to,muted_sections,digest,role";
 
 /** A household member as others see them. */
 export type Member = Omit<Profile, "hook_token" | "ics_token">;

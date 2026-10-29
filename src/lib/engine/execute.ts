@@ -39,18 +39,14 @@ export interface FireOutcome {
 async function loadPeople(db: Admin, userId: string) {
   const { data: me } = await db.from("profiles").select("*").eq("user_id", userId).single<Profile>();
   if (!me) throw new Error(`profile ${userId} not found`);
-  let partner: Profile | null = null;
+  let others: Profile[] = [];
   if (me.household_id) {
-    const { data } = await db
-      .from("profiles")
-      .select("*")
-      .eq("household_id", me.household_id)
-      .neq("user_id", userId)
-      .limit(1)
-      .maybeSingle<Profile>();
-    partner = data;
+    const { data } = await db.from("profiles").select("*").eq("household_id", me.household_id).neq("user_id", userId).order("created_at").returns<Profile[]>();
+    others = data ?? [];
   }
-  return { me, partner };
+  // "partner" in templates and recipients means the first other adult; in a bigger home, the owner or longest-standing adult.
+  const partner = others.find((p) => p.role === "owner") ?? others.find((p) => p.role === "adult") ?? others[0] ?? null;
+  return { me, partner, others };
 }
 
 /** The referenced spaces this automation is allowed to touch. */

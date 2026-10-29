@@ -92,6 +92,16 @@ export const en = {
     atStore: "{name} is at the supermarket now",
     today: "Today at home",
   },
+  members: {
+    role: "Role",
+    roles: { owner: "Owner", adult: "Adult", teen: "Teen", child: "Child", guest: "Guest" },
+    remove: "Remove",
+    removeConfirm: "Remove {name} from this home? Their private spaces go with them.",
+    rotate: "New invite code",
+    leave: "Leave this home",
+    leaveHint: "Your private spaces and automations are deleted; shared spaces stay with everyone else.",
+    leaveLast: "You're the last one here, so the whole home and everything in it is deleted.",
+  },
   onboarding: {
     title: "Let's set up your brain",
     name: "What should we call you?",
@@ -501,6 +511,7 @@ export const en = {
     whoDoes: "Who's on it",
   },
   ask: {
+    buttonAny: "Ask someone",
     button: "Ask {name}",
     title: "Ask {name}",
     placeholder: "Can you buy milk on the way? 🥛",

@@ -47,7 +47,7 @@ function streak(runs: Run[]) {
 }
 
 export default async function TodayPage() {
-  const { supabase, user, profile, partner, members } = await requireHome();
+  const { supabase, user, profile, others, members } = await requireHome();
   const t = await getT();
   const now = new Date();
   const local = zonedParts(now, profile.timezone);
@@ -81,7 +81,7 @@ export default async function TodayPage() {
     supabase.from("activity").select("id,actor,kind,title,at").gte("at", dayAgo).order("at", { ascending: false }).limit(50).returns<ActivityRow[]>(),
   ]);
   const memberList = members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }));
-  const partnerMember = memberList.find((m) => m.id !== user.id) ?? null;
+  const otherMembers = memberList.filter((m) => m.id !== user.id);
   const pet = petsQ.data?.[0] ?? null;
   const requests = requestsQ.data ?? [];
   const pending = pendingQ.data ?? [];
@@ -217,11 +217,9 @@ export default async function TodayPage() {
 
       {/* Home */}
       <SectionTitle>{t.today.bandHome}</SectionTitle>
-      {partner ? (
+      {others.length > 0 ? (
         <>
-          <p className="mb-2 px-1 text-sm text-muted">
-            🏠 {partner.emoji} {partner.display_name}
-          </p>
+          <p className="mb-2 px-1 text-sm text-muted">🏠 {others.map((o) => `${o.emoji} ${o.display_name}`).join(" · ")}</p>
           <ActivityStrip initial={activityQ.data ?? []} userId={user.id} members={memberList} />
         </>
       ) : (
@@ -235,7 +233,7 @@ export default async function TodayPage() {
         <Day />
       </Suspense>
 
-      <QuickActions partner={partnerMember} pet={pet ? { id: pet.id, name: pet.name, emoji: pet.emoji, daysLeft: foodDaysLeft(pet, today) } : null} />
+      <QuickActions others={otherMembers} pet={pet ? { id: pet.id, name: pet.name, emoji: pet.emoji, daysLeft: foodDaysLeft(pet, today) } : null} />
 
       {streaks.length > 0 && (
         <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">

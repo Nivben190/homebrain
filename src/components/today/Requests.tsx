@@ -12,8 +12,10 @@ import type { Member } from "@/components/sections/PropertyInput";
 import { fill } from "@/i18n";
 
 /** "Ask Naomi" sheet: a quick request that lands on her Today screen with a push. */
-export function AskSheet({ open, onClose, partner }: { open: boolean; onClose: () => void; partner: Member }) {
+export function AskSheet({ open, onClose, members }: { open: boolean; onClose: () => void; members: Member[] }) {
   const { t } = useI18n();
+  const [toId, setToId] = useState(members[0].id);
+  const partner = members.find((m) => m.id === toId) ?? members[0];
   const router = useRouter();
   const [text, setText] = useState("");
   const [due, setDue] = useState<"today" | "tomorrow" | null>("today");
@@ -38,6 +40,15 @@ export function AskSheet({ open, onClose, partner }: { open: boolean; onClose: (
   return (
     <Sheet open={open} onClose={onClose} title={`${partner.emoji} ${fill(t.ask.title, { name: partner.name })}`}>
       <div className="space-y-4 pb-4">
+        {members.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {members.map((m) => (
+              <button key={m.id} type="button" aria-pressed={m.id === toId} onClick={() => setToId(m.id)} className={m.id === toId ? "rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-accent-fg" : "rounded-full bg-sunken px-3 py-1.5 text-sm font-semibold"}>
+                {m.emoji} {m.name}
+              </button>
+            ))}
+          </div>
+        )}
         <Textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={t.ask.placeholder} rows={3} maxLength={300} />
         <div className="flex gap-2">
           {(["today", "tomorrow", null] as const).map((d) => (

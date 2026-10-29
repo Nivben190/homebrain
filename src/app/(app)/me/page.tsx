@@ -33,6 +33,8 @@ export default async function MePage() {
       members={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }))}
       feedUrl={`${origin}/api/cal/${profile.ics_token}.ics`}
       spaces={spaces ?? []}
+      userId={user.id}
+      roster={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji, role: m.role }))}
       partners={members.filter((m) => m.user_id !== user.id).map((m) => m.display_name)}
       brain={{ ...tickHealth(engine), failedJobs: failedJobs ?? 0, expiredGoogle }}
       gcal={gcal ?{ email: gcal.email, expired: gcal.status === "expired" } : null}

@@ -15,8 +15,8 @@ export interface PetSummary {
   daysLeft: number | null;
 }
 
-/** Three big tiles: alarm, ask partner, the dog. */
-export function QuickActions({ partner, pet }: { partner: Member | null; pet: PetSummary | null }) {
+/** Three big tiles: alarm, ask someone at home, the dog. */
+export function QuickActions({ others, pet }: { others: Member[]; pet: PetSummary | null }) {
   const { t } = useI18n();
   const [alarm, setAlarm] = useState(false);
   const [ask, setAsk] = useState(false);
@@ -31,12 +31,12 @@ export function QuickActions({ partner, pet }: { partner: Member | null; pet: Pe
           </span>
           <span className="w-full truncate text-xs font-bold">{t.alarm.title}</span>
         </button>
-        {partner && (
+        {others.length > 0 && (
           <button onClick={() => setAsk(true)} className={tile}>
             <span className="flex size-10 items-center justify-center rounded-2xl bg-linear-to-br from-[#ff5f9e] to-[#ffa1c6] text-white">
               <MessageCircleHeart className="size-5" />
             </span>
-            <span className="w-full truncate text-xs font-bold">{fill(t.ask.button, { name: partner.name })}</span>
+            <span className="w-full truncate text-xs font-bold">{others.length === 1 ? fill(t.ask.button, { name: others[0].name }) : t.ask.buttonAny}</span>
           </button>
         )}
         <Link href={pet ? `/pets/${pet.id}` : "/pets/new"} className={tile}>
@@ -48,7 +48,7 @@ export function QuickActions({ partner, pet }: { partner: Member | null; pet: Pe
         </Link>
       </div>
       <AlarmSheet open={alarm} onClose={() => setAlarm(false)} />
-      {partner && <AskSheet open={ask} onClose={() => setAsk(false)} partner={partner} />}
+      {others.length > 0 && <AskSheet open={ask} onClose={() => setAsk(false)} members={others} />}
     </>
   );
 }

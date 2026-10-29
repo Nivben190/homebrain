@@ -37,8 +37,9 @@ export async function requireHome() {
   const s = await getSession();
   if (!s.user) redirect("/login");
   if (!s.profile?.household_id || !s.household) redirect("/onboarding");
-  const partner = s.members.find((m) => m.user_id !== s.user!.id) ?? null;
-  return { ...s, user: s.user, profile: s.profile, household: s.household, partner };
+  // Everyone else in the home, any number of them (roadmap 3.1).
+  const others = s.members.filter((m) => m.user_id !== s.user!.id);
+  return { ...s, user: s.user, profile: s.profile, household: s.household, others };
 }
 
 export const getLocale = cache(async (): Promise<Locale> => {

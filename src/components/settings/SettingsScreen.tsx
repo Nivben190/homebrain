@@ -17,6 +17,7 @@ import { YourDataCard } from "./YourDataCard";
 import { useToast } from "@/components/Toaster";
 import { errorKey } from "@/lib/errors";
 import { InviteLinkButton } from "@/components/InviteLinkButton";
+import { MembersCard, type HomeMember } from "./MembersCard";
 
 type ProfileForm = Pick<Profile, "display_name" | "emoji" | "timezone" | "wake_mode"> & { phone: string; wake_time: string; email: string };
 
@@ -42,6 +43,8 @@ export function SettingsScreen({
   gcal,
   brain,
   partners,
+  roster,
+  userId,
   spaces,
 }: {
   profile: ProfileForm;
@@ -53,6 +56,8 @@ export function SettingsScreen({
   gcal: { email: string | null; expired: boolean } | null;
   brain: BrainStatus;
   partners: string[];
+  roster: HomeMember[];
+  userId: string;
   spaces: { id: string; icon: string; title: string }[];
 }) {
   const { t } = useI18n();
@@ -171,6 +176,7 @@ export function SettingsScreen({
           </button>
         </Field>
         <InviteLinkButton />
+        <MembersCard members={roster} userId={userId} />
       </Card>
 
       <SectionTitle>{t.settings.iphone}</SectionTitle>

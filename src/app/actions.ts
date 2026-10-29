@@ -21,7 +21,7 @@ import { dueFromProps, type PropertyDef } from "@/lib/registry/properties";
 import { sendPush } from "@/lib/push";
 import { openToken, revokeToken } from "@/lib/subs/gmail";
 import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
-import type { Automation, RequestRow } from "@/lib/db-types";
+import type { Automation, RequestRow, Role } from "@/lib/db-types";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
@@ -133,6 +133,26 @@ export async function quickAdd(input: { sectionId: string; title: string; day: s
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Members and roles (roadmap 3.1)
+// ---------------------------------------------------------------------------
+
+async function homeRpc(fn: string, args?: Record<string, unknown>): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { error } = await supabase.rpc(fn, args);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+export const setMemberRole = async (userId: string, role: Role) => homeRpc("set_member_role", { p_user: userId, p_role: role });
+export const removeMember = async (userId: string) => homeRpc("remove_member", { p_user: userId });
+export const rotateInvite = async () => homeRpc("rotate_invite");
+export async function leaveHome(): Promise<Result> {
+  const res = await homeRpc("leave_home");
+  if (res.ok) redirect("/onboarding");
+  return res;
 }
 
 /** A single-use /join link for the caller's home, valid for 7 days (roadmap 2.1). */

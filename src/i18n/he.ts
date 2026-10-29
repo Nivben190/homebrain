@@ -94,6 +94,16 @@ export const he: Dict = {
     atStore: "בסופר עכשיו: {name}",
     today: "היום בבית",
   },
+  members: {
+    role: "תפקיד",
+    roles: { owner: "בעלים", adult: "מבוגר", teen: "נוער", child: "ילד", guest: "אורח" },
+    remove: "הסרה",
+    removeConfirm: "להסיר את {name} מהבית? המרחבים הפרטיים יימחקו איתם.",
+    rotate: "קוד הזמנה חדש",
+    leave: "יציאה מהבית",
+    leaveHint: "המרחבים והאוטומציות הפרטיים שלכם יימחקו; המרחבים המשותפים נשארים לשאר.",
+    leaveLast: "אתם האחרונים כאן, אז כל הבית וכל מה שבו יימחקו.",
+  },
   onboarding: {
     title: "בואו נגדיר את המוח שלכם",
     name: "איך לקרוא לך?",
@@ -503,6 +513,7 @@ export const he: Dict = {
     whoDoes: "מי על זה",
   },
   ask: {
+    buttonAny: "לבקש ממישהו",
     button: "לבקש מ{name}",
     title: "בקשה מ{name}",
     placeholder: "תוכל/י לקנות חלב בדרך? 🥛",
