@@ -5,6 +5,7 @@ import { dirFor, getDict } from "@/i18n";
 import { getLocale } from "@/lib/session";
 import { MotionRoot } from "@/components/MotionRoot";
 import { Toaster } from "@/components/Toaster";
+import { startupImages } from "@/lib/splash";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
@@ -13,7 +14,7 @@ const heebo = Heebo({ variable: "--font-heebo", subsets: ["hebrew", "latin"] });
 export const metadata: Metadata = {
   title: "Home Brain",
   description: "Your home, thinking ahead.",
-  appleWebApp: { capable: true, title: "Home Brain", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Home Brain", statusBarStyle: "black-translucent", startupImage: startupImages() },
   icons: { icon: "/icons/192", apple: "/icons/180" },
 };
 
