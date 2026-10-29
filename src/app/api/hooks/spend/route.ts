@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { presentedToken } from "@/lib/hook-keys";
+import { authenticateHook } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push";
 import { categorize, matchesCommit, parseSpendSms, merchantKey, pickSpendSpace, readTx, recurringCharges, spendKey, TX_PROP, type Tx } from "@/lib/spend";
@@ -13,11 +15,11 @@ const money = (n: number, c: string) => (c === "$" || c === "€" ? `${c}${n}` :
 
 /**
  * A purchase text from Max / the bank, forwarded by an iPhone "Message" automation.
- *   POST /api/hooks/spend?token=<hook_token>   body: { "text": "<the SMS>" }
+ *   POST /api/hooks/spend   header x-brain-token: <purchases key>   body: { "text": "<the SMS>" }
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token") ?? request.headers.get("x-brain-token");
+  const token = presentedToken(request);
   let text = url.searchParams.get("text");
   try {
     const body = await request.json();
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
   text = text?.trim().slice(0, 1000) ?? "";
 
   const db = createSupabaseAdmin();
-  const { data: me } = await db.from("profiles").select("user_id,household_id,locale,timezone").eq("hook_token", token).maybeSingle();
+  const userId = await authenticateHook(db, token, "spend");
+  const { data: me } = userId ? await db.from("profiles").select("user_id,household_id,locale,timezone").eq("user_id", userId).maybeSingle() : { data: null };
   if (!me?.household_id) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   const parsed = parseSpendSms(text);

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { presentedToken } from "@/lib/hook-keys";
+import { authenticateHook } from "@/lib/hook-auth";
 import { createSupabaseAdmin, createSupabaseServer } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push";
 import { seeFridge } from "@/lib/fridge-vision";
@@ -14,17 +16,16 @@ const MAX_BYTES = 8 * 1024 * 1024;
  * Scans a fridge photo into the Fridge space's inventory, and puts staples that
  * ran low or out on the shopping list.
  *   From the app:   POST multipart "image" (one or more, up to 4) + "space", signed in.
- *   From a camera:  POST /api/fridge/scan?token=<hook_token>[&space=<id>], body = the JPEG.
+ *   From a camera:  POST /api/fridge/scan[?space=<id>]   header x-brain-token: <fridge key>, body = the JPEG.
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token") ?? request.headers.get("x-brain-token");
+  const token = presentedToken(request);
   const db = createSupabaseAdmin();
 
   let userId: string | null = null;
   if (token) {
-    const { data } = await db.from("profiles").select("user_id").eq("hook_token", token).maybeSingle();
-    userId = data?.user_id ?? null;
+    userId = await authenticateHook(db, token, "fridge");
   } else {
     const { data } = await (await createSupabaseServer()).auth.getUser();
     userId = data.user?.id ?? null;

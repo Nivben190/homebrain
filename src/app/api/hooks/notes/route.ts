@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { presentedToken } from "@/lib/hook-keys";
+import { authenticateHook } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { mergeNote, noteLines, type NoteState } from "@/lib/notes-sync";
 import type { Profile, Section } from "@/lib/db-types";
@@ -7,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Apple Notes sync from the "Brain Notes Sync" Shortcut:
- *   POST /api/hooks/notes?token=<hook token>
+ *   POST /api/hooks/notes   header x-brain-token: <notes key>
  *
  * Simple form (current): the body is the note's plain text (Request Body:
  * File → Text). The reply is plain text — the lines to append to the note, or
@@ -21,7 +23,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  let token = url.searchParams.get("token") ?? request.headers.get("x-brain-token");
+  let token = presentedToken(request);
   let sectionId = url.searchParams.get("section");
 
   const raw = await request.text();
@@ -72,12 +74,13 @@ export async function POST(request: Request) {
 
   if (!token) {
     console.error("[notes-sync] no token", { keys, bodyChars: raw.length, bodyStart: raw.slice(0, 120) });
-    const msg = "⚠️ Home Brain didn't get your key. Use your personal sync URL (Me → iPhone setup) in “Get Contents of URL”.";
+    const msg = "⚠️ Home Brain didn't get your key. In “Get Contents of URL”, add the x-brain-token header with your Notes sync key (Me → iPhone setup).";
     return reply("", { error: msg, message: msg }, 400);
   }
 
   const db = createSupabaseAdmin();
-  const { data: me } = await db.from("profiles").select("*").eq("hook_token", token).maybeSingle<Profile>();
+  const userId = await authenticateHook(db, token, "notes");
+  const { data: me } = userId ? await db.from("profiles").select("*").eq("user_id", userId).maybeSingle<Profile>() : { data: null };
   if (!me?.household_id) return reply("", { error: "invalid token" }, 401);
 
   const visible = (s: Pick<Section, "owner_id" | "household_id"> | null) => !!s && s.household_id === me.household_id && (!s.owner_id || s.owner_id === me.user_id);

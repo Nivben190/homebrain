@@ -2,12 +2,13 @@
 import { useI18n } from "@/i18n/client";
 import { NOTES_SHORTCUT_NAME } from "@/lib/engine/render";
 import { CopyField } from "./CopyField";
+import { HookKeyField, KeyHint, type KeyInfo } from "./HookKey";
 
 /** iCloud link of a working "Brain Notes Sync" Shortcut, once someone shares one. */
 const SHARED_SHORTCUT = process.env.NEXT_PUBLIC_NOTES_SHORTCUT_LINK;
 
 /** How the 🔄 button works + the Shortcut (one tap if shared, else build steps). */
-export function NotesSyncHelp({ hookToken, defaultOpen = false }: { hookToken: string; defaultOpen?: boolean }) {
+export function NotesSyncHelp({ keyInfo, defaultOpen = false }: { keyInfo?: KeyInfo; defaultOpen?: boolean }) {
   const { t } = useI18n();
   const n = t.notesSync;
   return (
@@ -31,7 +32,8 @@ export function NotesSyncHelp({ hookToken, defaultOpen = false }: { hookToken: s
           ))}
         </ol>
         <CopyField label={n.shortcutName} value={NOTES_SHORTCUT_NAME} />
-        <CopyField label={n.yourUrl} value={typeof window === "undefined" ? "" : `${window.location.origin}/api/hooks/notes?token=${hookToken}`} />
+        <CopyField label={n.yourUrl} value={typeof window === "undefined" ? "" : `${window.location.origin}/api/hooks/notes`} />
+        {keyInfo ? <HookKeyField purpose="notes" info={keyInfo} /> : <KeyHint purpose="notes" />}
         <p className="text-xs text-muted">{n.shareTip}</p>
       </div>
     </details>

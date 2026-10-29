@@ -8,6 +8,7 @@ import { alarmShortcutUrl } from "@/lib/engine/render";
 import { habitStats, heatmap, HABIT_PROP, nextReminder, readHabit, todayKey, type Habit } from "@/lib/engine/habits";
 import { Ring } from "./TrackerView";
 import { CopyField } from "@/components/settings/CopyField";
+import { KeyHint } from "@/components/settings/HookKey";
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import type { Member } from "./PropertyInput";
 
@@ -20,11 +21,11 @@ const HEAT: Record<string, string> = {
   future: "bg-sunken/50",
 };
 
-function CheckinShortcut({ itemId, hookToken }: { itemId: string; hookToken: string }) {
+function CheckinShortcut({ itemId, launchToken }: { itemId: string; launchToken: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const url = typeof window === "undefined" ? "" : `${window.location.origin}/api/hooks/checkin?token=${hookToken}&item=${itemId}`;
+  const url = typeof window === "undefined" ? "" : `${window.location.origin}/api/hooks/checkin?item=${itemId}`;
   return (
     <div className="rounded-2xl bg-sunken p-3">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-start font-semibold">
@@ -42,11 +43,12 @@ function CheckinShortcut({ itemId, hookToken }: { itemId: string; hookToken: str
             ))}
           </ol>
           <CopyField label={t.checkinButton.url} value={url} />
+          <KeyHint purpose="checkin" />
           <Button
             variant="soft"
             size="sm"
             onClick={async () => {
-              const res = await fetch(url, { method: "POST" });
+              const res = await fetch(url, { method: "POST", headers: { "x-brain-token": launchToken } });
               const body = await res.json().catch(() => ({}));
               setResult(body.message ?? body.error ?? String(res.status));
             }}
@@ -89,7 +91,7 @@ export function HabitSheet({
   onDelete,
   onCheckIn,
   userId,
-  hookToken,
+  launchToken,
 }: {
   item: Item | null;
   section: Section;
@@ -101,7 +103,7 @@ export function HabitSheet({
   onDelete: (id: string) => void;
   onCheckIn: (item: Item, status: "done" | "skipped" | null) => void;
   userId: string;
-  hookToken: string;
+  launchToken: string;
 }) {
   const { t, locale } = useI18n();
   const today = todayKey(timeZone);
@@ -297,7 +299,7 @@ export function HabitSheet({
         </Field>
 
         {/* One-tap check-in from the iPhone (Shortcut → Home Screen / Action Button / Siri) */}
-        {saved && <CheckinShortcut itemId={item.id} hookToken={hookToken} />}
+        {saved && <CheckinShortcut itemId={item.id} launchToken={launchToken} />}
 
         {/* History */}
         {checkins.length > 0 && (

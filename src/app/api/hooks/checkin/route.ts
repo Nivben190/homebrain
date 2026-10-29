@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { presentedToken } from "@/lib/hook-keys";
+import { authenticateHook } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { addDays, habitStats, readHabit, todayKey, type Checkin } from "@/lib/engine/habits";
 import type { Profile, Section } from "@/lib/db-types";
@@ -7,17 +9,18 @@ export const dynamic = "force-dynamic";
 
 /**
  * One-tap check-in from an iPhone Shortcut (Home Screen, Action Button, Siri):
- *   POST /api/hooks/checkin?token=<hook_token>&item=<item id>
+ *   POST /api/hooks/checkin?item=<item id>   header x-brain-token: <check-in key>
  * Replies with a short line the Shortcut can show, e.g. "✓ Breakfast · 🔥 5".
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token") ?? request.headers.get("x-brain-token");
+  const token = presentedToken(request);
   const itemId = url.searchParams.get("item");
   if (!token || !itemId) return NextResponse.json({ error: "missing token or item" }, { status: 400 });
 
   const db = createSupabaseAdmin();
-  const { data: me } = await db.from("profiles").select("*").eq("hook_token", token).maybeSingle<Profile>();
+  const userId = await authenticateHook(db, token, "checkin");
+  const { data: me } = userId ? await db.from("profiles").select("*").eq("user_id", userId).maybeSingle<Profile>() : { data: null };
   if (!me?.household_id) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   const { data: item } = await db.from("items").select("id,title,props,sections(*)").eq("id", itemId).maybeSingle();

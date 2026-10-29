@@ -702,6 +702,21 @@ export const en = {
   },
   colors: { violet: "Violet", pink: "Pink", amber: "Amber", green: "Green", sky: "Sky", coral: "Coral" },
   weekdaysShort: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+  keys: {
+    label: "Key",
+    header: "In “Get Contents of URL” → Show More → Headers, add a header named x-brain-token with your key as its value.",
+    create: "Create key",
+    rotate: "Replace key",
+    confirmRotate: "Tap again to replace — the Shortcut using the old key stops working",
+    shownOnce: "Copy it now — it's shown only once.",
+    lastUsed: "Last used {when}",
+    neverUsed: "Not used yet",
+    none: "No key yet",
+    inSetup: "It uses your “{name}” key from Me → iPhone setup.",
+    legacy: "Your Shortcuts still use the old shared key (last used {when}). It stops working on 12 November — give each Shortcut its own key below, then update the Shortcut.",
+    otherTitle: "More keys",
+    names: { event: "Wake & arrive", capture: "Siri add", spend: "Purchases", checkin: "Check-ins", notes: "Notes sync", fridge: "Fridge camera" } as Record<string, string>,
+  },
 };
 
 export type Dict = typeof en;

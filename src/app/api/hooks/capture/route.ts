@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { presentedToken } from "@/lib/hook-keys";
+import { authenticateHook } from "@/lib/hook-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { routeCapture } from "@/lib/capture";
 import { newCommit } from "@/lib/commit";
@@ -7,12 +9,12 @@ export const dynamic = "force-dynamic";
 
 /**
  * Siri / Shortcuts capture: "Hey Siri, Brain add milk".
- *   POST /api/hooks/capture?token=<hook_token>&text=milk[&space=<id or name>]
+ *   POST /api/hooks/capture?text=milk[&space=<id or name>]
  * Text and space may also come as JSON: { "text": "...", "space": "..." }.
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token") ?? request.headers.get("x-brain-token");
+  const token = presentedToken(request);
   let text = url.searchParams.get("text");
   let space = url.searchParams.get("space");
   try {
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
   if (!text) return NextResponse.json({ error: "nothing to add" }, { status: 400 });
 
   const db = createSupabaseAdmin();
-  const { data: me } = await db.from("profiles").select("user_id,household_id,timezone").eq("hook_token", token).maybeSingle();
+  const userId = await authenticateHook(db, token, "capture");
+  const { data: me } = userId ? await db.from("profiles").select("user_id,household_id,timezone").eq("user_id", userId).maybeSingle() : { data: null };
   if (!me?.household_id) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   // Shared spaces and this person's private ones.

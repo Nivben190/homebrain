@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireHome } from "@/lib/session";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { SectionScreen } from "@/components/sections/SectionScreen";
+import { launchTokenFor } from "@/lib/hook-auth";
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 
 export default async function SectionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,7 @@ export default async function SectionPage({ params }: { params: Promise<{ id: st
       initialItems={items ?? []}
       initialCheckins={checkins}
       timeZone={profile.timezone}
-      hookToken={profile.hook_token}
+      launch={{ notes: launchTokenFor(user.id, "notes"), checkin: launchTokenFor(user.id, "checkin") }}
       gmail={gmail ? { email: gmail.email, status: gmail.status, lastScanAt: gmail.last_scan_at } : null}
       userId={user.id}
       members={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }))}

@@ -17,12 +17,10 @@ export function SectionSettingsSheet({
   onClose,
   onSaved,
   onDeleted,
-  hookToken,
 }: {
   open: boolean;
   section: Section;
   userId: string;
-  hookToken: string;
   onClose: () => void;
   onSaved: (s: Section) => void;
   onDeleted: () => void;
@@ -136,7 +134,7 @@ export function SectionSettingsSheet({
             <Field label={t.notesSync.linkedNote} hint={t.notesSync.linkedHint}>
               <Input value={s.notes_link ?? ""} onChange={(e) => setS({ ...s, notes_link: e.target.value })} placeholder="רשימת קניות" />
             </Field>
-            <NotesSyncHelp hookToken={hookToken} />
+            <NotesSyncHelp />
           </>
         )}
 

@@ -53,7 +53,7 @@ export function SectionScreen({
   userId,
   members,
   timeZone,
-  hookToken,
+  launch,
   gmail = null,
 }: {
   initialSection: Section;
@@ -62,7 +62,8 @@ export function SectionScreen({
   userId: string;
   members: Member[];
   timeZone: string;
-  hookToken: string;
+  /** Signed tokens for Shortcuts the app launches or tests (roadmap 1.3). */
+  launch: { notes: string; checkin: string };
   /** The user's Gmail connection, for a Subscriptions space. */
   gmail?: GmailStatus | null;
 }) {
@@ -406,7 +407,7 @@ export function SectionScreen({
                   } catch {
                     // Without storage we just skip the result toast.
                   }
-                  window.location.href = notesShortcutUrl(hookToken, section.id);
+                  window.location.href = notesShortcutUrl(launch.notes, section.id);
                 }}
               >
                 <RefreshCw className="size-5" />
@@ -672,7 +673,7 @@ export function SectionScreen({
           onDelete={remove}
           onCheckIn={checkIn}
           userId={userId}
-          hookToken={hookToken}
+          launchToken={launch.checkin}
         />
       ) : (
         <ItemSheet item={openItem} section={section} members={members} onClose={() => setOpenItem(null)} onChange={update} onDelete={remove} />
@@ -682,7 +683,6 @@ export function SectionScreen({
         open={settings}
         section={section}
         userId={userId}
-        hookToken={hookToken}
         onClose={() => setSettings(false)}
         onSaved={(s) => setSection(s)}
         onDeleted={() => {

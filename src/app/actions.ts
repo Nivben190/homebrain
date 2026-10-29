@@ -21,6 +21,7 @@ import { sendPush } from "@/lib/push";
 import { openToken, revokeToken } from "@/lib/subs/gmail";
 import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
 import type { Automation, RequestRow } from "@/lib/db-types";
+import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -350,6 +351,24 @@ export async function sendTestPush(): Promise<Result> {
     url: "/",
   });
   return sent > 0 ? { ok: true } : { ok: false, error: "No devices registered" };
+}
+
+// ---------------------------------------------------------------------------
+// Shortcut keys (roadmap 1.3)
+// ---------------------------------------------------------------------------
+
+/** Revokes this person's key for one Shortcut and makes a new one, returned once. */
+export async function rotateHookKey(purpose: HookPurpose): Promise<Result & { key?: string }> {
+  if (!HOOK_PURPOSES.includes(purpose)) return { ok: false, error: "Unknown key" };
+  const { user } = await requireHome();
+  const admin = createSupabaseAdmin();
+  const { error: revokeError } = await admin.from("hook_keys").update({ revoked_at: new Date().toISOString() }).eq("user_id", user.id).eq("purpose", purpose).is("revoked_at", null);
+  if (revokeError) return { ok: false, error: revokeError.message };
+  const key = newKey();
+  const { error } = await admin.from("hook_keys").insert({ user_id: user.id, purpose, key_hash: hashKey(key) });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/me/iphone");
+  return { ok: true, key };
 }
 
 // ---------------------------------------------------------------------------
