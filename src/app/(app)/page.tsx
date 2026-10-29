@@ -1,3 +1,4 @@
+import { InviteLinkButton } from "@/components/InviteLinkButton";
 import Link from "next/link";
 import { requireHome, getT } from "@/lib/session";
 import { zonedParts } from "@/lib/engine/time";
@@ -134,6 +135,14 @@ export default async function TodayPage() {
       </header>
 
       <DayCard weather={forecast?.days.find((d) => d.day === today) ?? null} advice={forecast ? walkAdvice(hours, today) : null} holy={holyStatus(holyItems, now)} today={today} locale={profile.locale} place={profile.place ?? DEFAULT_PLACE.name} />
+
+      {!partner && (
+        <div className="glass mb-3 space-y-3 rounded-3xl p-4">
+          <p className="font-semibold">💞 {t.join.waiting}</p>
+          <p className="text-sm text-muted">{t.join.waitingHint}</p>
+          <InviteLinkButton variant="primary" />
+        </div>
+      )}
 
       <PushPrompt />
 

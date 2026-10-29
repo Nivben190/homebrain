@@ -24,8 +24,14 @@ export default function LoginPage() {
 
   // Errors handed back by /auth/confirm (e.g. an expired email link).
   useEffect(() => {
-    const e = new URLSearchParams(window.location.search).get("error");
+    const q = new URLSearchParams(window.location.search);
+    const e = q.get("error");
     if (e) setError(e);
+    const inv = q.get("invite");
+    if (inv) {
+      setInvite(inv);
+      if (q.get("mode") !== "signin") setMode("signup");
+    }
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -47,7 +53,8 @@ export default function LoginPage() {
     const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     setBusy(false);
     if (error) return setError(/invalid/i.test(error.message) ? t.login.invalid : error.message);
-    router.replace("/");
+    // From an invite link: back to it, which sends a new account on to onboarding.
+    router.replace(/^[0-9a-f]{32}$/.test(invite) ? `/join/${invite}` : "/");
     router.refresh();
   }
 

@@ -11,7 +11,7 @@ import { currentOccurrence, readDate } from "@/lib/engine/dates";
 import type { RenderedAction } from "@/lib/engine/types";
 import { nextRunAt } from "@/lib/engine/schedule";
 import { allowedSections, sectionRefs } from "@/lib/engine/scope";
-import { canSignUp } from "@/lib/signup";
+import { canSignUp, inviteState, isInviteToken } from "@/lib/signup";
 import { deletionPlan } from "@/lib/account-data";
 import { calendarAccess, deleteEvent, upsertEvent } from "@/lib/gcal";
 import { automationDefSchema } from "@/lib/engine/types";
@@ -25,7 +25,7 @@ import type { Automation, RequestRow } from "@/lib/db-types";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
 
 // ---------------------------------------------------------------------------
 // Accounts
@@ -53,7 +53,11 @@ export async function createAccount(input: { email: string; password: string; in
   if (!(await allow(admin, "signUp", clientIp(await headers())))) return { ok: false, error: "too_many" };
   const code = input.inviteCode?.trim().toUpperCase() ?? "";
   const [{ data: invited }, { count }] = await Promise.all([
-    code ? admin.from("households").select("id").eq("invite_code", code).maybeSingle() : Promise.resolve({ data: null }),
+    isInviteToken(input.inviteCode?.trim() ?? "")
+      ? admin.from("household_invites").select("used_at,expires_at").eq("token", input.inviteCode!.trim()).maybeSingle().then(({ data }) => ({ data: inviteState(data) === "ok" ? data : null }))
+      : code
+        ? admin.from("households").select("id").eq("invite_code", code).maybeSingle()
+        : Promise.resolve({ data: null }),
     admin.from("households").select("id", { count: "exact", head: true }),
   ]);
   const ok = canSignUp({ email, allowedEmails: process.env.ALLOWED_EMAILS, inviteValid: !!invited, anyHome: (count ?? 0) > 0 });
@@ -105,6 +109,24 @@ export async function deleteAccount(confirmEmail: string): Promise<Result> {
   return { ok: true };
 }
 
+/** A single-use /join link for the caller's home, valid for 7 days (roadmap 2.1). */
+export async function createInviteLink(): Promise<Result<{ token: string; expires_at: string }>> {
+  const { supabase } = await requireHome();
+  const { data, error } = await supabase.rpc("create_invite").single<{ token: string; expires_at: string }>();
+  if (error || !data) return { ok: false, error: error?.message ?? "failed" };
+  return { ok: true, data: { token: data.token, expires_at: data.expires_at } };
+}
+
+/** "Move to this home" for someone who already has one. */
+export async function acceptInvite(token: string, bring: boolean): Promise<Result> {
+  const { supabase, user } = await getSession();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { error } = await supabase.rpc("accept_invite", { p_token: token, p_bring: bring });
+  if (error) return { ok: false, error: /expired/.test(error.message) ? "expired" : error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Onboarding
 // ---------------------------------------------------------------------------
@@ -135,10 +157,13 @@ export async function setupHome(input: {
     .update({ display_name: p.displayName, emoji: p.emoji, phone: p.phone || null, timezone: p.timezone })
     .eq("user_id", user.id);
 
+  const invite = input.inviteCode?.trim() ?? "";
   const rpc =
     input.mode === "create"
       ? await supabase.rpc("create_household", { p_name: input.homeName?.trim() || "Home" })
-      : await supabase.rpc("join_household", { p_code: input.inviteCode ?? "" });
+      : isInviteToken(invite)
+        ? await supabase.rpc("accept_invite", { p_token: invite })
+        : await supabase.rpc("join_household", { p_code: invite });
   if (rpc.error) return { ok: false, error: rpc.error.message };
 
   if (input.starter) {

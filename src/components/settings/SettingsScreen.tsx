@@ -14,6 +14,7 @@ import type { Profile } from "@/lib/db-types";
 import { DailyBrainSettings, type DailyPrefs } from "./DailyBrainSettings";
 import { BrainStatusCard, type BrainStatus } from "./BrainStatusCard";
 import { YourDataCard } from "./YourDataCard";
+import { InviteLinkButton } from "@/components/InviteLinkButton";
 
 type ProfileForm = Pick<Profile, "display_name" | "emoji" | "timezone" | "wake_mode"> & { phone: string; wake_time: string; email: string };
 
@@ -168,6 +169,7 @@ export function SettingsScreen({
             <span className="font-sans text-sm font-semibold tracking-normal text-accent">{copied === "invite" ? t.common.copied : <Copy className="size-5" />}</span>
           </button>
         </Field>
+        <InviteLinkButton />
       </Card>
 
       <SectionTitle>{t.settings.iphone}</SectionTitle>

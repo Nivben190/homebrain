@@ -8,15 +8,15 @@ import { useI18n } from "@/i18n/client";
 import { Button, Card, EmojiPicker, Field, Input, Segmented, Toggle } from "@/components/ui";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 
-export function OnboardingForm({ defaultName }: { defaultName: string }) {
+export function OnboardingForm({ defaultName, invite }: { defaultName: string; invite?: string }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [mode, setMode] = useState<"create" | "join">("create");
+  const [mode, setMode] = useState<"create" | "join">(invite ? "join" : "create");
   const [displayName, setDisplayName] = useState(defaultName);
   const [emoji, setEmoji] = useState("😎");
   const [phone, setPhone] = useState("");
   const [homeName, setHomeName] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(invite ?? "");
   const [starter, setStarter] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -68,6 +68,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
           </Field>
         </Card>
 
+        {!invite && (
         <Segmented
           value={mode}
           onChange={setMode}
@@ -76,13 +77,14 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
             { value: "join", label: <span className="inline-flex items-center gap-1.5"><Users className="size-4" />{t.onboarding.joinTitle}</span> },
           ]}
         />
+        )}
 
         <Card className="space-y-4">
           {mode === "create" ? (
             <Field label={t.onboarding.homeName}>
               <Input value={homeName} placeholder={t.onboarding.homeNamePlaceholder} onChange={(e) => setHomeName(e.target.value)} />
             </Field>
-          ) : (
+          ) : invite ? null : (
             <Field label={t.onboarding.inviteCode} hint={t.onboarding.joinHint}>
               <Input required value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="text-center font-mono text-xl tracking-[0.3em]" maxLength={8} />
             </Field>
