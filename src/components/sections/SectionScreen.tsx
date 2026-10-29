@@ -36,6 +36,7 @@ async function purgeItem(item: Item) {
   return { error };
 }
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
+import { idbQueue, isNetworkError, type QueuedWrite } from "@/lib/offline-queue";
 import { fill } from "@/i18n";
 import { spaceType } from "@/lib/registry/spaces";
 import { WheelView } from "./WheelView";
@@ -90,7 +91,8 @@ export function SectionScreen({
   const [failed, setFailed] = useState<(() => void)[]>([]);
 
   /** Runs a write; if it fails, undoes the optimistic change and offers Retry. */
-  const persist = useCallback(async (write: () => PromiseLike<{ error: unknown }>, revert: () => void, retry: () => void) => {
+  // With `queued`, a write made without signal keeps its change and waits in the offline queue instead.
+  const persist = useCallback(async (write: () => PromiseLike<{ error: unknown }>, revert: () => void, retry: () => void, queued?: QueuedWrite) => {
     let error: unknown;
     try {
       ({ error } = await write());
@@ -98,6 +100,14 @@ export function SectionScreen({
       error = e;
     }
     if (!error) return true;
+    if (queued && isNetworkError(error)) {
+      try {
+        await idbQueue.add(queued);
+        return true;
+      } catch {
+        // No IndexedDB: fall back to Retry.
+      }
+    }
     console.error("[save] failed", error);
     revert();
     setFailed((f) => [...f, retry]);
@@ -245,12 +255,14 @@ export function SectionScreen({
     if (section.view === "wheel") temp.props = { [WHEEL_PROP]: { options: [] } };
     if (section.view === "commit") Object.assign(temp, newCommit(title, new Date(), timeZone));
     if (isSubs) temp.props = { [SUB_PROP]: manualSub(locale === "he" ? "ILS" : "USD") };
+    const newRow = { id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at };
     const save = async (): Promise<boolean> => {
       setItems((p) => [...p, temp]);
       return persist(
-        () => sb.from("items").upsert({ id: temp.id, section_id: temp.section_id, title: temp.title, position: temp.position, props: temp.props, remind_at: temp.remind_at, due_at: temp.due_at }),
+        () => sb.from("items").upsert(newRow),
         () => setItems((p) => p.filter((i) => i.id !== temp.id)),
         () => void save(),
+        { table: "items", action: "upsert", values: newRow },
       );
     };
     if (!(await save())) return;
@@ -265,7 +277,7 @@ export function SectionScreen({
     const row = { id: crypto.randomUUID(), section_id: section.id, title: c.title, props: c.props, remind_at: c.remind_at, position: (sorted.at(-1)?.position ?? 0) + 1 };
     const save = async () => {
       setItems((p) => [...p, { ...row, done: false, due_at: null, assignee_id: null, created_by: userId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
-      await persist(() => sb.from("items").upsert(row), () => setItems((p) => p.filter((i) => i.id !== row.id)), () => void save());
+      await persist(() => sb.from("items").upsert(row), () => setItems((p) => p.filter((i) => i.id !== row.id)), () => void save(), { table: "items", action: "upsert", values: row });
     };
     await save();
   }
@@ -307,12 +319,13 @@ export function SectionScreen({
     const revert = () => setCheckins((p) => [...p.filter((c) => !(c.item_id === item.id && c.day === day)), ...(existing ? [existing] : [])]);
     if (status === null) {
       setCheckins((p) => p.filter((c) => c !== existing));
-      await persist(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", day), revert, retry);
+      await persist(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", day), revert, retry, { table: "checkins", action: "delete", match: { item_id: item.id, day } });
       return;
     }
     const row: CheckinRow = { id: existing?.id ?? crypto.randomUUID(), item_id: item.id, user_id: userId, day, status, note: null, created_at: new Date().toISOString() };
     setCheckins((p) => [...p.filter((c) => c !== existing), row]);
-    const ok = await persist(() => sb.from("checkins").upsert({ id: row.id, item_id: item.id, day, status }, { onConflict: "item_id,day" }), revert, retry);
+    const values = { id: row.id, item_id: item.id, day, status };
+    const ok = await persist(() => sb.from("checkins").upsert(values, { onConflict: "item_id,day" }), revert, retry, { table: "checkins", action: "upsert", values, onConflict: "item_id,day" });
     if (ok && status === "done") celebrate();
   }
 
@@ -327,8 +340,9 @@ export function SectionScreen({
         }),
       );
       setOpenItem((o) => (o?.id === id ? { ...o, ...patch } : o));
+      const values = { ...patch, updated_at: new Date().toISOString() };
       await persist(
-        () => sb.from("items").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id),
+        () => sb.from("items").update(values).eq("id", id),
         () => {
           if (!previous) return;
           const undo = previous;
@@ -336,6 +350,7 @@ export function SectionScreen({
           setOpenItem((o) => (o?.id === id ? { ...o, ...undo } : o));
         },
         () => void updateItem(id, patch),
+        { table: "items", action: "update", values, match: { id } },
       );
     },
     [sb, persist],
@@ -362,7 +377,7 @@ export function SectionScreen({
 
   /** The real delete after the undo window; a failed one puts the item back. */
   function deleteForGood(item: Item) {
-    return persist(() => purgeItem(item), () => setItems((p) => (p.some((i) => i.id === item.id) ? p : [...p, item])), () => remove(item.id));
+    return persist(() => purgeItem(item), () => setItems((p) => (p.some((i) => i.id === item.id) ? p : [...p, item])), () => remove(item.id), { table: "items", action: "delete", match: { id: item.id } });
   }
 
   /** Subscriptions found in Gmail are hidden instead (a scan would bring them back). */

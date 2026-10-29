@@ -70,6 +70,10 @@ export const en = {
     clear: "Clear",
     none: "Nothing found",
   },
+  offline: {
+    offline: "Offline. Changes will sync later.",
+    waiting: "{n} changes waiting",
+  },
   onboarding: {
     title: "Let's set up your brain",
     name: "What should we call you?",

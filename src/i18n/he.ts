@@ -72,6 +72,10 @@ export const he: Dict = {
     clear: "ניקוי",
     none: "לא נמצא כלום",
   },
+  offline: {
+    offline: "אין חיבור. השינויים יסונכרנו אחר כך.",
+    waiting: "{n} שינויים ממתינים",
+  },
   onboarding: {
     title: "בואו נגדיר את המוח שלכם",
     name: "איך לקרוא לך?",
