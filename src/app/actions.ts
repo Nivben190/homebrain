@@ -19,7 +19,7 @@ import { addDays, todayKey } from "@/lib/engine/habits";
 import { getDict, fill } from "@/i18n";
 import { dueFromProps, type PropertyDef } from "@/lib/registry/properties";
 import { sendPush } from "@/lib/push";
-import { openToken, revokeToken } from "@/lib/subs/gmail";
+import { openToken, revokeToken, sealToken } from "@/lib/subs/gmail";
 import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
 import type { Automation, RequestRow, Role } from "@/lib/db-types";
 import { allow, clientIp } from "@/lib/rate-limit";
@@ -139,6 +139,46 @@ export async function quickAdd(input: { sectionId: string; title: string; day: s
 export async function linkRoutine(sectionId: string, petId: string | null): Promise<Result> {
   const { supabase } = await requireHome();
   const { error } = await supabase.from("sections").update({ pet_id: petId }).eq("id", sectionId);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Home info card (roadmap 3.9)
+// ---------------------------------------------------------------------------
+
+const homeInfoInput = z.object({
+  wifi_name: z.string().trim().max(64).nullable(),
+  wifi_password: z.string().max(128).nullable(),
+  info: z.object({
+    accounts: z.array(z.object({ label: z.string().max(60), value: z.string().max(120) })).max(30).default([]),
+    contacts: z.array(z.object({ label: z.string().max(60), phone: z.string().max(40) })).max(30).default([]),
+    vet: z.object({ name: z.string().max(80), phone: z.string().max(40) }).default({ name: "", phone: "" }),
+    notes: z.string().max(2000).default(""),
+  }),
+  guest_fields: z.array(z.enum(["wifi", "contacts", "vet", "notes"])).default(["wifi", "contacts", "vet"]),
+});
+export type HomeInfoInput = z.input<typeof homeInfoInput>;
+
+export async function saveHomeInfo(input: HomeInfoInput): Promise<Result> {
+  const { supabase, household } = await requireHome();
+  const parsed = homeInfoInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { error } = await supabase.from("home_info").upsert({ household_id: household.id, ...parsed.data, updated_at: new Date().toISOString() });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Alarm codes and the like: sealed with the app key, owner-only both ways. */
+export async function readHomeSecrets(): Promise<Result<string>> {
+  const { profile, household } = await requireHome();
+  if (profile.role !== "owner") return { ok: false, error: "owner only" };
+  const { data } = await createSupabaseAdmin().from("home_info").select("secrets").eq("household_id", household.id).maybeSingle();
+  return { ok: true, data: data?.secrets ? openToken(data.secrets) : "" };
+}
+
+export async function saveHomeSecrets(text: string): Promise<Result> {
+  const { profile, household } = await requireHome();
+  if (profile.role !== "owner") return { ok: false, error: "owner only" };
+  const { error } = await createSupabaseAdmin().from("home_info").upsert({ household_id: household.id, secrets: text.trim() ? sealToken(text.slice(0, 4000)) : null, updated_at: new Date().toISOString() });
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 

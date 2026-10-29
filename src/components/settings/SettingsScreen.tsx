@@ -179,6 +179,15 @@ export function SettingsScreen({
         <MembersCard members={roster} userId={userId} />
       </Card>
 
+      <Link href="/home-info" className="glass mt-3 flex items-center gap-3 rounded-3xl p-4">
+        <span className="text-2xl">🏠</span>
+        <span className="flex-1">
+          <span className="block font-semibold">{t.homeInfo.title}</span>
+          <span className="block text-sm text-muted">{t.homeInfo.link}</span>
+        </span>
+        <ChevronRight className="size-5 text-faint rtl:rotate-180" />
+      </Link>
+
       <SectionTitle>{t.settings.iphone}</SectionTitle>
       <Link href="/me/iphone" className="glass flex items-center gap-3 rounded-3xl p-4">
         <Smartphone className="size-6 text-accent" />
