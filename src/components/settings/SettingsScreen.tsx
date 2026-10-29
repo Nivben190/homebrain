@@ -12,6 +12,7 @@ import { LanguageSwitch } from "@/components/LanguageSwitch";
 import type { Member } from "@/components/sections/PropertyInput";
 import type { Profile } from "@/lib/db-types";
 import { DailyBrainSettings, type DailyPrefs } from "./DailyBrainSettings";
+import { BrainStatusCard, type BrainStatus } from "./BrainStatusCard";
 
 type ProfileForm = Pick<Profile, "display_name" | "emoji" | "timezone" | "wake_mode"> & { phone: string; wake_time: string; email: string };
 
@@ -35,6 +36,7 @@ export function SettingsScreen({
   daily,
   gmail,
   gcal,
+  brain,
 }: {
   profile: ProfileForm;
   household: { name: string; invite_code: string };
@@ -43,6 +45,7 @@ export function SettingsScreen({
   daily: DailyPrefs;
   gmail: { sectionId: string; email: string | null; expired: boolean; space: string }[];
   gcal: { email: string | null; expired: boolean } | null;
+  brain: BrainStatus;
 }) {
   const { t } = useI18n();
   const [p, setP] = useState(profile);
@@ -138,6 +141,10 @@ export function SettingsScreen({
           )
         )}
       </Card>
+
+      <div className="mt-3">
+        <BrainStatusCard status={brain} />
+      </div>
 
       <SectionTitle>{t.settings.household}</SectionTitle>
       <Card className="space-y-4">

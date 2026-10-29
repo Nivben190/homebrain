@@ -1,0 +1,21 @@
+name: Uptime
+
+# A free backup to an uptime monitor (roadmap 1.5): checks /api/health every
+# hour and fails when the engine has stopped ticking. GitHub emails you about
+# failed scheduled runs. For 5-minute alerts, point a free UptimeRobot monitor
+# at the same URL. Set the APP_URL repository variable if the domain changes.
+
+on:
+  schedule:
+    - cron: "11 * * * *"
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check /api/health
+        run: curl --fail-with-body --silent --show-error --max-time 30 "${APP_URL:-https://homebrain-jade.vercel.app}/api/health"
+        env:
+          APP_URL: ${{ vars.APP_URL }}

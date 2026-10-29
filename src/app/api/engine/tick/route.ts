@@ -12,5 +12,14 @@ export async function POST(request: Request) {
   const db = createSupabaseAdmin();
   // Always 200: a failed phase is reported in `phases` and the next minute tries again.
   const { outcomes, phases } = await tick(db);
-  return NextResponse.json({ ok: phases.every((p) => p.ok), phases, outcomes });
+  const failed = phases.filter((p) => !p.ok);
+  // The heartbeat /api/health watches (roadmap 1.5).
+  const { error } = await db.from("engine_status").upsert({
+    id: true,
+    last_tick_at: new Date().toISOString(),
+    failed_phases: failed.map((p) => p.phase),
+    last_error: failed[0]?.error?.slice(0, 500) ?? null,
+  });
+  if (error) console.error("[engine] heartbeat not written", error.message);
+  return NextResponse.json({ ok: failed.length === 0, phases, outcomes });
 }
