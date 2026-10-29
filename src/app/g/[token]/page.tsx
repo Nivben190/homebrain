@@ -19,7 +19,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
 
   const [{ data: home }, { data: section }, { data: info }, { data: tz }] = await Promise.all([
     db.from("households").select("name").eq("id", link.household_id).single(),
-    link.section_id ? db.from("sections").select("id,title,icon,view").eq("id", link.section_id).maybeSingle() : Promise.resolve({ data: null }),
+    link.section_id ? db.from("sections").select("id,title,icon,view").eq("id", link.section_id).eq("household_id", link.household_id).is("owner_id", null).maybeSingle() : Promise.resolve({ data: null }),
     link.include_info ? db.from("home_info").select("wifi_name,wifi_password,info,guest_fields").eq("household_id", link.household_id).maybeSingle<HomeInfo>() : Promise.resolve({ data: null }),
     db.from("profiles").select("timezone").eq("household_id", link.household_id).limit(1).maybeSingle(),
   ]);

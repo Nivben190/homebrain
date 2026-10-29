@@ -33,7 +33,7 @@ export function GuestScreen({
 
   async function tick(id: string) {
     const before = items;
-    setItems((list) => list.map((i) => (i.id === id ? { ...i, done: section?.tracker ? true : !i.done } : i)));
+    setItems((list) => list.map((i) => (i.id === id ? { ...i, done: true } : i)));
     const res = await guestTick(token, id);
     if (!res.ok) {
       setItems(before);
@@ -55,7 +55,7 @@ export function GuestScreen({
           </SectionTitle>
           <div className="space-y-2">
             {items.map((i) => (
-              <button key={i.id} onClick={() => tick(i.id)} disabled={section.tracker && i.done} className="glass flex w-full items-center gap-3 rounded-3xl p-4 text-start">
+              <button key={i.id} onClick={() => tick(i.id)} disabled={i.done} className="glass flex w-full items-center gap-3 rounded-3xl p-4 text-start">
                 <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full border-2", i.done ? "border-success bg-success text-white" : "border-faint-deco")}>{i.done && <Check className="size-4" />}</span>
                 <span className={cn("flex-1 text-lg font-semibold", i.done && "text-muted line-through")}>{i.title}</span>
               </button>

@@ -193,7 +193,7 @@ async function monthEndSummary(db: Admin, people: Profile[], now: Date) {
     const month = await loadMonth(db, home, today.slice(0, 7), tz);
     if (month.total <= 0) continue;
     for (const m of members) {
-      if (await sentToday(db, m, "money", now)) continue;
+      if (!pushAllowed({ ...m, digest: false }, null, now) || (await sentToday(db, m, "money", now))) continue;
       await markSent(db, m, "money");
       const t = getDict(m.locale).daily;
       const top = month.byCategory[0];

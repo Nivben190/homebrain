@@ -141,7 +141,10 @@ export async function quickAdd(input: { sectionId: string; title: string; day: s
 /** Ties a routine space to one pet, or (null) shares it across all of them (roadmap 3.10). */
 export async function linkRoutine(sectionId: string, petId: string | null): Promise<Result> {
   const { supabase } = await requireHome();
+  // RLS shows only this home's pets, so a foreign id finds nothing.
+  if (petId && !(await supabase.from("pets").select("id").eq("id", petId).maybeSingle()).data) return { ok: false, error: "not allowed" };
   const { error } = await supabase.from("sections").update({ pet_id: petId }).eq("id", sectionId);
+  revalidatePath("/pets", "layout");
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 
@@ -262,7 +265,13 @@ export async function setBillAmount(itemId: string, amount: number | null): Prom
 // ---------------------------------------------------------------------------
 
 export async function createGuestLink(input: { sectionId: string | null; includeInfo: boolean; days: number; label: string }): Promise<Result<{ token: string }>> {
-  const { supabase, user, household } = await requireHome();
+  const { supabase, user, profile, household } = await requireHome();
+  if (profile.role === "child" || profile.role === "guest") return { ok: false, error: "not allowed" };
+  // Only a shared space of this home: the guest page reads it with the service role.
+  if (input.sectionId) {
+    const { data: s } = await supabase.from("sections").select("id").eq("id", input.sectionId).eq("household_id", household.id).is("owner_id", null).maybeSingle();
+    if (!s) return { ok: false, error: "not allowed" };
+  }
   const days = Math.min(Math.max(Math.round(input.days), 1), 30);
   const { data, error } = await supabase
     .from("guest_links")
@@ -296,7 +305,8 @@ export async function guestTick(token: string, itemId: string): Promise<Result> 
     const day = todayKey(me?.timezone ?? "Asia/Jerusalem");
     await db.from("checkins").upsert({ item_id: item.id, day, status: "done", user_id: null, guest_label: who }, { onConflict: "item_id,day" });
   } else {
-    await db.from("items").update({ done: !item.done, updated_at: new Date().toISOString() }).eq("id", item.id);
+    // Guests only tick; undoing is left to the family.
+    if (!item.done) await db.from("items").update({ done: true, updated_at: new Date().toISOString() }).eq("id", item.id);
   }
   return { ok: true };
 }
