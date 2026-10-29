@@ -26,6 +26,7 @@ import { allow, clientIp } from "@/lib/rate-limit";
 import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
+import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib/guest-links";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
@@ -180,6 +181,50 @@ export async function saveHomeSecrets(text: string): Promise<Result> {
   if (profile.role !== "owner") return { ok: false, error: "owner only" };
   const { error } = await createSupabaseAdmin().from("home_info").upsert({ household_id: household.id, secrets: text.trim() ? sealToken(text.slice(0, 4000)) : null, updated_at: new Date().toISOString() });
   return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Sitter and guest links (roadmap 3.3)
+// ---------------------------------------------------------------------------
+
+export async function createGuestLink(input: { sectionId: string | null; includeInfo: boolean; days: number; label: string }): Promise<Result<{ token: string }>> {
+  const { supabase, user, household } = await requireHome();
+  const days = Math.min(Math.max(Math.round(input.days), 1), 30);
+  const { data, error } = await supabase
+    .from("guest_links")
+    .insert({ household_id: household.id, section_id: input.sectionId, include_info: input.includeInfo, label: input.label.trim().slice(0, 40), created_by: user.id, expires_at: new Date(Date.now() + days * 86_400_000).toISOString() })
+    .select("token")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/home-info");
+  return { ok: true, data: { token: data.token } };
+}
+
+export async function revokeGuestLink(token: string): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { error } = await supabase.from("guest_links").update({ revoked_at: new Date().toISOString() }).eq("token", token);
+  revalidatePath("/home-info");
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** A guest's tick, with no account: checked against the link on every call. */
+export async function guestTick(token: string, itemId: string): Promise<Result> {
+  if (!isGuestToken(token)) return { ok: false, error: "expired" };
+  const db = createSupabaseAdmin();
+  if (!(await allow(db, "guest", token))) return { ok: false, error: "too_many" };
+  const { data: link } = await db.from("guest_links").select("*").eq("token", token).maybeSingle<GuestLink>();
+  if (!link || !guestLinkOpen(link)) return { ok: false, error: "expired" };
+  const { data: item } = await db.from("items").select("id,section_id,done,sections(view)").eq("id", itemId).maybeSingle<{ id: string; section_id: string; done: boolean; sections: { view: string } | null }>();
+  if (!item || !guestMayTick(link, item)) return { ok: false, error: "not allowed" };
+  const who = link.label || "Guest";
+  if (item.sections?.view === "tracker") {
+    const { data: me } = await db.from("profiles").select("timezone").eq("household_id", link.household_id).limit(1).maybeSingle();
+    const day = todayKey(me?.timezone ?? "Asia/Jerusalem");
+    await db.from("checkins").upsert({ item_id: item.id, day, status: "done", user_id: null, guest_label: who }, { onConflict: "item_id,day" });
+  } else {
+    await db.from("items").update({ done: !item.done, updated_at: new Date().toISOString() }).eq("id", item.id);
+  }
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
