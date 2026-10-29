@@ -23,6 +23,8 @@ import { openToken, revokeToken } from "@/lib/subs/gmail";
 import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
 import type { Automation, RequestRow } from "@/lib/db-types";
 import { allow, clientIp } from "@/lib/rate-limit";
+import { zonedTimeToUtc } from "@/lib/engine/time";
+import { newCommit } from "@/lib/commit";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
@@ -106,6 +108,29 @@ export async function deleteAccount(confirmEmail: string): Promise<Result> {
   const { error } = await db.auth.admin.deleteUser(user.id);
   if (error) return { ok: false, error: error.message };
   await supabase.auth.signOut({ scope: "local" });
+  return { ok: true };
+}
+
+/** Quick-add (roadmap 2.3): one item into any space, with an optional day, time and person. */
+export async function quickAdd(input: { sectionId: string; title: string; day: string | null; time: string | null; assigneeId: string | null }): Promise<Result> {
+  const { supabase, user, profile } = await requireHome();
+  const title = input.title.trim().slice(0, 300);
+  if (!title) return { ok: false, error: "empty" };
+  const { data: section } = await supabase.from("sections").select("id,view,schema").eq("id", input.sectionId).single<{ id: string; view: string; schema: PropertyDef[] }>();
+  if (!section) return { ok: false, error: "no space" };
+
+  const row: Record<string, unknown> = { section_id: section.id, created_by: user.id, position: Date.now() / 1000, title, assignee_id: input.assigneeId };
+  if (section.view === "commit") Object.assign(row, newCommit(title, new Date(), profile.timezone));
+  if (input.day) {
+    const [y, m, d] = input.day.split("-").map(Number);
+    const [hh, mm] = (input.time ?? "09:00").split(":").map(Number);
+    row.due_at = zonedTimeToUtc(y, m, d, hh, mm, profile.timezone).toISOString();
+    const dateProp = section.schema.find((p) => p.type === "date");
+    if (dateProp) row.props = { ...((row.props as object) ?? {}), [dateProp.id]: input.time ? `${input.day}T${input.time}` : input.day };
+  }
+  const { error } = await supabase.from("items").insert(row);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

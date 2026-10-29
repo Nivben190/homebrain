@@ -57,6 +57,14 @@ export const en = {
     waiting: "Waiting for your partner",
     waitingHint: "Send them the link. Shared lists, reminders and nudges switch on once they join.",
   },
+  quickAdd: {
+    title: "Add anything",
+    placeholder: "dentist Tuesday 10, milk, I commit to…",
+    noDate: "No date",
+    nobody: "Anyone",
+    add: "Add",
+    added: "Added to {space}",
+  },
   onboarding: {
     title: "Let's set up your brain",
     name: "What should we call you?",

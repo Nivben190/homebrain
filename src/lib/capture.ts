@@ -19,7 +19,7 @@ const ADDABLE = new Set(["list", "checklist", "notes"]);
  * / "חלב לקניות" names one at the end; food words go to the groceries list;
  * otherwise the first list. Returns the cleaned item text too.
  */
-export function routeCapture(raw: string, spaces: CaptureSpace[], explicit?: string | null): { space: CaptureSpace | null; text: string } {
+export function routeCapture<S extends CaptureSpace>(raw: string, spaces: S[], explicit?: string | null): { space: S | null; text: string } {
   let text = raw.trim().replace(/[.!]+$/, "");
   const norm = (s: string) => s.replace(/[^\p{L}\p{N} ]/gu, "").trim().toLowerCase();
   const byName = (name: string) => spaces.find((s) => s.id === name || norm(s.title) === norm(name) || norm(s.title).startsWith(norm(name)));
