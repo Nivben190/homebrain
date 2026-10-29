@@ -5,6 +5,8 @@ import type { PropertyDef } from "@/lib/registry/properties";
 import { EXPIRY_PROP, expiryStage, type ExpirySent } from "@/lib/expiry";
 import { pushAllowed } from "@/lib/calm";
 import { loadMonth } from "@/lib/money-data";
+import { sendEmail } from "@/lib/email";
+import { weekdayOf } from "./habits";
 import { getDict, fill } from "@/i18n";
 import { sendPush } from "@/lib/push";
 import { buildDay, dayScore, openTitles } from "@/lib/day";
@@ -159,6 +161,23 @@ export async function dailyJobs(db: Admin, now = new Date()) {
   sent.push(...(await foodAlerts(db, people ?? [], now)));
   sent.push(...(await expiryAlerts(db, people ?? [], now)));
   sent.push(...(await monthEndSummary(db, people ?? [], now)));
+  sent.push(...(await weeklyCheckin(db, people ?? [], now)));
+  return sent;
+}
+
+/** Sunday 20:00, before the check-in: a push and an email pointing at the weekly page (roadmap 3.8). */
+async function weeklyCheckin(db: Admin, people: Profile[], now: Date) {
+  const sent: string[] = [];
+  for (const p of people) {
+    if (!p.household_id || weekdayOf(todayKey(p.timezone, now)) !== 0 || !inWindow(minuteOfDay(zonedParts(now, p.timezone)), "20:00")) continue;
+    if (await sentToday(db, p, "weekly", now)) continue;
+    await markSent(db, p, "weekly");
+    const t = getDict(p.locale).daily;
+    const url = `${(process.env.NEXT_PUBLIC_APP_URL ?? "https://homebrain-jade.vercel.app").replace(/\/$/, "")}/weekly`;
+    if (pushAllowed({ ...p, digest: false }, null, now)) await sendPush(db, p.user_id, { title: t.weeklyTitle, body: t.weeklyBody, url: "/weekly" });
+    if (p.email) await sendEmail(p.email, t.weeklyTitle, `${t.weeklyBody}\n\n${url}`);
+    sent.push(`weekly:${p.user_id}`);
+  }
   return sent;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMonth, monthlyShare, settleUp } from "./money";
+import { buildMonth, monthlyShare, settleUp, spendBetween } from "./money";
 import { manualSub } from "./subs/types";
 import type { Tx } from "./spend";
 
@@ -25,6 +25,11 @@ describe("household money", () => {
     expect(m.byCategory[0]).toEqual({ category: "bills", amount: 500, budget: null });
     expect(m.byCategory.find((c) => c.category === "groceries")).toEqual({ category: "groceries", amount: 380, budget: 350 });
     expect(m.paidBy).toEqual({ a: 780, b: 100 });
+  });
+
+  it("sums a week of spending with refunds netted", () => {
+    const txs = [tx(100, "eating", "a", "2026-10-20T10:00:00Z"), tx(30, "eating", "a", "2026-10-21T10:00:00Z", true), tx(999, "eating", "a", "2026-10-10T10:00:00Z")];
+    expect(spendBetween(txs, new Date("2026-10-18T00:00:00Z"), new Date("2026-10-25T00:00:00Z"))).toBe(70);
   });
 
   it("settles up so everyone carries an equal share", () => {

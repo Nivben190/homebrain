@@ -51,6 +51,11 @@ export function buildMonth(input: MoneyInput): MoneyMonth {
   };
 }
 
+/** ₪ spent between two instants, refunds netted (the weekly check-in, roadmap 3.8). */
+export function spendBetween(txs: Tx[], from: Date, to: Date) {
+  return Math.round(txs.filter((t) => t.currency === "₪" && new Date(t.at) >= from && new Date(t.at) < to).reduce((s, t) => s + signed(t), 0));
+}
+
 /** Who pays whom so everyone carries an equal share; fewest transfers, largest first. */
 export function settleUp(paid: Record<string, number>, members: string[]): { from: string; to: string; amount: number }[] {
   if (members.length < 2) return [];
