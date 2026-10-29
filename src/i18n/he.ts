@@ -494,6 +494,8 @@ export const he: Dict = {
     shopBody: "{n} פריטים ברשימה",
     shopBodyEmpty: "צריך לקנות משהו לפני שבת?",
     storeTitle: "🛒 בסופר",
+    expiryTitle: "התוקף של {title} עומד לפוג",
+    expiryBody: "בעוד {n} ימים לכל היותר, ב-{date}. הזמן לחדש.",
     foodTitle: "🦴 האוכל של {name} עומד להיגמר",
     foodBody: "נשארו בערך {n} ימים — זמן להזמין.",
     whosOnIt: "מי על זה",

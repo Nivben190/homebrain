@@ -492,6 +492,8 @@ export const en = {
     shopBody: "{n} items on the list",
     shopBodyEmpty: "Anything to buy before Shabbat?",
     storeTitle: "🛒 At the supermarket",
+    expiryTitle: "{title} expires soon",
+    expiryBody: "In {n} days or less, on {date}. Time to renew.",
     foodTitle: "🦴 {name}'s food is running low",
     foodBody: "About {n} days left — time to reorder.",
     whosOnIt: "Who's on it",

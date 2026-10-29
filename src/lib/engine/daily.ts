@@ -1,6 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Pet, Profile } from "@/lib/db-types";
+import type { PropertyDef } from "@/lib/registry/properties";
+import { EXPIRY_PROP, expiryStage, type ExpirySent } from "@/lib/expiry";
+import { pushAllowed } from "@/lib/calm";
 import { getDict, fill } from "@/i18n";
 import { sendPush } from "@/lib/push";
 import { buildDay, dayScore, openTitles } from "@/lib/day";
@@ -153,6 +156,40 @@ export async function dailyJobs(db: Admin, now = new Date()) {
   }
 
   sent.push(...(await foodAlerts(db, people ?? [], now)));
+  sent.push(...(await expiryAlerts(db, people ?? [], now)));
+  return sent;
+}
+
+/** Documents: a heads-up 60, 30 and 7 days before the expiry date, between 09:00 and 21:00 (roadmap 3.7). */
+async function expiryAlerts(db: Admin, people: Profile[], now: Date) {
+  const { data: spaces } = await db.from("sections").select("id,household_id,owner_id,schema,icon").eq("template", "documents").returns<{ id: string; household_id: string; owner_id: string | null; schema: PropertyDef[]; icon: string }[]>();
+  const sent: string[] = [];
+  for (const s of spaces ?? []) {
+    const dateProp = s.schema.find((p) => p.type === "date");
+    if (!dateProp) continue;
+    const members = people.filter((p) => p.household_id === s.household_id && (!s.owner_id || p.user_id === s.owner_id));
+    const tz = members[0]?.timezone ?? "Asia/Jerusalem";
+    const hour = zonedParts(now, tz).hour;
+    if (hour < 9 || hour >= 21) continue;
+    const today = todayKey(tz, now);
+    const { data: items } = await db.from("items").select("id,title,props").eq("section_id", s.id).eq("done", false);
+    for (const item of items ?? []) {
+      const expires = item.props?.[dateProp.id];
+      if (typeof expires !== "string" || !expires) continue;
+      const state = (item.props[EXPIRY_PROP] ?? null) as ExpirySent | null;
+      const stage = expiryStage(expires, today, state);
+      if (!stage) continue;
+      const day = expires.slice(0, 10);
+      const next: ExpirySent = { for: day, sent: [...(state?.for === day ? state.sent : []), stage] };
+      await db.from("items").update({ props: { ...item.props, [EXPIRY_PROP]: next } }).eq("id", item.id);
+      for (const m of members) {
+        if (!pushAllowed(m, s.id, now)) continue;
+        const t = getDict(m.locale).daily;
+        await sendPush(db, m.user_id, { title: `${s.icon} ${fill(t.expiryTitle, { title: item.title })}`, body: fill(t.expiryBody, { n: stage, date: day }), url: `/sections/${s.id}` });
+      }
+      sent.push(`expiry:${item.id}:${stage}`);
+    }
+  }
   return sent;
 }
 
