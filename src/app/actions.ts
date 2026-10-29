@@ -231,6 +231,10 @@ const settingsInput = z.object({
   wrapup_time: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   quiet_shabbat: z.boolean().optional(),
   shabbat_shop: z.boolean().optional(),
+  quiet_from: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  quiet_to: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  muted_sections: z.array(z.string().uuid()).max(100).optional(),
+  digest: z.boolean().optional(),
 });
 
 export async function updateProfile(patch: z.input<typeof settingsInput>): Promise<Result> {

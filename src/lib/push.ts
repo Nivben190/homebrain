@@ -17,6 +17,8 @@ export interface PushPayload {
   title: string;
   body: string;
   url: string;
+  /** Home Screen badge: unanswered cards. Filled in by sendPush. */
+  badge?: number;
 }
 
 /** Sends to every registered device of a user; prunes expired subscriptions. */
@@ -25,7 +27,11 @@ export async function sendPush(db: SupabaseClient, userId: string, payload: Push
     console.warn("[push] VAPID keys missing, skipping push");
     return 0;
   }
-  const { data: subs } = await db.from("push_subscriptions").select("*").eq("user_id", userId);
+  const [{ data: subs }, { count }] = await Promise.all([
+    db.from("push_subscriptions").select("*").eq("user_id", userId),
+    db.from("runs").select("id", { count: "exact", head: true }).eq("user_id", userId).is("acknowledged_at", null).gte("fired_at", new Date(Date.now() - 86400000).toISOString()),
+  ]);
+  payload = { ...payload, badge: count ?? 0 };
   let sent = 0;
   await Promise.all(
     (subs ?? []).map(async (s) => {

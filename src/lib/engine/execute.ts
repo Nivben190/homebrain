@@ -8,6 +8,7 @@ import { alarmShortcutUrl, renderActions } from "./render";
 import { addDays, assigneesFor, diffDays, habitStats, isDue, nextReminder, NUDGE_TIME, readHabit, todayKey, type Checkin } from "./habits";
 import { datePlan, nextDateReminder, readDate, type DateSpec } from "./dates";
 import { dailyJobs, isQuiet, sendBriefing, sendStoreList } from "./daily";
+import { pushAllowed } from "@/lib/calm";
 import { DEFAULT_PLACE, getForecast, outdoorWarning, weatherAt } from "@/lib/weather";
 import type { RenderedAction } from "./types";
 import { conditionsPass, nextRunAt } from "./schedule";
@@ -162,7 +163,7 @@ export async function fireAutomation(db: Admin, automation: Automation, now = ne
       await db.from("items").insert({ section_id: effect.sectionId, title: effect.title, created_by: me.user_id });
     }
   }
-  await sendPush(db, me.user_id, { title: `${def.icon} ${out.title}`, body: out.body, url: `/runs/${run.id}` });
+  if (pushAllowed(me, null, now)) await sendPush(db, me.user_id, { title: `${def.icon} ${out.title}`, body: out.body, url: `/runs/${run.id}` });
 
   return { automationId: automation.id, status: "fired", runId: run.id, reason: skipped.join("; ") || undefined };
 }
@@ -368,7 +369,8 @@ export async function sendReminders(
     const { title, body, rendered } = card(target);
     const run = await insertItemRun(db, { user_id: target.user_id, household_id: section.household_id, item_id: itemId, title, body, icon: section.icon, rendered, fired_at: now.toISOString() });
     if (!run) continue;
-    await sendPush(db, target.user_id, { title: `${section.icon} ${title}`, body, url: `/runs/${run.id}` });
+    // The card is there either way; quiet hours, a muted space or the digest only hold back the buzz.
+    if (pushAllowed(target, section.id, now)) await sendPush(db, target.user_id, { title: `${section.icon} ${title}`, body, url: `/runs/${run.id}` });
     fired++;
   }
   return fired;

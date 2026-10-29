@@ -30,11 +30,15 @@ export interface Profile {
   wrapup_time: string;
   quiet_shabbat: boolean;
   shabbat_shop: boolean;
+  quiet_from: string | null;
+  quiet_to: string | null;
+  muted_sections: string[];
+  digest: boolean;
 }
 
 /** Columns any household member may read (everything but the secret tokens). */
 export const PUBLIC_PROFILE_COLUMNS =
-  "user_id,household_id,display_name,emoji,locale,timezone,phone,email,wake_mode,wake_time,lat,lon,place,briefing,wrapup,wrapup_time,quiet_shabbat,shabbat_shop";
+  "user_id,household_id,display_name,emoji,locale,timezone,phone,email,wake_mode,wake_time,lat,lon,place,briefing,wrapup,wrapup_time,quiet_shabbat,shabbat_shop,quiet_from,quiet_to,muted_sections,digest";
 
 /** A household member as others see them. */
 export type Member = Omit<Profile, "hook_token" | "ics_token">;

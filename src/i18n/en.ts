@@ -220,6 +220,12 @@ export const en = {
     history: "Recent",
   },
   settings: {
+    quietHours: "Quiet hours",
+    quietHoursHint: "Cards still arrive; your phone stays silent.",
+    digest: "Evening digest",
+    digestHint: "No single pushes. One summary at wrap-up time instead.",
+    muted: "Muted spaces",
+    mutedHint: "Tap a space to stop its pushes.",
     yourData: "Your data",
     exportTitle: "Export my data",
     exportHint: "A zip with every space as a spreadsheet, all your photos and files, and the raw data.",

@@ -12,10 +12,14 @@ export interface DailyPrefs {
   wrapup_time: string;
   quiet_shabbat: boolean;
   shabbat_shop: boolean;
+  quiet_from: string | null;
+  quiet_to: string | null;
+  muted_sections: string[];
+  digest: boolean;
 }
 
 /** Location + briefing / wrap-up / Shabbat preferences. Each change saves instantly. */
-export function DailyBrainSettings({ initial }: { initial: DailyPrefs }) {
+export function DailyBrainSettings({ initial, spaces }: { initial: DailyPrefs; spaces: { id: string; icon: string; title: string }[] }) {
   const { t, locale } = useI18n();
   const s = t.settings;
   const [p, setP] = useState(initial);
@@ -90,6 +94,38 @@ export function DailyBrainSettings({ initial }: { initial: DailyPrefs }) {
           </div>
           {row(`🛒 ${s.shabbatShop}`, s.shabbatShopHint, p.shabbat_shop, (shabbat_shop) => save({ shabbat_shop }))}
           {row(`🕯️ ${s.quietShabbat}`, s.quietShabbatHint, p.quiet_shabbat, (quiet_shabbat) => save({ quiet_shabbat }))}
+          <div className="py-1">
+            {row(`🌜 ${s.quietHours}`, s.quietHoursHint, !!p.quiet_from, (on) => save(on ? { quiet_from: "22:00", quiet_to: "07:00" } : { quiet_from: null, quiet_to: null }))}
+            {p.quiet_from && (
+              <div className="mt-2 flex items-center gap-2">
+                <Input type="time" aria-label={s.quietHours} value={p.quiet_from.slice(0, 5)} onChange={(e) => e.target.value && setP({ ...p, quiet_from: e.target.value })} onBlur={() => save({ quiet_from: p.quiet_from!.slice(0, 5) })} className="h-10 w-32" />
+                <span className="text-muted">–</span>
+                <Input type="time" aria-label={s.quietHours} value={(p.quiet_to ?? "07:00").slice(0, 5)} onChange={(e) => e.target.value && setP({ ...p, quiet_to: e.target.value })} onBlur={() => save({ quiet_to: (p.quiet_to ?? "07:00").slice(0, 5) })} className="h-10 w-32" />
+              </div>
+            )}
+          </div>
+          {row(`📬 ${s.digest}`, s.digestHint, p.digest, (digest) => save({ digest }))}
+          {spaces.length > 0 && (
+            <div className="py-2">
+              <p className="font-semibold">🔕 {s.muted}</p>
+              <p className="text-sm text-muted">{s.mutedHint}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {spaces.map((sp) => {
+                  const muted = p.muted_sections.includes(sp.id);
+                  return (
+                    <button
+                      key={sp.id}
+                      aria-pressed={muted}
+                      onClick={() => save({ muted_sections: muted ? p.muted_sections.filter((x) => x !== sp.id) : [...p.muted_sections, sp.id] })}
+                      className={muted ? "rounded-full bg-fg px-3 py-1.5 text-sm font-medium text-bg" : "rounded-full bg-sunken px-3 py-1.5 text-sm font-medium"}
+                    >
+                      {sp.icon} {sp.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
         {status && <p className="text-sm font-semibold text-accent">{status}</p>}
       </Card>

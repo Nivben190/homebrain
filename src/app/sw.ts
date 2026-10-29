@@ -27,6 +27,8 @@ serwist.addEventListeners();
 // Brain notifications: payload is { title, body, url } from src/lib/push.ts
 self.addEventListener("push", (event) => {
   const data = event.data?.json() ?? { title: "Home Brain", body: "", url: "/" };
+  // Home Screen badge (iOS 16.4+ installed apps): how many cards wait for an answer.
+  if (typeof data.badge === "number" && "setAppBadge" in self.navigator) void self.navigator.setAppBadge(data.badge).catch(() => {});
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,

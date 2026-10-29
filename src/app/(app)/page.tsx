@@ -7,6 +7,7 @@ import { Card, IconTile, SectionTitle } from "@/components/ui";
 import { RunCard } from "@/components/today/RunCard";
 import { AwakeButton } from "@/components/today/AwakeButton";
 import { PushPrompt } from "@/components/today/PushPrompt";
+import { AppBadge } from "@/components/today/AppBadge";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import type { Automation, CheckinRow, Item, Pet, RequestRow, Run, Section } from "@/lib/db-types";
 import { QuickActions } from "@/components/today/QuickActions";
@@ -164,6 +165,7 @@ export default async function TodayPage() {
       </header>
 
       <PushPrompt />
+      <AppBadge count={pending.length} />
 
       {/* Now */}
       <SectionTitle>{t.today.bandNow}</SectionTitle>

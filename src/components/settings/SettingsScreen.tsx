@@ -40,6 +40,7 @@ export function SettingsScreen({
   gcal,
   brain,
   partners,
+  spaces,
 }: {
   profile: ProfileForm;
   household: { name: string; invite_code: string };
@@ -50,6 +51,7 @@ export function SettingsScreen({
   gcal: { email: string | null; expired: boolean } | null;
   brain: BrainStatus;
   partners: string[];
+  spaces: { id: string; icon: string; title: string }[];
 }) {
   const { t } = useI18n();
   const [p, setP] = useState(profile);
@@ -124,7 +126,7 @@ export function SettingsScreen({
         </Field>
       </Card>
 
-      <DailyBrainSettings initial={daily} />
+      <DailyBrainSettings initial={daily} spaces={spaces} />
 
       <SectionTitle>{t.settings.notifications}</SectionTitle>
       <Card className="flex items-center gap-3">

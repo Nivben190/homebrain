@@ -123,7 +123,7 @@ export async function dailyJobs(db: Admin, now = new Date()) {
     if (p.briefing && inWindow(nowMin, "09:30") && (await sendBriefing(db, p.user_id, now))) sent.push(`briefing:${p.user_id}`);
 
     // Evening wrap-up.
-    if (p.wrapup && inWindow(nowMin, p.wrapup_time) && !(await sentToday(db, p, "wrapup", now)) && !(await isQuiet(p, now))) {
+    if ((p.wrapup || p.digest) && inWindow(nowMin, p.wrapup_time) && !(await sentToday(db, p, "wrapup", now)) && !(await isQuiet(p, now))) {
       const members = await membersOf(db, p.household_id!);
       const day = await buildDay(db, p, members.map((m) => m.user_id), now);
       const score = dayScore(day);
