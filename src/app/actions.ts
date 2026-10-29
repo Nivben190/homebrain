@@ -12,6 +12,7 @@ import type { RenderedAction } from "@/lib/engine/types";
 import { nextRunAt } from "@/lib/engine/schedule";
 import { allowedSections, sectionRefs } from "@/lib/engine/scope";
 import { canSignUp } from "@/lib/signup";
+import { deletionPlan } from "@/lib/account-data";
 import { calendarAccess, deleteEvent, upsertEvent } from "@/lib/gcal";
 import { automationDefSchema } from "@/lib/engine/types";
 import { addDays, todayKey } from "@/lib/engine/habits";
@@ -63,6 +64,44 @@ export async function createAccount(input: { email: string; password: string; in
     const exists = /already|registered|exists/i.test(error.message);
     return { ok: false, error: exists ? "exists" : error.message };
   }
+  return { ok: true };
+}
+
+/**
+ * Me → Delete my account. Revokes Google, removes the files that go with the
+ * account, deletes the home if nobody else lives there, then the user; their
+ * private spaces, keys, devices and runs cascade with it. Shared items they
+ * made stay for the partner. The typed email guards against a stray tap.
+ */
+export async function deleteAccount(confirmEmail: string): Promise<Result> {
+  const { supabase, user, household } = await requireHome();
+  if (!user.email || confirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) return { ok: false, error: "confirm" };
+
+  const db = createSupabaseAdmin();
+  const [{ count: others }, { data: sections }, { data: gmail }, { data: gcal }] = await Promise.all([
+    db.from("profiles").select("user_id", { count: "exact", head: true }).eq("household_id", household.id).neq("user_id", user.id),
+    db.from("sections").select("id,owner_id").eq("household_id", household.id),
+    db.from("gmail_connections").select("refresh_token").eq("user_id", user.id),
+    db.from("calendar_connections").select("refresh_token").eq("user_id", user.id),
+  ]);
+  const { data: items } = await db.from("items").select("section_id,props").in("section_id", (sections ?? []).map((s) => s.id));
+  const plan = deletionPlan({ userId: user.id, otherMembers: others ?? 0, sections: sections ?? [], items: items ?? [] });
+
+  // Google first: once the rows are gone the tokens can't be revoked.
+  await Promise.all(
+    [...(gmail ?? []), ...(gcal ?? [])].map(async (c) => {
+      try {
+        await revokeToken(openToken(c.refresh_token));
+      } catch {
+        // Unreadable token: deleting it is enough.
+      }
+    }),
+  );
+  for (let i = 0; i < plan.files.length; i += 100) await db.storage.from("attachments").remove(plan.files.slice(i, i + 100));
+  if (plan.deleteHome) await db.from("households").delete().eq("id", household.id);
+  const { error } = await db.auth.admin.deleteUser(user.id);
+  if (error) return { ok: false, error: error.message };
+  await supabase.auth.signOut({ scope: "local" });
   return { ok: true };
 }
 

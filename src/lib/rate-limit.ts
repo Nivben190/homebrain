@@ -20,6 +20,8 @@ export const LIMITS = {
   fridgeScan: { limit: 20, windowSeconds: 86_400, failClosed: true },
   /** Per IP: account creation is rare and the invite code is guessable by brute force. */
   signUp: { limit: 5, windowSeconds: 3600 },
+  /** Per person: each export reads every table and file. */
+  export: { limit: 5, windowSeconds: 3600 },
 } satisfies Record<string, Limit>;
 
 export type LimitRule = keyof typeof LIMITS;

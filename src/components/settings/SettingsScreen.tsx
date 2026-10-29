@@ -13,6 +13,7 @@ import type { Member } from "@/components/sections/PropertyInput";
 import type { Profile } from "@/lib/db-types";
 import { DailyBrainSettings, type DailyPrefs } from "./DailyBrainSettings";
 import { BrainStatusCard, type BrainStatus } from "./BrainStatusCard";
+import { YourDataCard } from "./YourDataCard";
 
 type ProfileForm = Pick<Profile, "display_name" | "emoji" | "timezone" | "wake_mode"> & { phone: string; wake_time: string; email: string };
 
@@ -37,6 +38,7 @@ export function SettingsScreen({
   gmail,
   gcal,
   brain,
+  partners,
 }: {
   profile: ProfileForm;
   household: { name: string; invite_code: string };
@@ -46,6 +48,7 @@ export function SettingsScreen({
   gmail: { sectionId: string; email: string | null; expired: boolean; space: string }[];
   gcal: { email: string | null; expired: boolean } | null;
   brain: BrainStatus;
+  partners: string[];
 }) {
   const { t } = useI18n();
   const [p, setP] = useState(profile);
@@ -210,6 +213,8 @@ export function SettingsScreen({
           </div>
         </>
       )}
+
+      <YourDataCard email={p.email} partners={partners} />
 
       <form action={signOut} className="mt-8">
         <Button variant="ghost" className="w-full">

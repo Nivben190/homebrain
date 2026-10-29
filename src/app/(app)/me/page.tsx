@@ -31,6 +31,7 @@ export default async function MePage() {
       household={{ name: household.name, invite_code: household.invite_code }}
       members={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }))}
       feedUrl={`${origin}/api/cal/${profile.ics_token}.ics`}
+      partners={members.filter((m) => m.user_id !== user.id).map((m) => m.display_name)}
       brain={{ ...tickHealth(engine), failedJobs: failedJobs ?? 0, expiredGoogle }}
       gcal={gcal ?{ email: gcal.email, expired: gcal.status === "expired" } : null}
       gmail={(gmail ?? []).map((g) => ({ sectionId: g.section_id, email: g.email, expired: g.status === "expired", space: `${g.sections?.icon ?? "💳"} ${g.sections?.title ?? ""}` }))}
