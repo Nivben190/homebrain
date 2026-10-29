@@ -67,6 +67,11 @@ export const he: Dict = {
     add: "הוספה",
     added: "נוסף ל{space}",
   },
+  search: {
+    placeholder: "חיפוש בכל הבית",
+    clear: "ניקוי",
+    none: "לא נמצא כלום",
+  },
   onboarding: {
     title: "בואו נגדיר את המוח שלכם",
     name: "איך לקרוא לך?",

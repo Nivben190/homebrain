@@ -65,6 +65,11 @@ export const en = {
     add: "Add",
     added: "Added to {space}",
   },
+  search: {
+    placeholder: "Search the house",
+    clear: "Clear",
+    none: "Nothing found",
+  },
   onboarding: {
     title: "Let's set up your brain",
     name: "What should we call you?",

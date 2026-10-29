@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui";
 import { SpacesGrid } from "@/components/sections/SpacesGrid";
 import { NewSectionButton } from "@/components/sections/NewSectionButton";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { SearchBox } from "@/components/sections/SearchBox";
 import type { Section } from "@/lib/db-types";
 
 export default async function SectionsPage() {
@@ -19,6 +20,7 @@ export default async function SectionsPage() {
     <>
       <RealtimeRefresh tables={["sections"]} />
       <PageHeader title={t.sections.title} action={<NewSectionButton householdId={household.id} userId={user.id} timeZone={profile.timezone} />} />
+      <SearchBox spaces={(sections ?? []).map((s) => ({ id: s.id, icon: s.icon, title: s.title }))} />
       <SpacesGrid sections={sections ?? []} counts={Object.fromEntries(counts)} />
     </>
   );
