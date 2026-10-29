@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** ready-for-agent
+**Status:** dropped (2026-10-29): Gmail's own unsubscribe link already does this; not worth a restricted-scope feature
 
 - [ ] A list of top senders with how many emails each sent recently
 - [ ] One-tap unsubscribe works for senders that offer it; the sender is then marked unsubscribed

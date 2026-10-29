@@ -4,7 +4,7 @@
 
 **Blocked by:** 10 - One table per space type
 
-**Status:** ready-for-agent
+**Status:** done (roadmap 3.6): Spaces → Money adds up spending, subscriptions and bills by month, with budgets, who paid and a settle-up
 
 - [ ] A monthly total per currency, combining every Subscriptions space you can see plus shared expenses
 - [ ] Each expense can be marked as yours, your partner's or split

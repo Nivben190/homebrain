@@ -4,7 +4,7 @@
 
 **Blocked by:** None - can start immediately
 
-**Status:** partial — covered by the new "Spin the wheel" space (with a Date night wheel, plus "We did it" resting an option for 21 days); the weekly push is not built yet
+**Status:** done: the Spin the wheel space, plus the Date night Brain recipe (every Thursday 20:00, spin and tell you both)
 
 - [ ] Starter space with a few ideas in English and Hebrew
 - [ ] The weekly push picks a random idea from the space
