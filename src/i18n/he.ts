@@ -76,6 +76,16 @@ export const he: Dict = {
     offline: "אין חיבור. השינויים יסונכרנו אחר כך.",
     waiting: "{n} שינויים ממתינים",
   },
+  activity: {
+    added: "{name} הוסיפו את {title}",
+    ticked: "{name} סימנו את {title}",
+    checked_in: "{name} עשו {title} ✓",
+    arrive_home: "{name} הגיעו הביתה",
+    arrive_store: "{name} הגיעו לסופר",
+    wake: "{name} התעוררו",
+    atStore: "{name} בסופר עכשיו",
+    today: "היום בבית",
+  },
   onboarding: {
     title: "בואו נגדיר את המוח שלכם",
     name: "איך לקרוא לך?",

@@ -74,6 +74,16 @@ export const en = {
     offline: "Offline. Changes will sync later.",
     waiting: "{n} changes waiting",
   },
+  activity: {
+    added: "{name} added {title}",
+    ticked: "{name} ticked {title}",
+    checked_in: "{name} did {title} ✓",
+    arrive_home: "{name} got home",
+    arrive_store: "{name} reached the store",
+    wake: "{name} is up",
+    atStore: "{name} is at the supermarket now",
+    today: "Today at home",
+  },
   onboarding: {
     title: "Let's set up your brain",
     name: "What should we call you?",

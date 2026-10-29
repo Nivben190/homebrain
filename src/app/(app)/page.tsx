@@ -8,6 +8,7 @@ import { RunCard } from "@/components/today/RunCard";
 import { AwakeButton } from "@/components/today/AwakeButton";
 import { PushPrompt } from "@/components/today/PushPrompt";
 import { AppBadge } from "@/components/today/AppBadge";
+import { ActivityStrip, type ActivityRow } from "@/components/today/ActivityStrip";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import type { Automation, CheckinRow, Item, Pet, RequestRow, Run, Section } from "@/lib/db-types";
 import { QuickActions } from "@/components/today/QuickActions";
@@ -58,7 +59,7 @@ export default async function TodayPage() {
   const lon = profile.lon ?? DEFAULT_PLACE.lon;
   const forecastP = getForecast(lat, lon, profile.timezone);
   const holyP = getJewishCalendar(lat, lon, profile.timezone, addDays(today, -2), addDays(today, 14));
-  const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ] = await Promise.all([
+  const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ, activityQ] = await Promise.all([
     supabase.from("runs").select("*").eq("user_id", user.id).is("acknowledged_at", null).gte("fired_at", dayAgo).order("fired_at", { ascending: false }).returns<Run[]>(),
     supabase.from("runs").select("*").eq("user_id", user.id).gte("fired_at", new Date(now.getTime() - 60 * 86400000).toISOString()).order("fired_at", { ascending: false }).returns<Run[]>(),
     supabase.from("automations").select("*").eq("target_user_id", user.id).eq("enabled", true).returns<Automation[]>(),
@@ -77,6 +78,7 @@ export default async function TodayPage() {
     supabase.from("items").select("id,title,props,section_id, sections!inner(view,schema,icon,color)").eq("sections.view", "gallery").returns<(Pick<Item, "id" | "title" | "props" | "section_id"> & { sections: Pick<Section, "schema" | "icon" | "color"> })[]>(),
     supabase.from("requests").select("*").in("status", ["open", "doing"]).order("created_at").returns<RequestRow[]>(),
     supabase.from("pets").select("*").order("created_at").limit(1).returns<Pet[]>(),
+    supabase.from("activity").select("id,actor,kind,title,at").gte("at", dayAgo).order("at", { ascending: false }).limit(50).returns<ActivityRow[]>(),
   ]);
   const memberList = members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }));
   const partnerMember = memberList.find((m) => m.id !== user.id) ?? null;
@@ -216,9 +218,12 @@ export default async function TodayPage() {
       {/* Home */}
       <SectionTitle>{t.today.bandHome}</SectionTitle>
       {partner ? (
-        <p className="mb-3 px-1 text-sm text-muted">
-          🏠 {partner.emoji} {partner.display_name}
-        </p>
+        <>
+          <p className="mb-2 px-1 text-sm text-muted">
+            🏠 {partner.emoji} {partner.display_name}
+          </p>
+          <ActivityStrip initial={activityQ.data ?? []} userId={user.id} members={memberList} />
+        </>
       ) : (
         <div className="glass mb-3 space-y-3 rounded-3xl p-4">
           <p className="font-semibold">💞 {t.join.waiting}</p>
