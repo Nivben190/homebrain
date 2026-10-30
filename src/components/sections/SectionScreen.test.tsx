@@ -133,7 +133,7 @@ describe("the item sheet", () => {
 
   it("a date makes it due at 09:00 Israel time, and it can remind a day before", async () => {
     const { user, t, item } = await withDate();
-    const date = screen.getByLabelText("When");
+    const date = screen.getByLabelText("When", { selector: "input" });
     await user.clear(date);
     await user.type(date, "2026-11-03");
     await waitFor(async () => expect(new Date((await row(item.id))[0].due_at!).toISOString()).toBe("2026-11-03T07:00:00.000Z"));

@@ -7,6 +7,7 @@ import { ChevronDown, ChevronLeft, ChevronUp, Play, Plus, Trash2, X } from "luci
 import { deleteAutomation, runAutomationNow, saveAutomation } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
+import { errorKey } from "@/lib/errors";
 import { Button, Card, Chip, EmojiPicker, Field, Input, Segmented, Select, Sheet, Textarea, Toggle } from "@/components/ui";
 import { ACTION_META, CONDITION_META, EVENT_ICONS } from "@/lib/registry/automation";
 import { EVENT_TYPES, type Action, type AutomationDef, type Condition, type Trigger } from "@/lib/engine/types";
@@ -52,11 +53,15 @@ export function AutomationEditor({
     });
   const setCondition = (i: number, c: Condition) => setDef((d) => ({ ...d, conditions: d.conditions.map((x, j) => (j === i ? c : x)) }));
 
+  /** The server's reasons are for developers; say what to fix in the user's words. */
+  const explain = (raw: string) =>
+    !def.name.trim() ? t.brain.needName : !def.actions.length ? t.brain.needAction : /^[\w.]*: /.test(raw) ? t.brain.incomplete : t.failures[errorKey(raw)];
+
   function save() {
     setError(null);
     startSave(async () => {
       const res = await saveAutomation(id, def, target);
-      if (!res.ok) return setError(res.error);
+      if (!res.ok) return setError(explain(res.error));
       router.push("/brain");
       router.refresh();
     });
@@ -66,9 +71,9 @@ export function AutomationEditor({
     if (!id) return;
     startTest(async () => {
       const saved = await saveAutomation(id, def, target);
-      if (!saved.ok) return setError(saved.error);
+      if (!saved.ok) return setError(explain(saved.error));
       const res = await runAutomationNow(id);
-      setToast(res.ok ? t.brain.tested : res.error);
+      setToast(res.ok ? t.brain.tested : t.failures[errorKey(res.error)]);
       setTimeout(() => setToast(null), 3000);
     });
   }
@@ -357,7 +362,7 @@ function TemplateField({ label, value, onChange, sections, multiline }: { label:
   };
   return (
     <Field label={label}>
-      {multiline ? <Textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} rows={2} className="min-h-0" /> : <Input ref={ref} value={value} onChange={(e) => onChange(e.target.value)} />}
+      {multiline ? <Textarea ref={ref} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} rows={2} className="min-h-0" /> : <Input ref={ref} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} />}
       <span className="no-scrollbar mt-1.5 flex gap-1.5 overflow-x-auto">
         {[
           ["{{partner}}", `👤 ${t.common.partner}`],

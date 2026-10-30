@@ -11,6 +11,8 @@ export const he: Dict = {
     generic: "משהו השתבש. נסו שוב.",
   },
   common: {
+    from: "מ־",
+    until: "עד",
     save: "שמירה",
     cancel: "ביטול",
     delete: "מחיקה",
@@ -333,6 +335,9 @@ export const he: Dict = {
     templateHint: "טיפ: אפשר להשתמש ב־{{partner}}, {{me}}, {{time}} או בשורה אקראית ממרחב.",
     insertRandom: "שורה אקראית",
     active: "פעיל",
+    needName: "תנו לה שם.",
+    needAction: "הוסיפו לפחות פעולה אחת.",
+    incomplete: "בחלק מהשלבים חסרים פרטים.",
   },
   events: { wake: "כשאני מתעורר/ת", arrive_home: "כשאני מגיע/ה הביתה", leave_home: "כשאני יוצא/ת מהבית", bedtime: "שעת שינה", arrive_store: "כשאני מגיע/ה לסופר", custom: "מותאם אישית" },
   conditions: { time_window: "בין השעות", days: "בימים", once_per_day: "פעם ביום" },

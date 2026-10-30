@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { newFoodBag, savePet } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
+import { errorKey } from "@/lib/errors";
 import { Button, Chip, Field, Input, Textarea } from "@/components/ui";
 import type { Pet } from "@/lib/db-types";
 
@@ -46,7 +47,7 @@ export function PetForm({ pet, onSaved }: { pet?: Pet; onSaved?: () => void }) {
         chip: txt(f.chip),
         notes: txt(f.notes),
       });
-      if (!res.ok || !res.id) return setError(res.ok ? "Error" : res.error);
+      if (!res.ok || !res.id) return setError(t.failures[errorKey(res.ok ? null : res.error)]);
       if (!pet && num(f.food_bag_kg) && num(f.daily_grams)) await newFoodBag(res.id);
       if (onSaved) onSaved();
       else router.replace(`/pets/${res.id}`);

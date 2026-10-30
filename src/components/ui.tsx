@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion, useDragControls } from "motion/react";
-import { forwardRef, useEffect, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { forwardRef, isValidElement, useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useI18n } from "@/i18n/client";
@@ -111,13 +111,29 @@ export function Select({ className, children, ...props }: React.SelectHTMLAttrib
   );
 }
 
+/**
+ * A labelled field. One input is wrapped in a <label>; anything else (chips,
+ * steppers, lists) becomes a named group, since a <label> would hand its name
+ * and its taps to the first button inside.
+ */
 export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block px-1 text-sm font-semibold text-muted">{label}</span>
+  const id = useId();
+  const single = isValidElement(children) && [Input, Textarea, Select, "input", "select", "textarea"].includes(children.type as never);
+  const body = (
+    <>
+      <span id={id} className="mb-1.5 block px-1 text-sm font-semibold text-muted">
+        {label}
+      </span>
       {children}
       {hint && <span className="mt-1 block px-1 text-xs text-faint">{hint}</span>}
-    </label>
+    </>
+  );
+  return single ? (
+    <label className="block">{body}</label>
+  ) : (
+    <div role="group" aria-labelledby={id} className="block">
+      {body}
+    </div>
   );
 }
 
@@ -175,6 +191,7 @@ export function Chip({ active, className, ...props }: ButtonHTMLAttributes<HTMLB
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={cn(
         "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-full px-3 text-sm font-semibold transition active:scale-95",
         active ? "bg-accent text-accent-fg" : "bg-sunken text-muted",

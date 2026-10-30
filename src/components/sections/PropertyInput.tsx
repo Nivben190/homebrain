@@ -14,11 +14,11 @@ export function PropertyInput({ def, value, onChange, members }: { def: Property
       return <Toggle checked={!!value} onChange={onChange} label={def.name} />;
     case "number":
     case "price":
-      return <Input type="number" inputMode="decimal" value={value === undefined || value === null ? "" : String(value)} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} />;
+      return <Input aria-label={def.name} type="number" inputMode="decimal" value={value === undefined || value === null ? "" : String(value)} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} />;
     case "date":
-      return <Input type="date" value={typeof value === "string" ? value.slice(0, 10) : ""} onChange={(e) => onChange(e.target.value || null)} />;
+      return <Input aria-label={def.name} type="date" value={typeof value === "string" ? value.slice(0, 10) : ""} onChange={(e) => onChange(e.target.value || null)} />;
     case "url":
-      return <Input type="url" inputMode="url" placeholder="https://" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />;
+      return <Input aria-label={def.name} type="url" inputMode="url" placeholder="https://" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />;
     case "select":
       return (
         <div className="flex flex-wrap gap-2">
@@ -52,7 +52,7 @@ export function PropertyInput({ def, value, onChange, members }: { def: Property
         </div>
       );
     default:
-      return <Input value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />;
+      return <Input aria-label={def.name} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />;
   }
 }
 

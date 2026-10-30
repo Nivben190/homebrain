@@ -476,8 +476,14 @@ export function SectionScreen({
           timeZone={timeZone}
           onDelete={remove}
           onSettings={async (settings) => {
+            const before = section.settings;
             setSection({ ...section, settings });
-            await sb.from("sections").update({ settings }).eq("id", section.id);
+            // Zero rows back means the database said no (only owners and adults edit a shared space).
+            const { data, error } = await sb.from("sections").update({ settings }).eq("id", section.id).select("id");
+            if (error || !data?.length) {
+              setSection((s) => ({ ...s, settings: before }));
+              toast.error(t.failures[error ? errorKey(error) : "denied"]);
+            }
           }}
         />
       ) : section.view === "commit" ? (

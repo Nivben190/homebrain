@@ -35,8 +35,8 @@ describe("Brain editor", () => {
     await user.click(screen.getByRole("button", { name: /Dana/ }));
     await user.click(screen.getByRole("button", { name: new RegExp(t.brain.addAction) }));
     await user.click(screen.getByRole("button", { name: new RegExp(t.actions.push) }));
-    await user.type(screen.getByLabelText(t.actions.title), "Plants");
-    await user.type(screen.getByLabelText(t.actions.body), "Water them");
+    await user.type(screen.getByLabelText(t.actions.title, { selector: "input" }), "Plants");
+    await user.type(screen.getByLabelText(t.actions.body, { selector: "textarea" }), "Water them");
     await user.click(screen.getByRole("button", { name: t.common.save }));
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/brain"));
     const [row] = await sql<{ name: string; target_user_id: string; actions: unknown[]; next_run_at: unknown }>(`select name, target_user_id, actions, next_run_at from automations where household_id = $1`, [home.householdId]);
@@ -48,7 +48,7 @@ describe("Brain editor", () => {
     const { user, t, home } = await setup();
     await user.type(screen.getByLabelText(t.brain.name), "Empty");
     await user.click(screen.getByRole("button", { name: t.common.save }));
-    expect(await screen.findByText(/actions/)).toBeInTheDocument();
+    expect(await screen.findByText(t.brain.needAction)).toBeInTheDocument();
     expect(await sql(`select 1 from automations where household_id = $1`, [home.householdId])).toEqual([]);
   });
 
@@ -75,7 +75,7 @@ describe("Brain editor", () => {
       await user.click(screen.getByRole("button", { name: new RegExp(t.brain.addAction) }));
       await user.click(screen.getByRole("button", { name: new RegExp(kind) }));
     }
-    await user.type(screen.getByLabelText(t.actions.title), "Welcome");
+    await user.type(screen.getByLabelText(t.actions.title, { selector: "input" }), "Welcome");
     await user.click(screen.getAllByRole("button", { name: t.common.moveUp }).at(-1)!);
     await user.click(screen.getByRole("button", { name: t.common.save }));
     await waitFor(() => expect(router.push).toHaveBeenCalled());

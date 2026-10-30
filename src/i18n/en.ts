@@ -9,6 +9,8 @@ export const en = {
     generic: "Something went wrong. Try again.",
   },
   common: {
+    from: "From",
+    until: "Until",
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
@@ -331,6 +333,9 @@ export const en = {
     templateHint: "Tip: use {{partner}}, {{me}}, {{time}} or pick a random line from a space.",
     insertRandom: "Random line",
     active: "Active",
+    needName: "Give it a name.",
+    needAction: "Add at least one thing for it to do.",
+    incomplete: "Some steps are missing details.",
   },
   events: { wake: "I wake up", arrive_home: "I get home", leave_home: "I leave home", bedtime: "Bedtime", arrive_store: "I get to the supermarket", custom: "Custom" },
   conditions: { time_window: "Between hours", days: "On days", once_per_day: "Once a day" },

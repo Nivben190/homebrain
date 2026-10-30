@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { homeWith, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
 
@@ -36,7 +36,7 @@ async function setup(role = "owner", inviteCode: string | null = "ABCD1234") {
       spaces={[]}
     />,
   );
-  const profile = () => sql<Record<string, unknown>>(`select display_name, phone, timezone, wake_mode, wake_time::text, briefing, quiet_shabbat from profiles where user_id = $1`, [home.users[role]]);
+  const profile = () => sql<Record<string, unknown>>(`select display_name, phone, timezone, wake_mode, wake_time::text, briefing, quiet_shabbat, quiet_from::text, quiet_to::text from profiles where user_id = $1`, [home.users[role]]);
   return { ...ui, home, profile };
 }
 
@@ -63,6 +63,16 @@ describe("settings", () => {
     await user.click(screen.getByRole("switch", { name: new RegExp(t.settings.briefing) }));
     await user.click(screen.getByRole("switch", { name: new RegExp(t.settings.quietShabbat) }));
     await waitFor(async () => expect((await profile())[0]).toMatchObject({ briefing: false, quiet_shabbat: true }));
+  });
+
+  it("quiet hours: each end has its own name and saves", async () => {
+    const { user, t, profile } = await setup();
+    await user.click(screen.getByRole("switch", { name: new RegExp(t.settings.quietHours) }));
+    const until = await screen.findByLabelText(`${t.settings.quietHours} · ${t.common.until}`);
+    expect(screen.getByLabelText(`${t.settings.quietHours} · ${t.common.from}`)).toHaveValue("22:00");
+    fireEvent.change(until, { target: { value: "06:30" } });
+    fireEvent.blur(until);
+    await waitFor(async () => expect((await profile())[0]).toMatchObject({ quiet_from: "22:00:00", quiet_to: "06:30:00" }));
   });
 
   it("an empty name is refused with a message, not saved", async () => {

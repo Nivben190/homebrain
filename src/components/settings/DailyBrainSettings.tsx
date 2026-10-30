@@ -101,9 +101,9 @@ export function DailyBrainSettings({ initial, spaces }: { initial: DailyPrefs; s
             {row(`🌜 ${s.quietHours}`, s.quietHoursHint, !!p.quiet_from, (on) => save(on ? { quiet_from: "22:00", quiet_to: "07:00" } : { quiet_from: null, quiet_to: null }))}
             {p.quiet_from && (
               <div className="mt-2 flex items-center gap-2">
-                <Input type="time" aria-label={s.quietHours} value={p.quiet_from.slice(0, 5)} onChange={(e) => e.target.value && setP({ ...p, quiet_from: e.target.value })} onBlur={() => save({ quiet_from: p.quiet_from!.slice(0, 5) })} className="h-10 w-32" />
+                <Input type="time" aria-label={`${s.quietHours} · ${t.common.from}`} value={p.quiet_from.slice(0, 5)} onChange={(e) => e.target.value && setP({ ...p, quiet_from: e.target.value })} onBlur={() => save({ quiet_from: p.quiet_from!.slice(0, 5) })} className="h-10 w-32" />
                 <span className="text-muted">–</span>
-                <Input type="time" aria-label={s.quietHours} value={(p.quiet_to ?? "07:00").slice(0, 5)} onChange={(e) => e.target.value && setP({ ...p, quiet_to: e.target.value })} onBlur={() => save({ quiet_to: (p.quiet_to ?? "07:00").slice(0, 5) })} className="h-10 w-32" />
+                <Input type="time" aria-label={`${s.quietHours} · ${t.common.until}`} value={(p.quiet_to ?? "07:00").slice(0, 5)} onChange={(e) => e.target.value && setP({ ...p, quiet_to: e.target.value })} onBlur={() => save({ quiet_to: (p.quiet_to ?? "07:00").slice(0, 5) })} className="h-10 w-32" />
               </div>
             )}
           </div>
