@@ -10,6 +10,8 @@ import { cn } from "@/lib/cn";
 import type { RequestRow } from "@/lib/db-types";
 import type { Member } from "@/components/sections/PropertyInput";
 import { fill } from "@/i18n";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 
 /** "Ask Naomi" sheet: a quick request that lands on her Today screen with a push. */
 export function AskSheet({ open, onClose, members }: { open: boolean; onClose: () => void; members: Member[] }) {
@@ -21,12 +23,13 @@ export function AskSheet({ open, onClose, members }: { open: boolean; onClose: (
   const [due, setDue] = useState<"today" | "tomorrow" | null>("today");
   const [pending, start] = useTransition();
   const [sent, setSent] = useState(false);
+  const toast = useToast();
 
   function send() {
     if (!text.trim()) return;
     start(async () => {
       const res = await sendRequest({ to: partner.id, text, due });
-      if (!res.ok) return;
+      if (!res.ok) return void toast.error(t.failures[errorKey(res.error)]);
       setSent(true);
       setText("");
       router.refresh();
@@ -71,14 +74,21 @@ export function RequestCards({ incoming, outgoing, members }: { incoming: Reques
   const router = useRouter();
   const [, start] = useTransition();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const toast = useToast();
   const who = (id: string) => members.find((m) => m.id === id);
-  const act = (r: RequestRow, status: "doing" | "done" | "declined") => {
-    if (status !== "doing") setHidden((h) => new Set(h).add(r.id));
+  /** Hides the card at once; a change that doesn't save brings it back and says why. */
+  const settle = (id: string, write: () => Promise<{ ok: boolean; error?: string }>, hide = true) => {
+    if (hide) setHidden((h) => new Set(h).add(id));
     start(async () => {
-      await setRequestStatus(r.id, status);
+      const res = await write().catch((e: unknown) => ({ ok: false, error: String(e) }));
+      if (!res.ok) {
+        setHidden((h) => new Set([...h].filter((x) => x !== id)));
+        return void toast.error(t.failures[errorKey(res.error)]);
+      }
       router.refresh();
     });
   };
+  const act = (r: RequestRow, status: "doing" | "done" | "declined") => settle(r.id, () => setRequestStatus(r.id, status), status !== "doing");
   const open = incoming.filter((r) => (r.status === "open" || r.status === "doing") && !hidden.has(r.id));
   const waiting = outgoing.filter((r) => (r.status === "open" || r.status === "doing") && !hidden.has(r.id));
   if (!open.length && !waiting.length) return null;
@@ -125,10 +135,7 @@ export function RequestCards({ incoming, outgoing, members }: { incoming: Reques
             </span>
             <button
               aria-label={t.common.delete}
-              onClick={() => {
-                setHidden((h) => new Set(h).add(r.id));
-                start(() => deleteRequest(r.id));
-              }}
+              onClick={() => settle(r.id, () => deleteRequest(r.id))}
               className="text-faint"
             >
               <X className="size-4" />

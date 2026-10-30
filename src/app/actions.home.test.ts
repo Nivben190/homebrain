@@ -150,8 +150,8 @@ describe("requests", () => {
     expect(await A.setRequestStatus(id, "done")).toEqual({ ok: true });
     expect(app.pushes.map((p) => p.userId)).toEqual([home.users.adult, home.users.owner]);
     signIn(home.users.owner);
-    expect(await A.setRequestStatus(id, "open")).toEqual({ ok: false, error: "Not found" });
-    await A.deleteRequest(id);
+    expect(await A.setRequestStatus(id, "open")).toEqual({ ok: false, error: "permission denied" });
+    expect(await A.deleteRequest(id)).toEqual({ ok: true });
     expect(await sql(`select 1 from requests where id = $1`, [id])).toEqual([]);
   });
 

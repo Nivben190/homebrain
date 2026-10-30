@@ -1,22 +1,18 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { REAL, newHome, signIn as signInAs } from "./helpers";
 
-const email = process.env.E2E_EMAIL ?? "";
-const password = process.env.E2E_PASSWORD ?? "";
 const stamp = `e2e-${Date.now()}`;
+let who = REAL ?? { email: "", password: "" };
 
-test.skip(!email || !password, "Set E2E_EMAIL and E2E_PASSWORD for a dedicated test account");
+test.skip(!!REAL && (!REAL.email || !REAL.password), "Against a deployment, set E2E_EMAIL and E2E_PASSWORD for a dedicated test account");
+test.beforeAll(async () => {
+  if (!REAL) who = (await newHome(["owner"])).people.owner;
+});
 
-async function signIn(page: Page) {
-  await page.goto("/login");
-  await page.getByPlaceholder("Email").fill(email);
-  await page.getByPlaceholder("Password").fill(password);
-  await page.getByRole("button", { name: /Sign in/ }).last().click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
-}
+const signIn = (page: Parameters<typeof signInAs>[0]) => signInAs(page, who);
 
 test.describe.serial("smoke", () => {
   test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([{ name: "hb_locale", value: "en", url: test.info().project.use.baseURL! }]);
     await signIn(page);
   });
 
@@ -25,12 +21,12 @@ test.describe.serial("smoke", () => {
     await page.getByRole("button", { name: "New space" }).click();
     await page.getByRole("button", { name: /Blank/ }).first().click();
     await page.getByRole("textbox").first().fill(stamp);
-    await page.getByRole("button", { name: /Checklist/ }).first().click();
     await page.getByRole("button", { name: /^Create/ }).last().click();
     await expect(page.getByRole("heading", { name: stamp })).toBeVisible();
 
-    // Custom property from the space settings.
+    // A blank space starts as a plain list; make it a checklist, with a custom property.
     await page.getByRole("button", { name: "Space settings" }).click();
+    await page.getByRole("button", { name: /Checklist/ }).first().click();
     await page.getByRole("button", { name: /Add property/ }).click();
     await page.getByPlaceholder(/Property name/).fill("Price");
     await page.getByRole("button", { name: /^Save/ }).last().click();
@@ -55,13 +51,15 @@ test.describe.serial("smoke", () => {
   test("build an automation in the editor", async ({ page }) => {
     await page.goto("/brain/new");
     await page.getByPlaceholder(/name/i).first().fill(stamp);
+    await page.getByRole("textbox", { name: "Title" }).fill("Good morning");
     await page.getByRole("button", { name: /^Save/ }).last().click();
-    await page.waitForURL(/\/brain/);
-    await expect(page.getByText(stamp)).toBeVisible();
+    await page.waitForURL((u) => u.pathname === "/brain");
+    await expect(page.getByText(stamp).first()).toBeVisible();
   });
 
   test.afterAll(async ({ browser }) => {
-    // Clean up: delete what this run created.
+    // Clean up what this run created on a real deployment; a throwaway home just goes away.
+    if (!REAL) return;
     const page = await browser.newPage();
     await signIn(page);
     await page.goto("/brain");

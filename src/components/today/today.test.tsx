@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { app, broadcast, homeWith, router, signIn, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
-import type { Item, Run } from "@/lib/db-types";
+import type { Item, RequestRow, Run } from "@/lib/db-types";
 
 vi.mock("@/lib/supabase/server", () => import("@/test/app").then((m) => m.supabaseServerMock));
 vi.mock("@/lib/supabase/browser", () => import("@/test/app").then((m) => m.supabaseBrowserMock));
@@ -26,6 +26,7 @@ const { PushPrompt } = await import("./PushPrompt");
 const { QuickActions } = await import("./QuickActions");
 const { OnThisDay } = await import("./OnThisDay");
 const { AppBadge } = await import("./AppBadge");
+const { RequestCards } = await import("./Requests");
 const { idbQueue } = await import("@/lib/offline-queue");
 
 const TZ = "Asia/Jerusalem";
@@ -98,7 +99,7 @@ describe("evening wrap-up", () => {
     app.offline = false;
     await sql(`delete from requests where id = $1`, [ids.ask]);
     await user.click(card("Buy bread").getByRole("button", { name: new RegExp(t.daily.done) }));
-    expect(await screen.findByText(t.failures.generic, undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText(t.failures.denied, undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/Buy bread/)).toBeInTheDocument();
   });
 
@@ -381,5 +382,43 @@ describe("Today tiles", () => {
     rerender(<AppBadge count={0} />);
     expect(set).toHaveBeenCalledWith(2);
     expect(clear).toHaveBeenCalled();
+  });
+});
+
+describe("requests on Today", () => {
+  async function asked() {
+    const home = await homeWith(["adult", "owner"]);
+    const [r] = await sql<RequestRow>(`insert into requests (household_id, from_user, to_user, text) values ($1, $2, $3, 'Water the plants') returning *, created_at::text, updated_at::text`, [home.householdId, home.users.owner, home.users.adult]);
+    const members = [
+      { id: home.users.owner, name: "Noa", emoji: "🦊" },
+      { id: home.users.adult, name: "Dan", emoji: "🐻" },
+    ];
+    return { home, r, members };
+  }
+
+  it("done goes away and is saved", async () => {
+    const { r, members } = await asked();
+    const { user, t } = renderUi(<RequestCards incoming={[r]} outgoing={[]} members={members} />);
+    await user.click(screen.getByRole("button", { name: t.ask.done }));
+    await waitFor(async () => expect((await sql<{ status: string }>(`select status from requests where id = $1`, [r.id]))[0].status).toBe("done"));
+    expect(screen.queryByText("Water the plants")).not.toBeInTheDocument();
+  });
+
+  it("withdrawn meanwhile: the card comes back and says so", async () => {
+    const { r, members } = await asked();
+    await sql(`delete from requests where id = $1`, [r.id]);
+    const { user, t } = renderUi(<RequestCards incoming={[r]} outgoing={[]} members={members} />);
+    await user.click(screen.getByRole("button", { name: t.ask.done }));
+    expect(await screen.findByText(t.failures.denied, undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText("Water the plants")).toBeInTheDocument();
+  });
+
+  it("only the sender can withdraw one", async () => {
+    const { r, members, home } = await asked();
+    signIn(home.users.adult);
+    const { user, t } = renderUi(<RequestCards incoming={[]} outgoing={[r]} members={members} />);
+    await user.click(screen.getByRole("button", { name: t.common.delete }));
+    expect(await screen.findByText(t.failures.denied, undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(await sql(`select 1 from requests where id = $1`, [r.id])).toHaveLength(1);
   });
 });

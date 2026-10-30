@@ -155,9 +155,9 @@ export function AutomationEditor({
               </div>
               {c.type === "time_window" && (
                 <div className="mt-2 flex items-center gap-2">
-                  <Input type="time" value={c.from} onChange={(e) => setCondition(i, { ...c, from: e.target.value })} className="h-11" />
+                  <Input type="time" value={c.from} onChange={(e) => setCondition(i, { ...c, from: e.target.value })} aria-label={`${t.conditions[c.type]} · ${t.common.from}`} className="h-11" />
                   <span className="text-muted">–</span>
-                  <Input type="time" value={c.to} onChange={(e) => setCondition(i, { ...c, to: e.target.value })} className="h-11" />
+                  <Input type="time" value={c.to} onChange={(e) => setCondition(i, { ...c, to: e.target.value })} aria-label={`${t.conditions[c.type]} · ${t.common.until}`} className="h-11" />
                 </div>
               )}
               {c.type === "days" && (
@@ -321,6 +321,7 @@ function ScheduleFields({ trigger, onChange }: { trigger: Extract<Trigger, { typ
             <div key={i} className="flex items-center rounded-2xl bg-card-solid pe-1">
               <input
                 type="time"
+                aria-label={trigger.times.length > 1 ? `${t.brain.times} ${i + 1}` : t.brain.times}
                 value={time}
                 onChange={(e) => onChange({ ...trigger, times: trigger.times.map((x, j) => (j === i ? e.target.value : x)) })}
                 className="h-11 bg-transparent px-3 font-bold outline-none"

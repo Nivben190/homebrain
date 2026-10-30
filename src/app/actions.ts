@@ -715,8 +715,9 @@ export async function sendRequest(input: { to: string; text: string; due: "today
 
 export async function setRequestStatus(id: string, status: "doing" | "done" | "declined" | "open"): Promise<Result> {
   const { supabase, profile, members } = await requireHome();
-  const { data: req } = await supabase.from("requests").update({ status, updated_at: new Date().toISOString() }).eq("id", id).select("*").single<RequestRow>();
-  if (!req) return { ok: false, error: "Not found" };
+  const { data: req } = await supabase.from("requests").update({ status, updated_at: new Date().toISOString() }).eq("id", id).select("*").maybeSingle<RequestRow>();
+  // Not theirs to answer, or withdrawn meanwhile: nothing changed.
+  if (!req) return { ok: false, error: "permission denied" };
   // Tell the sender when it's done (or can't be done).
   const sender = members.find((m) => m.user_id === req.from_user);
   if (sender && sender.user_id !== profile.user_id && (status === "done" || status === "declined")) {
@@ -728,10 +729,12 @@ export async function setRequestStatus(id: string, status: "doing" | "done" | "d
   return { ok: true };
 }
 
-export async function deleteRequest(id: string) {
+export async function deleteRequest(id: string): Promise<Result> {
   const { supabase } = await requireHome();
-  await supabase.from("requests").delete().eq("id", id);
+  const { data, error } = await supabase.from("requests").delete().eq("id", id).select("id");
   revalidatePath("/");
+  if (error) return { ok: false, error: error.message };
+  return data.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 // ---------------------------------------------------------------------------
