@@ -75,7 +75,8 @@ export function ItemSheet({
   };
 
   const due = item.due_at ? new Date(item.due_at) : null;
-  const dueDay = due ? new Date(due.toISOString().slice(0, 10) + "T00:00:00Z") : null;
+  // The calendar day where the phone is (a UTC date is a day early just after midnight in Israel).
+  const dueDay = due ? new Date(`${new Intl.DateTimeFormat("en-CA").format(due)}T00:00:00Z`) : null;
 
   return (
     <Sheet

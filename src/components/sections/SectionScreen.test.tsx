@@ -108,6 +108,48 @@ describe("when a save fails", () => {
   });
 });
 
+describe("the item sheet", () => {
+  async function withDate() {
+    const home = await homeWith(["owner"]);
+    const schema = [{ id: "when", name: "When", type: "date" }];
+    const [section] = await sql<Section>(`insert into sections (household_id, title, view, schema) values ($1, 'House', 'checklist', $2) returning *`, [home.householdId, JSON.stringify(schema)]);
+    const [item] = await sql<Item>(`insert into items (section_id, title) values ($1, 'Fix tap') returning *`, [section.id]);
+    const ui = renderUi(<SectionScreen initialSection={section} initialItems={[{ ...item, created_at: String(item.created_at) }]} initialCheckins={[]} userId={home.users.owner} members={[]} timeZone="Asia/Jerusalem" launch={{ notes: "", checkin: "" }} />);
+    await ui.user.click(screen.getByText("Fix tap"));
+    return { ...ui, section, item };
+  }
+  const row = (id: string) => sql<{ title: string; done: boolean; props: Record<string, unknown>; due_at: Date | null; remind_at: Date | null }>(`select title, done, props, due_at, remind_at from items where id = $1`, [id]);
+
+  it("renames and takes notes, saved when the sheet closes", async () => {
+    const { user, t, item } = await withDate();
+    const title = screen.getByDisplayValue("Fix tap");
+    await user.clear(title);
+    await user.type(title, "Fix kitchen tap");
+    await user.type(screen.getByLabelText(t.sections.notes), "Washer is 1/2 inch");
+    await user.click(screen.getByRole("button", { name: t.common.close }));
+    await waitFor(async () => expect((await row(item.id))[0]).toMatchObject({ title: "Fix kitchen tap", props: { _notes: "Washer is 1/2 inch" } }));
+  });
+
+  it("a date makes it due at 09:00 Israel time, and it can remind a day before", async () => {
+    const { user, t, item } = await withDate();
+    const date = screen.getByLabelText("When");
+    await user.clear(date);
+    await user.type(date, "2026-11-03");
+    await waitFor(async () => expect(new Date((await row(item.id))[0].due_at!).toISOString()).toBe("2026-11-03T07:00:00.000Z"));
+    await user.click(screen.getByRole("button", { name: t.sections.remindLead[1440] }));
+    expect(screen.getByRole("button", { name: t.sections.remindLead[1440] })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(async () => expect(new Date((await row(item.id))[0].remind_at!).toISOString()).toBe("2026-11-02T07:00:00.000Z"));
+  });
+
+  it("done from the sheet, and delete from the sheet", async () => {
+    const { user, t, item } = await withDate();
+    await user.click(screen.getByRole("button", { name: new RegExp(t.common.done) }));
+    await waitFor(async () => expect((await row(item.id))[0].done).toBe(true));
+    await user.click(screen.getAllByRole("button", { name: t.common.delete }).at(-1)!);
+    await gone("Fix tap");
+  });
+});
+
 describe("other kinds of space", () => {
   it("a private space says so; an empty one says it's empty", async () => {
     const home = await homeWith(["owner"]);
