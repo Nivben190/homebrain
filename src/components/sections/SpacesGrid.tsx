@@ -8,16 +8,20 @@ import { cn } from "@/lib/cn";
 import { moveItem } from "@/lib/reorder";
 import { reorderSections } from "@/app/actions";
 import { IconTile } from "@/components/ui";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 import type { Section } from "@/lib/db-types";
 
 const HOLD_MS = 400;
 
 /**
  * The spaces as tiles. Hold one, then drag it over another tile to move it
- * there; letting go saves the order for both phones.
+ * there; letting go saves the order for both phones. Only those who run the
+ * home (owners and adults) arrange it.
  */
-export function SpacesGrid({ sections, counts }: { sections: Section[]; counts: Record<string, number> }) {
+export function SpacesGrid({ sections, counts, canReorder }: { sections: Section[]; counts: Record<string, number>; canReorder: boolean }) {
   const { t } = useI18n();
+  const toast = useToast();
   const [order, setOrder] = useState(sections);
   const [dragging, setDragging] = useState<string | null>(null);
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; id: string } | null>(null);
@@ -30,6 +34,7 @@ export function SpacesGrid({ sections, counts }: { sections: Section[]; counts: 
 
   function start(id: string) {
     moved.current = false;
+    if (!canReorder) return;
     hold.current = {
       id,
       timer: setTimeout(() => {
@@ -61,7 +66,10 @@ export function SpacesGrid({ sections, counts }: { sections: Section[]; counts: 
     // Let the click that ends the drag be swallowed, then accept taps again.
     setTimeout(() => (moved.current = false), 0);
     const res = await reorderSections(order.map((s) => s.id));
-    if (!res.ok) setOrder(sections);
+    if (!res.ok) {
+      setOrder(sections);
+      toast.error(t.failures[errorKey(res.error)]);
+    }
   }
 
   return (
@@ -94,7 +102,7 @@ export function SpacesGrid({ sections, counts }: { sections: Section[]; counts: 
           </motion.div>
         ))}
       </div>
-      {order.length > 1 && <p className="mt-4 text-center text-xs text-faint">{t.sections.reorderHint}</p>}
+      {canReorder && order.length > 1 && <p className="mt-4 text-center text-xs text-faint">{t.sections.reorderHint}</p>}
     </>
   );
 }

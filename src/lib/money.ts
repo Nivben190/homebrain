@@ -36,7 +36,9 @@ export function buildMonth(input: MoneyInput): MoneyMonth {
   const spend = summarizeMonth(input.txs, input.month, input.timeZone);
   const subs = round(input.subs.reduce((sum, s) => sum + monthlyShare(s), 0));
   const bills = round(input.bills.reduce((sum, b) => sum + b.amount, 0));
-  const rows = [...spend.byCategory, { category: "subscriptions", amount: subs }, { category: "bills", amount: bills }].filter((r) => r.amount > 0);
+  // A budgeted category shows even before anything is spent on it, so it can be seen and changed.
+  const rows = [...spend.byCategory, { category: "subscriptions", amount: subs }, { category: "bills", amount: bills }].filter((r) => r.amount > 0 || r.category in input.budgets);
+  for (const category of Object.keys(input.budgets)) if (!rows.some((r) => r.category === category)) rows.push({ category, amount: 0 });
   const paidBy: Record<string, number> = {};
   const add = (who: string | null, n: number) => {
     if (who) paidBy[who] = round((paidBy[who] ?? 0) + n);

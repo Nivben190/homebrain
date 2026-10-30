@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { Button } from "@/components/ui";
 import type { HookPurpose } from "@/lib/hook-keys";
+import { errorKey } from "@/lib/errors";
 import { CopyField } from "./CopyField";
 
 export interface KeyInfo {
@@ -36,7 +37,7 @@ export function HookKeyField({ purpose, info }: { purpose: HookPurpose; info: Ke
     const res = await rotateHookKey(purpose);
     setBusy(false);
     setConfirming(false);
-    if (!res.ok || !res.key) return setError(res.ok ? t.sections.saveFailed : res.error);
+    if (!res.ok || !res.key) return setError(t.failures[errorKey(res.ok ? null : res.error)]);
     setFresh(res.key);
     setState({ exists: true, lastUsedAt: null });
   };

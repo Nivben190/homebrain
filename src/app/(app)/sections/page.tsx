@@ -28,7 +28,7 @@ export default async function SectionsPage() {
         <Link href="/weekly" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">🗓️ {t.weekly.title}</Link>
       </div>
       <SearchBox spaces={(sections ?? []).map((s) => ({ id: s.id, icon: s.icon, title: s.title }))} />
-      <SpacesGrid sections={sections ?? []} counts={Object.fromEntries(counts)} />
+      <SpacesGrid sections={sections ?? []} counts={Object.fromEntries(counts)} canReorder={["owner", "adult"].includes(profile.role)} />
     </>
   );
 }

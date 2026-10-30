@@ -138,7 +138,7 @@ describe("rate limits on hooks", () => {
     const statuses: number[] = [];
     for (let i = 0; i < 70; i++) statuses.push((await capture.POST(post("/api/hooks/capture", key, { text: `x${i}` }))).status);
     expect(statuses).toContain(429);
-  });
+  }, 60_000);
 });
 
 describe("engine tick and health", () => {

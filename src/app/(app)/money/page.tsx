@@ -97,7 +97,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
         </>
       )}
 
-      <MoneyEditor bills={data.billItems} budgets={Object.fromEntries(data.byCategory.filter((c) => c.budget !== null).map((c) => [c.category, c.budget!]))} categories={data.byCategory.map((c) => c.category)} />
+      <MoneyEditor bills={data.billItems} budgets={Object.fromEntries(data.byCategory.filter((c) => c.budget !== null).map((c) => [c.category, c.budget!]))} categories={data.byCategory.map((c) => c.category)} canBudget={profile.role === "owner" || profile.role === "adult"} />
     </>
   );
 }

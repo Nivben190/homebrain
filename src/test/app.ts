@@ -116,6 +116,9 @@ export const supabaseBrowserMock = {
       }
       return from(table);
     }) as never;
+    const rpc = client.rpc.bind(client);
+    // supabase-js reports a dropped connection on rpc as an error result rather than throwing.
+    client.rpc = ((...args: Parameters<typeof rpc>) => (app.offline ? Promise.resolve({ data: null, error: { message: "TypeError: Failed to fetch" } }) : rpc(...args))) as never;
     return client;
   },
 };

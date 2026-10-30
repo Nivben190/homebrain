@@ -27,6 +27,14 @@ describe("household money", () => {
     expect(m.paidBy).toEqual({ a: 780, b: 100 });
   });
 
+  it("a budget shows before anything is spent on it", () => {
+    const m = buildMonth({ month: "2026-10", timeZone: "Asia/Jerusalem", txs: [tx(80, "groceries", "a")], subs: [], bills: [], budgets: { eating: 600, groceries: 900 } });
+    expect(m.byCategory).toEqual([
+      { category: "groceries", amount: 80, budget: 900 },
+      { category: "eating", amount: 0, budget: 600 },
+    ]);
+  });
+
   it("sums a week of spending with refunds netted", () => {
     const txs = [tx(100, "eating", "a", "2026-10-20T10:00:00Z"), tx(30, "eating", "a", "2026-10-21T10:00:00Z", true), tx(999, "eating", "a", "2026-10-10T10:00:00Z")];
     expect(spendBetween(txs, new Date("2026-10-18T00:00:00Z"), new Date("2026-10-25T00:00:00Z"))).toBe(70);

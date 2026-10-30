@@ -242,7 +242,8 @@ export async function shopForPlan(from: string, to: string): Promise<Result<{ ad
 // ---------------------------------------------------------------------------
 
 export async function setBudget(category: string, amount: number | null): Promise<Result> {
-  const { supabase, household } = await requireHome();
+  const { supabase, household, profile } = await requireHome();
+  if (profile.role !== "owner" && profile.role !== "adult") return { ok: false, error: "permission denied" };
   if (!/^[a-z_]{1,30}$/.test(category) || (amount !== null && !(amount >= 0))) return { ok: false, error: "bad input" };
   const { error } =
     amount === null
@@ -256,8 +257,9 @@ export async function setBillAmount(itemId: string, amount: number | null): Prom
   if (amount !== null && !(amount >= 0)) return { ok: false, error: "bad input" };
   const { data: item } = await supabase.from("items").select("props").eq("id", itemId).single();
   if (!item) return { ok: false, error: "not found" };
-  const { error } = await supabase.from("items").update({ props: { ...item.props, [AMOUNT_PROP]: amount } }).eq("id", itemId);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const { data, error } = await supabase.from("items").update({ props: { ...item.props, [AMOUNT_PROP]: amount } }).eq("id", itemId).select("id");
+  if (error) return { ok: false, error: error.message };
+  return data?.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 // ---------------------------------------------------------------------------
@@ -456,13 +458,16 @@ export async function signOut() {
 
 /** Saves the spaces' order as dragged on the Spaces screen (shared by both phones). */
 export async function reorderSections(ids: string[]): Promise<Result> {
-  const { supabase } = await requireHome();
+  const { supabase, profile } = await requireHome();
+  if (profile.role !== "owner" && profile.role !== "adult") return { ok: false, error: "permission denied" };
   const parsed = z.array(z.string().uuid()).max(200).safeParse(ids);
   if (!parsed.success) return { ok: false, error: "Invalid order" };
-  const results = await Promise.all(parsed.data.map((id, position) => supabase.from("sections").update({ position }).eq("id", id)));
+  const results = await Promise.all(parsed.data.map((id, position) => supabase.from("sections").update({ position }).eq("id", id).select("id")));
   const failed = results.find((r) => r.error);
   revalidatePath("/sections");
-  return failed ? { ok: false, error: failed.error!.message } : { ok: true };
+  if (failed) return { ok: false, error: failed.error!.message };
+  // A space RLS hides or refuses updates nothing: say so instead of a silent half-saved order.
+  return results.every((r) => r.data?.length) ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 export async function saveAutomation(id: string | null, raw: unknown, targetUserId: string): Promise<Result & { id?: string }> {
