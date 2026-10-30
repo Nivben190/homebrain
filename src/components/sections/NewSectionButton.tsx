@@ -9,8 +9,10 @@ import { nextReminder, todayKey } from "@/lib/engine/habits";
 import { useI18n } from "@/i18n/client";
 import { Button, Chip, ColorPicker, EmojiPicker, Field, IconButton, IconTile, Input, Segmented, Sheet } from "@/components/ui";
 import { spaceType } from "@/lib/registry/spaces";
+import { errorKey } from "@/lib/errors";
 
-export function NewSectionButton({ householdId, userId, timeZone }: { householdId: string; userId: string; timeZone: string }) {
+/** `privateOnly`: a teen's spaces are always their own (roadmap 3.1 roles). */
+export function NewSectionButton({ householdId, userId, timeZone, privateOnly = false }: { householdId: string; userId: string; timeZone: string; privateOnly?: boolean }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -31,7 +33,7 @@ export function NewSectionButton({ householdId, userId, timeZone }: { householdI
     setTitle(next.title[locale]);
     setIcon(next.icon);
     setColor(next.color);
-    setVisibility(templateIsShared(next) ? "shared" : "private");
+    setVisibility(templateIsShared(next) && !privateOnly ? "shared" : "private");
     setError(null);
   }
 
@@ -65,7 +67,7 @@ export function NewSectionButton({ householdId, userId, timeZone }: { householdI
       .single();
     if (error) {
       setBusy(false);
-      return setError(error.message);
+      return setError(t.failures[errorKey(error)]);
     }
     if (items.length) {
       const now = new Date();
@@ -135,16 +137,18 @@ export function NewSectionButton({ householdId, userId, timeZone }: { householdI
                   ))}
                 </div>
               )}
-              <Field label={t.sections.visibility}>
-                <Segmented
-                  value={visibility}
-                  onChange={setVisibility}
-                  options={[
-                    { value: "shared", label: `👫 ${t.common.shared}` },
-                    { value: "private", label: `🔒 ${t.common.private}` },
-                  ]}
-                />
-              </Field>
+              {!privateOnly && (
+                <Field label={t.sections.visibility}>
+                  <Segmented
+                    value={visibility}
+                    onChange={setVisibility}
+                    options={[
+                      { value: "shared", label: `👫 ${t.common.shared}` },
+                      { value: "private", label: `🔒 ${t.common.private}` },
+                    ]}
+                  />
+                </Field>
+              )}
               <Field label={t.sections.icon}>
                 <EmojiPicker value={icon} onChange={setIcon} />
               </Field>

@@ -40,6 +40,7 @@ import { useToast } from "@/components/Toaster";
 import { idbQueue, isNetworkError, type QueuedWrite } from "@/lib/offline-queue";
 import { fill } from "@/i18n";
 import { spaceType } from "@/lib/registry/spaces";
+import { errorKey } from "@/lib/errors";
 import { WheelView } from "./WheelView";
 import { WHEEL_PROP } from "@/lib/wheel";
 import { CommitView } from "./CommitView";
@@ -122,9 +123,10 @@ export function SectionScreen({
     }
     console.error("[save] failed", error);
     revert();
-    setFailed((f) => [...f, retry]);
+    if (errorKey(error) === "denied") toast.error(t.failures.denied);
+    else setFailed((f) => [...f, retry]);
     return false;
-  }, []);
+  }, [toast, t]);
 
   // Back from the Notes Shortcut: reload the list (the socket sleeps while away)
   // and show what the sync did.

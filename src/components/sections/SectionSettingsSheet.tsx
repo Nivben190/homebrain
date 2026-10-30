@@ -1,4 +1,5 @@
 "use client";
+import { errorKey } from "@/lib/errors";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
@@ -45,16 +46,18 @@ export function SectionSettingsSheet({
     setBusy(true);
     setError(null);
     const patch = { title: s.title.trim() || section.title, icon: s.icon, color: s.color, view: s.view, owner_id: s.owner_id, schema: s.schema.filter((p) => p.name.trim()), notes_link: s.notes_link?.trim() || null, ...((s.notes_link?.trim() || null) !== (section.notes_link ?? null) ? { notes_state: null } : {}) };
-    const { error } = await supabaseBrowser().from("sections").update(patch).eq("id", section.id);
+    // Roles that may not reshape the home change no rows (RLS) rather than erroring.
+    const { data, error } = await supabaseBrowser().from("sections").update(patch).eq("id", section.id).select("id");
     setBusy(false);
-    if (error) return setError(error.message);
+    if (error || !data?.length) return setError(t.failures[errorKey(error ?? "permission denied")]);
     onSaved({ ...section, ...patch });
     onClose();
   }
 
   async function remove() {
     if (!confirm(t.sections.deleteConfirm)) return;
-    await supabaseBrowser().from("sections").delete().eq("id", section.id);
+    const { data, error } = await supabaseBrowser().from("sections").delete().eq("id", section.id).select("id");
+    if (error || !data?.length) return setError(t.failures[errorKey(error ?? "permission denied")]);
     onDeleted();
   }
 

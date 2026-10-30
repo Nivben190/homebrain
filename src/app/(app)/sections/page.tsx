@@ -20,7 +20,7 @@ export default async function SectionsPage() {
   return (
     <>
       <RealtimeRefresh tables={["sections"]} />
-      <PageHeader title={t.sections.title} action={<NewSectionButton householdId={household.id} userId={user.id} timeZone={profile.timezone} />} />
+      <PageHeader title={t.sections.title} action={["owner", "adult", "teen"].includes(profile.role) ? <NewSectionButton householdId={household.id} userId={user.id} timeZone={profile.timezone} privateOnly={profile.role === "teen"} /> : undefined} />
       <div className="mb-3 grid grid-cols-2 gap-2">
         <Link href="/meals" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">🍽️ {t.meals.link}</Link>
         <Link href="/calendar" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">📅 {t.calendar.title}</Link>

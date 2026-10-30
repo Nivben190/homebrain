@@ -79,12 +79,13 @@ describe("a checklist space", () => {
 });
 
 describe("when a save fails", () => {
-  it("refused by the database: the change is undone and the failure shown", async () => {
+  it("refused by the database: the change is undone and it says why, with no pointless Retry", async () => {
     const { user, t, section } = await open("checklist");
     // Someone from another home: the database refuses their writes here.
     signIn((await homeWith(["owner"])).users.owner);
     await user.type(screen.getByPlaceholderText(t.sections.addItem), "Tea{Enter}");
-    expect(await screen.findByText(new RegExp(t.sections.saveFailed))).toBeInTheDocument();
+    expect(await screen.findByText(t.failures.denied)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.sections.retry })).not.toBeInTheDocument();
     await gone("Tea");
     expect(await dbItems(section.id)).toEqual([]);
   });

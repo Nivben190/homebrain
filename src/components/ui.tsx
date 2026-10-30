@@ -156,6 +156,8 @@ export function Segmented<T extends string>({
           key={o.value}
           type="button"
           aria-pressed={value === o.value}
+          // Its own name: inside a Field's <label>, the first option would otherwise be named by the whole label.
+          aria-label={typeof o.label === "string" ? o.label : undefined}
           onClick={() => onChange(o.value)}
           className="relative flex-1 rounded-xl px-3 py-2 text-sm font-semibold"
         >
