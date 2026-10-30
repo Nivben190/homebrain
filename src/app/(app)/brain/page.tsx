@@ -56,7 +56,7 @@ export default async function BrainPage() {
                   </span>
                 </span>
               </Link>
-              <AutomationToggle id={a.id} enabled={a.enabled} />
+              <AutomationToggle id={a.id} enabled={a.enabled} name={a.name} />
             </div>
           );
         })}

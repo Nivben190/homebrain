@@ -135,10 +135,13 @@ describe("rate limits on hooks", () => {
     const home = await homeWith(["owner"]);
     await space(home.householdId, { title: "List", view: "checklist" });
     const key = await keyFor(home.users.owner, "capture");
-    const statuses: number[] = [];
-    for (let i = 0; i < 70; i++) statuses.push((await capture.POST(post("/api/hooks/capture", key, { text: `x${i}` }))).status);
-    expect(statuses).toContain(429);
-  }, 60_000);
+    const send = async (text: string) => (await capture.POST(post("/api/hooks/capture", key, { text }))).status;
+    expect(await send("first")).toBe(200);
+    // The key's minute is used up (and the next one too, should the clock tick over meanwhile).
+    await sql(`update rate_limits set hits = 60 where bucket like 'hookKey:%'`);
+    await sql(`insert into rate_limits (bucket, window_start, hits) select bucket, window_start + interval '60 seconds', 60 from rate_limits where bucket like 'hookKey:%' on conflict do nothing`);
+    expect(await send("one too many")).toBe(429);
+  });
 });
 
 describe("engine tick and health", () => {

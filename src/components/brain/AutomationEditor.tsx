@@ -228,7 +228,13 @@ export function AutomationEditor({
               variant="danger"
               aria-label={t.common.delete}
               onClick={() => {
-                if (confirm(t.brain.deleteConfirm)) startSave(() => deleteAutomation(id));
+                if (!confirm(t.brain.deleteConfirm)) return;
+                startSave(async () => {
+                  const res = await deleteAutomation(id);
+                  if (!res.ok) return setError(t.failures[errorKey(res.error)]);
+                  router.push("/brain");
+                  router.refresh();
+                });
               }}
             >
               <Trash2 className="size-5" />

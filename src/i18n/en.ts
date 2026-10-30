@@ -674,6 +674,7 @@ export const en = {
     runsOut: "Runs out around {date}",
     reorder: "Add to shopping list",
     added: "Added ✓",
+    noList: "Add a Dog supplies or Groceries space first, then food can go on it.",
     weight: "Weight",
     addWeight: "Log weight",
     kg: "kg",

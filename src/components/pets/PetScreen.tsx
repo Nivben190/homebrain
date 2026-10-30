@@ -13,6 +13,8 @@ import { normalizePhone } from "@/lib/engine/render";
 import { PetForm } from "./PetForm";
 import type { Pet, PetWeight } from "@/lib/db-types";
 import { fill } from "@/i18n";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 
 export interface PetRoutine {
   id: string;
@@ -54,6 +56,7 @@ export function PetScreen({ pet, pets, weights, routines, today }: { pet: Pet; p
   const [kg, setKg] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const toast = useToast();
 
   const left = foodDaysLeft(pet, today);
   const total = bagDays(pet);
@@ -62,9 +65,10 @@ export function PetScreen({ pet, pets, weights, routines, today }: { pet: Pet; p
     setMsg(m);
     setTimeout(() => setMsg(null), 1600);
   };
-  const run = (fn: () => Promise<unknown>, done?: string) =>
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) =>
     start(async () => {
-      await fn();
+      const res = await fn();
+      if (!res.ok) return void toast.error(res.error === "No shopping list" ? t.pets.noList : t.failures[errorKey(res.error)]);
       if (done) flash(done);
       router.refresh();
     });
@@ -146,7 +150,7 @@ export function PetScreen({ pet, pets, weights, routines, today }: { pet: Pet; p
             setKg("");
           }}
         >
-          <Input type="number" inputMode="decimal" step="0.1" value={kg} onChange={(e) => setKg(e.target.value)} placeholder={`${t.pets.addWeight} (${t.pets.kg})`} className="h-11 flex-1" />
+          <Input type="number" inputMode="decimal" step="0.1" value={kg} onChange={(e) => setKg(e.target.value)} placeholder={`${t.pets.addWeight} (${t.pets.kg})`} aria-label={t.pets.addWeight} className="h-11 flex-1" />
           <Button disabled={!kg}>{t.common.add}</Button>
         </form>
       </Card>
@@ -199,10 +203,7 @@ export function PetScreen({ pet, pets, weights, routines, today }: { pet: Pet; p
                   aria-pressed={r.petId === pet.id}
                   aria-label={fill(t.pets.onlyFor, { name: pet.name })}
                   title={fill(t.pets.onlyFor, { name: pet.name })}
-                  onClick={async () => {
-                    await linkRoutine(r.id, r.petId === pet.id ? null : pet.id);
-                    router.refresh();
-                  }}
+                  onClick={() => run(() => linkRoutine(r.id, r.petId === pet.id ? null : pet.id))}
                   className={r.petId === pet.id ? "rounded-full bg-accent-soft px-2 py-1 text-sm" : "rounded-full px-2 py-1 text-sm opacity-50"}
                 >
                   {pet.emoji}📌
@@ -224,7 +225,15 @@ export function PetScreen({ pet, pets, weights, routines, today }: { pet: Pet; p
         onClose={() => setEditing(false)}
         title={`${pet.emoji} ${t.pets.edit}`}
         footer={
-          <Button variant="danger" className="w-full" onClick={() => confirm(t.sections.deleteConfirm) && start(() => deletePet(pet.id))}>
+          <Button variant="danger" className="w-full" onClick={() =>
+              confirm(t.sections.deleteConfirm) &&
+              start(async () => {
+                const res = await deletePet(pet.id);
+                if (!res.ok) return void toast.error(t.failures[errorKey(res.error)]);
+                router.replace("/");
+                router.refresh();
+              })
+            }>
             <Trash2 className="size-4" /> {t.common.delete}
           </Button>
         }

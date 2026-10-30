@@ -21,7 +21,7 @@ export function TabBar({ spaces, members, timeZone }: { spaces: QuickSpace[]; me
       <div className="glass pointer-events-auto mx-auto flex max-w-md items-center justify-around rounded-[1.75rem] p-1.5">
         {tabs.map(({ href, label, Icon, active }, n) => [
           n === 2 && <QuickAdd key="add" spaces={spaces} members={members} timeZone={timeZone} />,
-          <Link key={href} href={href} className="relative flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-3xl">
+          <Link key={href} href={href} aria-current={active ? "page" : undefined} className="relative flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-3xl">
             {active && (
               <motion.span layoutId="tab-pill" className="absolute inset-0 rounded-3xl bg-accent-soft" transition={{ type: "spring", stiffness: 500, damping: 38 }} />
             )}

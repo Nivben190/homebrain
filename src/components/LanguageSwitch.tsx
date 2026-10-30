@@ -15,8 +15,8 @@ export function LanguageSwitch() {
       <Segmented<Locale>
         value={locale}
         options={[
-          { value: "en", label: "EN" },
-          { value: "he", label: "עב" },
+          { value: "en", label: "EN", name: "English" },
+          { value: "he", label: "עב", name: "עברית" },
         ]}
         onChange={(v) =>
           start(async () => {

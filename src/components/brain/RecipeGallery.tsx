@@ -5,6 +5,7 @@ import { addRecipe } from "@/app/actions";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
 import { useI18n } from "@/i18n/client";
 import { Button } from "@/components/ui";
+import { errorKey } from "@/lib/errors";
 
 /** One-tap routines (roadmap 2.7). */
 export function RecipeGallery() {
@@ -15,7 +16,7 @@ export function RecipeGallery() {
   async function add(id: RecipeId) {
     setState((s) => ({ ...s, [id]: "busy" }));
     const res = await addRecipe(id);
-    setState((s) => ({ ...s, [id]: res.ok ? "added" : res.error === "missing" ? t.brain.recipeMissing : res.error }));
+    setState((s) => ({ ...s, [id]: res.ok ? "added" : res.error === "missing" ? t.brain.recipeMissing : t.failures[errorKey(res.error)] }));
     if (res.ok) router.refresh();
   }
 

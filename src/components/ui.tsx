@@ -162,7 +162,8 @@ export function Segmented<T extends string>({
   onChange,
 }: {
   value: T;
-  options: { value: T; label: ReactNode }[];
+  /** `name` is what a screen reader says when the label is short or symbolic. */
+  options: { value: T; label: ReactNode; name?: string }[];
   onChange: (v: T) => void;
 }) {
   return (
@@ -173,7 +174,7 @@ export function Segmented<T extends string>({
           type="button"
           aria-pressed={value === o.value}
           // Its own name: inside a Field's <label>, the first option would otherwise be named by the whole label.
-          aria-label={typeof o.label === "string" ? o.label : undefined}
+          aria-label={o.name ?? (typeof o.label === "string" ? o.label : undefined)}
           onClick={() => onChange(o.value)}
           className="relative flex-1 rounded-xl px-3 py-2 text-sm font-semibold"
         >

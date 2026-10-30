@@ -143,9 +143,10 @@ export async function linkRoutine(sectionId: string, petId: string | null): Prom
   const { supabase } = await requireHome();
   // RLS shows only this home's pets, so a foreign id finds nothing.
   if (petId && !(await supabase.from("pets").select("id").eq("id", petId).maybeSingle()).data) return { ok: false, error: "not allowed" };
-  const { error } = await supabase.from("sections").update({ pet_id: petId }).eq("id", sectionId);
+  const { data, error } = await supabase.from("sections").update({ pet_id: petId }).eq("id", sectionId).select("id");
   revalidatePath("/pets", "layout");
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  return data.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 // ---------------------------------------------------------------------------
@@ -518,25 +519,32 @@ export async function toggleAutomation(id: string, enabled: boolean): Promise<Re
   const { data: a } = await supabase.from("automations").select("*").eq("id", id).single<Automation>();
   if (!a) return { ok: false, error: "Not found" };
   const tz = members.find((m) => m.user_id === a.target_user_id)?.timezone ?? "Asia/Jerusalem";
-  await supabase
+  const { data, error } = await supabase
     .from("automations")
     .update({ enabled, next_run_at: enabled ? (nextRunAt(a.trigger, new Date(), tz)?.toISOString() ?? null) : null })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
   revalidatePath("/brain");
-  return { ok: true };
+  if (error) return { ok: false, error: error.message };
+  return data.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
-export async function deleteAutomation(id: string) {
+export async function deleteAutomation(id: string): Promise<Result> {
   const { supabase } = await requireHome();
-  const { data: mine } = await supabase.from("automations").select("id").eq("id", id).maybeSingle();
-  if (mine) {
-    // Its unanswered cards would otherwise linger in "Waiting for you" (both of us).
-    await createSupabaseAdmin().from("runs").update({ acknowledged_at: new Date().toISOString() }).eq("automation_id", id).is("acknowledged_at", null);
-    await supabase.from("automations").delete().eq("id", id);
-  }
+  const admin = createSupabaseAdmin();
+  // Deleting clears the runs' link, so note its unanswered cards first; they'd otherwise linger in "Waiting for you" (both of us).
+  const { data: open } = await admin.from("runs").select("id").eq("automation_id", id).is("acknowledged_at", null);
+  const { data, error } = await supabase.from("automations").delete().eq("id", id).select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data.length) return { ok: false, error: "permission denied" };
+  if (open?.length)
+    await admin
+      .from("runs")
+      .update({ acknowledged_at: new Date().toISOString() })
+      .in("id", open.map((r) => r.id));
   revalidatePath("/brain");
   revalidatePath("/");
-  redirect("/brain");
+  return { ok: true };
 }
 
 /** Fires an automation immediately (for testing from the editor). */
@@ -786,32 +794,35 @@ export async function logPetWeight(petId: string, kg: number): Promise<Result> {
 
 export async function newFoodBag(petId: string): Promise<Result> {
   const { supabase, profile } = await requireHome();
-  const { error } = await supabase.from("pets").update({ bag_started: todayKey(profile.timezone), food_alerted_bag: null }).eq("id", petId);
+  const { data, error } = await supabase.from("pets").update({ bag_started: todayKey(profile.timezone), food_alerted_bag: null }).eq("id", petId).select("id");
   revalidatePath(`/pets/${petId}`);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  return data.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 /** Adds "Dog food" to the dog supplies list (or groceries), re-opening it if it's in history. */
 export async function reorderFood(petId: string): Promise<Result> {
   const { supabase, profile, household } = await requireHome();
-  const { data: pet } = await supabase.from("pets").select("name").eq("id", petId).single();
+  const { data: pet } = await supabase.from("pets").select("name").eq("id", petId).maybeSingle();
+  if (!pet) return { ok: false, error: "permission denied" };
   const { data: lists } = await supabase.from("sections").select("id,template").eq("household_id", household.id).in("template", ["dog-supplies", "groceries"]);
   const list = lists?.find((l) => l.template === "dog-supplies") ?? lists?.[0];
   if (!list) return { ok: false, error: "No shopping list" };
   const t = getDict(profile.locale).pets;
-  const title = fill(t.foodItem, { name: pet?.name ?? t.theDog });
+  const title = fill(t.foodItem, { name: pet.name });
   const { data: existing } = await supabase.from("items").select("id").eq("section_id", list.id).ilike("title", `%${t.foodWord}%`).limit(1).maybeSingle();
-  if (existing) await supabase.from("items").update({ done: false }).eq("id", existing.id);
-  else await supabase.from("items").insert({ section_id: list.id, title, position: Date.now() / 1000 });
+  const { error } = existing ? await supabase.from("items").update({ done: false }).eq("id", existing.id) : await supabase.from("items").insert({ section_id: list.id, title, position: Date.now() / 1000 });
   revalidatePath(`/pets/${petId}`);
-  return { ok: true };
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
-export async function deletePet(petId: string) {
+/** The screen goes back to Today itself once this says it worked. */
+export async function deletePet(petId: string): Promise<Result> {
   const { supabase } = await requireHome();
-  await supabase.from("pets").delete().eq("id", petId);
+  const { data, error } = await supabase.from("pets").delete().eq("id", petId).select("id");
   revalidatePath("/");
-  redirect("/");
+  if (error) return { ok: false, error: error.message };
+  return data.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 /**

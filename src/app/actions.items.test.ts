@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { app, homeWith, Redirect, signIn, sql, startApp } from "@/test/app";
+import { app, homeWith, signIn, sql, startApp } from "@/test/app";
 
 vi.mock("@/lib/supabase/server", () => import("@/test/app").then((m) => m.supabaseServerMock));
 vi.mock("next/cache", () => import("@/test/app").then((m) => m.nextCacheMock));
@@ -201,7 +201,7 @@ describe("Brain", () => {
     const ran = await A.runAutomationNow(saved.id!);
     expect(ran.ok).toBe(true);
     expect(app.pushes.map((p) => p.userId)).toEqual([home.users.adult]);
-    await expect(A.deleteAutomation(saved.id!)).rejects.toThrow(Redirect);
+    expect(await A.deleteAutomation(saved.id!)).toEqual({ ok: true });
     expect(await sql(`select 1 from automations where id = $1`, [saved.id])).toEqual([]);
     expect(await sql(`select count(*)::int as open from runs where automation_id is null and acknowledged_at is null and user_id = $1`, [home.users.adult])).toEqual([{ open: 0 }]);
   });
@@ -280,7 +280,7 @@ describe("pets", () => {
     expect(await A.reorderFood(saved.id!)).toEqual({ ok: true });
     expect(await A.reorderFood(saved.id!)).toEqual({ ok: true });
     expect(await sql(`select count(*)::int as n from items where section_id = $1`, [supplies])).toEqual([{ n: 1 }]);
-    await expect(A.deletePet(saved.id!)).rejects.toThrow(Redirect);
+    expect(await A.deletePet(saved.id!)).toEqual({ ok: true });
     expect(await sql(`select 1 from pets where id = $1`, [saved.id])).toEqual([]);
     expect((await A.savePet(null, { name: "" })).ok).toBe(false);
   });
