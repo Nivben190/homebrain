@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { vi } from "vitest";
 import { migratedDb, seedHome, type Db } from "./db";
 import { testClient } from "./postgrest";
@@ -22,6 +23,10 @@ export const app = {
   pushes: [] as { userId: string; payload: { title: string; body: string; url?: string } }[],
   outbound: [] as string[],
   /** Canned replies for outside services, by URL; anything else gets an empty 200. */
+  /** Browser writes fail like a phone with no signal. */
+  offline: false,
+  /** The next browser write fails once with a server error. */
+  failNext: false,
   respond: (_url: string): unknown => undefined, // eslint-disable-line @typescript-eslint/no-unused-vars
 };
 
@@ -36,6 +41,8 @@ export async function startApp() {
   app.pushes = [];
   app.outbound = [];
   app.respond = () => undefined;
+  app.offline = false;
+  app.failNext = false;
   // Nothing in a test talks to the internet: Google, Resend, weather all land here.
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
     const url = String(input instanceof Request ? input.url : input);
@@ -74,6 +81,33 @@ export const supabaseServerMock = {
   createSupabaseAdmin: () => testClient(app.db),
 };
 
+/** The browser's Supabase client, as the signed-in test user; realtime is a quiet stand-in. */
+export const supabaseBrowserMock = {
+  supabaseBrowser: () => {
+    const client = testClient(app.db, app.userId ?? undefined);
+    const channel = { on: () => channel, subscribe: () => channel, unsubscribe: async () => "ok" };
+    client.channel = (() => channel) as never;
+    client.removeChannel = (async () => "ok") as never;
+    const from = client.from.bind(client);
+    client.from = ((table: string) => {
+      if (app.offline) throw new TypeError("Failed to fetch");
+      if (app.failNext) {
+        app.failNext = false;
+        throw new Error("500 Internal Server Error");
+      }
+      return from(table);
+    }) as never;
+    return client;
+  },
+};
+
+/** next/link without the app router: a plain anchor. */
+export const nextLinkMock = {
+  default: ({ href, children, prefetch: _p, ...rest }: { href: string; children?: unknown; prefetch?: unknown }) => createElement("a", { href, ...rest }, children as never), // eslint-disable-line @typescript-eslint/no-unused-vars
+};
+
+export const router = { push: vi.fn(), refresh: vi.fn(), back: vi.fn(), replace: vi.fn(), prefetch: vi.fn() };
+
 export const nextCacheMock = { revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: <T>(fn: T) => fn };
 
 export const nextHeadersMock = {
@@ -92,6 +126,9 @@ export class Redirect extends Error {
   }
 }
 export const nextNavigationMock = {
+  useRouter: () => router,
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
   redirect: (url: string) => {
     throw new Redirect(url);
   },

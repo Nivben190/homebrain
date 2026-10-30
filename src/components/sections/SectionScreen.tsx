@@ -697,7 +697,9 @@ function ItemRow({
         <motion.button
           whileTap={{ scale: 0.8 }}
           onClick={onToggle}
-          aria-label="Toggle"
+          role="checkbox"
+          aria-checked={item.done}
+          aria-label={item.title}
           className={cn(
             "flex size-7 shrink-0 items-center justify-center rounded-full border-2 transition",
             item.done ? "border-success bg-success text-white" : "border-faint-deco",
