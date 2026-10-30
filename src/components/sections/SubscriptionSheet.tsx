@@ -119,7 +119,7 @@ export function SubscriptionSheet({
 
         <Field label={t.subs.price}>
           <div className="flex gap-2">
-            <Input inputMode="decimal" value={price} placeholder="0" onChange={(e) => (setPrice(e.target.value), edit({}))} className="h-12 flex-1 text-lg font-bold tabular-nums" />
+            <Input inputMode="decimal" aria-label={t.subs.price} value={price} placeholder="0" onChange={(e) => (setPrice(e.target.value), edit({}))} className="h-12 flex-1 text-lg font-bold tabular-nums" />
             <Select value={sub.currency} onChange={(e) => edit({ currency: e.target.value as Currency })} className="h-12 w-28">
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>

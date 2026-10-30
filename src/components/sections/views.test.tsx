@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
-import { app, homeWith, signIn, sql, startApp } from "@/test/app";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { app, homeWith, router, signIn, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
 import type { Item, Section } from "@/lib/db-types";
 
@@ -341,5 +341,73 @@ describe("spending", () => {
     expect(await screen.findByText(t.failures.denied)).toBeInTheDocument();
     expect(screen.queryByText("•5555")).not.toBeInTheDocument();
     expect(await sql(`select settings->'cards' as c from sections where id = $1`, [section.id])).toEqual([{ c: null }]);
+  });
+});
+
+describe("subscriptions", () => {
+  const sub = (extra: Record<string, unknown> = {}) => ({ _sub: { key: null, source: "manual", status: "active", amount: 40, currency: "ILS", cycle: "monthly", next: null, last: null, cancel: null, icon: "💳", remind: false, ...extra } });
+  const subOf = async (sectionId: string) => (await sql<{ title: string; props: { _sub: Record<string, unknown>; _dates?: unknown }; remind_at: unknown }>(`select title, props, remind_at from items where section_id = $1 order by position`, [sectionId]));
+
+  it("one added by hand: price, yearly, a renewal date and its reminder", async () => {
+    const { user, t, section } = await open("subscriptions");
+    await user.type(screen.getByPlaceholderText(t.subs.addPlaceholder), "Netflix{Enter}");
+    await user.type(await screen.findByLabelText(t.subs.price, { selector: "input" }), "49.9");
+    await user.click(screen.getByRole("button", { name: t.subs.yearly }));
+    fireEvent.change(screen.getByLabelText(t.subs.next), { target: { value: "2027-01-20" } });
+    await user.click(screen.getByRole("switch"));
+    await waitFor(async () => {
+      const [row] = await subOf(section.id);
+      expect(row.props._sub).toMatchObject({ amount: 49.9, cycle: "yearly", next: "2027-01-20", remind: true, edited: true });
+      expect(row.props._dates).toMatchObject({ date: "2027-01-20", repeat: "yearly" });
+      expect(row.remind_at).not.toBeNull();
+    });
+  });
+
+  it("totals per month, and 'I cancelled it' moves it out of the total", async () => {
+    const { user, t, section } = await open("subscriptions", [
+      { title: "Spotify", props: sub({ amount: 20 }) },
+      { title: "Cloud", props: sub({ amount: 120, cycle: "yearly" }) },
+    ]);
+    expect(screen.getByText(new RegExp(t.subs.active.replace("{n}", "2")))).toBeInTheDocument();
+    expect(screen.getByText(/₪30/)).toBeInTheDocument();
+    await user.click(screen.getByText("Spotify"));
+    await user.click(await screen.findByRole("button", { name: new RegExp(t.subs.markCancelled) }));
+    await waitFor(async () => expect((await subOf(section.id))[0].props._sub).toMatchObject({ status: "cancelled" }));
+    await user.click(screen.getByRole("button", { name: t.common.close }));
+    await user.click(await screen.findByRole("button", { name: (n) => n.startsWith(`${t.subs.cancelled} (1)`) }));
+    expect(screen.getByText(/₪10/)).toBeInTheDocument();
+  });
+
+  it("one found in Gmail isn't deleted but set aside, so a scan won't bring it back", async () => {
+    const { user, t, section } = await open("subscriptions", [{ title: "Receipt", props: sub({ source: "gmail", key: "rcpt" }) }]);
+    await user.click(screen.getByText("Receipt"));
+    await user.click(await screen.findByRole("button", { name: t.subs.hide }));
+    await waitFor(async () => expect((await subOf(section.id))[0].props._sub).toMatchObject({ status: "hidden" }));
+    expect(await screen.findByRole("button", { name: new RegExp(t.subs.hidden) })).toBeInTheDocument();
+  });
+
+  it("Gmail: connect link, a scan that finishes, the result of connecting, and disconnect", async () => {
+    window.history.replaceState(null, "", "/sections/x?gmail=connected");
+    const started = new Date(Date.now() + 1000).toISOString();
+    app.respond = (url) => (url.includes("/api/google/scan?") ? { lastScanAt: started, status: "ok", failed: false } : undefined);
+    const { user, t, section } = await open("subscriptions", [], { gmail: { email: "me@gmail.com", status: "ok", lastScanAt: null } });
+    expect(await screen.findByText(t.subs.resultConnected)).toBeInTheDocument();
+    expect(router.replace).toHaveBeenCalledWith(`/sections/${section.id}`, { scroll: false });
+    window.history.replaceState(null, "", "/");
+    await user.click(screen.getByRole("button", { name: new RegExp(t.subs.scanNow) }));
+    expect(await screen.findByText(t.subs.done, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(app.outbound.some((u) => u.endsWith("/api/google/scan"))).toBe(true);
+    await user.click(screen.getByRole("button", { name: t.subs.disconnect }));
+    await user.click(screen.getByRole("button", { name: t.subs.disconnectConfirm.replace("{email}", "me@gmail.com") }));
+    expect(await screen.findByText(t.subs.disconnected)).toBeInTheDocument();
+  }, 20_000);
+
+  it("not connected offers to connect; expired asks to reconnect", async () => {
+    const { t, section, unmount } = await open("subscriptions");
+    expect(screen.getByRole("link", { name: new RegExp(t.subs.connect) })).toHaveAttribute("href", `/api/google/connect?section=${section.id}`);
+    unmount();
+    await open("subscriptions", [], { gmail: { email: "me@gmail.com", status: "expired", lastScanAt: null } });
+    expect(screen.getByText(t.subs.expired)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: t.subs.reconnect })).toBeInTheDocument();
   });
 });

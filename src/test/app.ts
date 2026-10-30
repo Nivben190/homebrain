@@ -128,7 +128,7 @@ export class Redirect extends Error {
 export const nextNavigationMock = {
   useRouter: () => router,
   usePathname: () => "/",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search),
   redirect: (url: string) => {
     throw new Redirect(url);
   },

@@ -387,10 +387,40 @@ export function postgrestFetch(db: Db) {
     return json({ msg: `auth ${req.method} ${path} not stubbed` }, 501);
   }
 
+  /** Storage: upload, sign and remove, each an objects row checked by its RLS policies. The bytes aren't kept. */
+  async function storage(req: Request, url: URL) {
+    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "") || null;
+    const path = decodeURIComponent(url.pathname.replace(/^\/storage\/v1\/object\//, ""));
+    type Obj = { name: string };
+    try {
+      if (req.method === "POST" && path.startsWith("sign/")) {
+        const bucket = path.slice(5);
+        const { paths } = (await req.json()) as { paths: string[] };
+        const seen = new Set((await asRole<Obj>(token, (q) => q(`select name from storage.objects where bucket_id = $1 and name = any($2)`, [bucket, paths])) as Obj[]).map((o) => o.name));
+        return json(paths.map((p) => (seen.has(p) ? { path: p, signedURL: `/object/sign/${bucket}/${p}?token=t`, error: null } : { path: p, signedURL: null, error: "Either the object does not exist or you do not have access to it" })));
+      }
+      const [bucket, ...rest] = path.split("/");
+      if (req.method === "POST" || req.method === "PUT") {
+        const name = rest.join("/");
+        await asRole(token, (q) => q(`insert into storage.objects (bucket_id, name, owner) values ($1, $2, auth.uid())`, [bucket, name]));
+        return json({ Key: `${bucket}/${name}`, Id: crypto.randomUUID() });
+      }
+      if (req.method === "DELETE") {
+        const { prefixes } = (await req.json()) as { prefixes: string[] };
+        const gone = (await asRole<Obj>(token, (q) => q(`delete from storage.objects where bucket_id = $1 and name = any($2) returning name`, [bucket, prefixes]))) as Obj[];
+        return json(gone.map((o) => ({ name: o.name, bucket_id: bucket })));
+      }
+    } catch (e) {
+      return json({ statusCode: "403", error: "Unauthorized", message: (e as Error).message }, 400);
+    }
+    return json({ message: `storage ${req.method} ${path} not stubbed` }, 501);
+  }
+
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const req = new Request(input, init);
     const url = new URL(req.url);
     if (url.pathname.startsWith("/rest/v1/")) return rest(req, url);
+    if (url.pathname.startsWith("/storage/v1/object/")) return storage(req, url);
     if (url.pathname.startsWith("/auth/v1/")) return auth(req, url);
     return json({ message: `not stubbed: ${url.pathname}` }, 501);
   };

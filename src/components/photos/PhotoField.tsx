@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Camera, ChevronLeft, ChevronRight, FileText, ImagePlus, Paperclip, ScanLine, Trash2, X } from "lucide-react";
 import { useI18n } from "@/i18n/client";
+import { errorKey } from "@/lib/errors";
 import { deleteAttachment, uploadAttachment, usePhotoUrls, type Photo, type UploadTarget } from "@/lib/photos";
 import { Spinner } from "@/components/ui";
 
@@ -29,7 +30,7 @@ export function PhotoField({ photos, target, onChange }: { photos: Photo[]; targ
         next = [...next, await uploadAttachment(target, file, { scan })];
         onChange(next);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(t.failures[errorKey(e)]);
       }
       setUploading((n) => n - 1);
     }
