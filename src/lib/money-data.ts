@@ -9,16 +9,18 @@ type Row = { id: string; title: string; props: Record<string, unknown>; created_
 
 /** Loads one home's month from its Spending, Subscriptions and Bills spaces (roadmap 3.6). */
 export async function loadMonth(db: SupabaseClient, householdId: string, month: string, timeZone: string) {
-  const [{ data: rows }, { data: budgets }] = await Promise.all([
-    db
-      .from("items")
-      .select("id,title,props,created_by,assignee_id,sections!inner(view,template,household_id)")
-      .eq("sections.household_id", householdId)
-      .or("view.eq.spend,view.eq.subscriptions,template.eq.bills", { referencedTable: "sections" })
-      .returns<Row[]>(),
+  // Purchases are many, so only those added around this month (a text arrives within days of the purchase);
+  // subscriptions and bills are few and recur, so all of them.
+  const [y0, m0] = month.split("-").map(Number);
+  const from = new Date(Date.UTC(y0, m0 - 1, 1) - 7 * 86_400_000).toISOString();
+  const to = new Date(Date.UTC(y0, m0, 1) + 31 * 86_400_000).toISOString();
+  const cols = "id,title,props,created_by,assignee_id,sections!inner(view,template,household_id)";
+  const [{ data: spend }, { data: recurring }, { data: budgets }] = await Promise.all([
+    db.from("items").select(cols).eq("sections.household_id", householdId).eq("sections.view", "spend").gte("created_at", from).lt("created_at", to).limit(5000).returns<Row[]>(),
+    db.from("items").select(cols).eq("sections.household_id", householdId).or("view.eq.subscriptions,template.eq.bills", { referencedTable: "sections" }).returns<Row[]>(),
     db.from("money_budgets").select("category,amount").eq("household_id", householdId),
   ]);
-  const all = rows ?? [];
+  const all = [...(spend ?? []), ...(recurring ?? [])];
   const [y, m] = month.split("-").map(Number);
   const days = Array.from({ length: new Date(Date.UTC(y, m, 0)).getUTCDate() }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
 
