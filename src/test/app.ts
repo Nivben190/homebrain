@@ -21,6 +21,8 @@ export const app = {
   headers: new Headers({ "x-forwarded-for": "203.0.113.7" }),
   pushes: [] as { userId: string; payload: { title: string; body: string; url?: string } }[],
   outbound: [] as string[],
+  /** Canned replies for outside services, by URL; anything else gets an empty 200. */
+  respond: (_url: string): unknown => undefined, // eslint-disable-line @typescript-eslint/no-unused-vars
 };
 
 process.env.GOOGLE_TOKEN_KEY ??= Buffer.alloc(32, 7).toString("base64");
@@ -33,10 +35,14 @@ export async function startApp() {
   app.userId = null;
   app.pushes = [];
   app.outbound = [];
+  app.respond = () => undefined;
   // Nothing in a test talks to the internet: Google, Resend, weather all land here.
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
-    app.outbound.push(String(input instanceof Request ? input.url : input));
-    return new Response(JSON.stringify({}), { status: 200, headers: { "content-type": "application/json" } });
+    const url = String(input instanceof Request ? input.url : input);
+    app.outbound.push(url);
+    const canned = app.respond(url);
+    if (canned instanceof Response) return canned;
+    return new Response(JSON.stringify(canned ?? {}), { status: 200, headers: { "content-type": "application/json" } });
   });
   return app.db;
 }
