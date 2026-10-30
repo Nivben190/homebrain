@@ -79,14 +79,14 @@ export function AutomationEditor({
         <Link href="/brain" className="inline-flex items-center gap-1 text-sm font-semibold text-muted">
           <ChevronLeft className="size-4 rtl:rotate-180" /> {t.brain.title}
         </Link>
-        <Toggle checked={def.enabled} onChange={(enabled) => setDef({ ...def, enabled })} />
+        <Toggle label={t.brain.active} checked={def.enabled} onChange={(enabled) => setDef({ ...def, enabled })} />
       </div>
 
       <div className="flex items-center gap-3">
-        <button onClick={() => setIconSheet(true)} className="flex size-16 shrink-0 items-center justify-center rounded-[1.4rem] bg-accent-soft text-3xl transition active:scale-90">
+        <button aria-label={t.sections.icon} onClick={() => setIconSheet(true)} className="flex size-16 shrink-0 items-center justify-center rounded-[1.4rem] bg-accent-soft text-3xl transition active:scale-90">
           {def.icon}
         </button>
-        <Input value={def.name} onChange={(e) => setDef({ ...def, name: e.target.value })} placeholder={t.brain.name} className="h-14 text-xl font-bold" />
+        <Input aria-label={t.brain.name} value={def.name} onChange={(e) => setDef({ ...def, name: e.target.value })} placeholder={t.brain.name} className="h-14 text-xl font-bold" />
       </div>
 
       {members.length > 1 && (

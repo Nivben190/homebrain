@@ -332,6 +332,7 @@ export const he: Dict = {
     deleteConfirm: "למחוק את האוטומציה?",
     templateHint: "טיפ: אפשר להשתמש ב־{{partner}}, {{me}}, {{time}} או בשורה אקראית ממרחב.",
     insertRandom: "שורה אקראית",
+    active: "פעיל",
   },
   events: { wake: "כשאני מתעורר/ת", arrive_home: "כשאני מגיע/ה הביתה", leave_home: "כשאני יוצא/ת מהבית", bedtime: "שעת שינה", arrive_store: "כשאני מגיע/ה לסופר", custom: "מותאם אישית" },
   conditions: { time_window: "בין השעות", days: "בימים", once_per_day: "פעם ביום" },

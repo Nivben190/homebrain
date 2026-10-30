@@ -330,6 +330,7 @@ export const en = {
     deleteConfirm: "Delete this automation?",
     templateHint: "Tip: use {{partner}}, {{me}}, {{time}} or pick a random line from a space.",
     insertRandom: "Random line",
+    active: "Active",
   },
   events: { wake: "I wake up", arrive_home: "I get home", leave_home: "I leave home", bedtime: "Bedtime", arrive_store: "I get to the supermarket", custom: "Custom" },
   conditions: { time_window: "Between hours", days: "On days", once_per_day: "Once a day" },
