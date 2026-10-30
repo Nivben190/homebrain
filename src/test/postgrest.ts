@@ -78,6 +78,13 @@ function orExpr(body: string, col: (c: string) => string, p: Params, joiner: "or
   return `(${parts.join(` ${joiner} `)})`;
 }
 
+/** Passwords given at sign-up, per database; seeded test users sign in with "password". */
+const allPasswords = new WeakMap<Db, Map<string, string>>();
+const passwordsOf = (db: Db) => {
+  if (!allPasswords.has(db)) allPasswords.set(db, new Map());
+  return allPasswords.get(db)!;
+};
+
 export function postgrestFetch(db: Db) {
   let rels: { from_table: string; from_cols: string[]; to_table: string; to_cols: string[] }[] | null = null;
   // Inside a request the transaction holds PGlite's lock, so catalog lookups must go through it.
@@ -345,6 +352,8 @@ export function postgrestFetch(db: Db) {
     return pks.get(table)!;
   }
 
+  const passwords = passwordsOf(db);
+
   async function auth(req: Request, url: URL) {
     const path = url.pathname.replace(/^\/auth\/v1/, "");
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "");
@@ -360,7 +369,15 @@ export function postgrestFetch(db: Db) {
       const exists = await db.query(`select 1 from auth.users where email = $1`, [b.email]);
       if (exists.rows.length) return json({ code: 422, error_code: "email_exists", msg: "A user with this email address has already been registered" }, 422);
       const { rows } = await db.query<{ id: string }>(`insert into auth.users (email) values ($1) returning id`, [b.email]);
+      if (b.password) passwords.set(b.email, b.password);
       return json({ id: rows[0].id, email: b.email, aud: "authenticated", app_metadata: {}, user_metadata: {} });
+    }
+    if (path === "/token" && url.searchParams.get("grant_type") === "password") {
+      const b = JSON.parse(await req.text());
+      const { rows } = await db.query<{ id: string; created_at: string }>(`select id, created_at from auth.users where email = $1`, [b.email]);
+      if (!rows[0] || (passwords.get(b.email) ?? "password") !== b.password) return json({ code: 400, error_code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
+      const user = { id: rows[0].id, aud: "authenticated", role: "authenticated", email: b.email, app_metadata: {}, user_metadata: {}, created_at: rows[0].created_at };
+      return json({ access_token: jwt({ sub: rows[0].id, role: "authenticated", email: b.email }), token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "refresh", user });
     }
     const del = /^\/admin\/users\/([\w-]+)$/.exec(path);
     if (del && req.method === "DELETE") {
