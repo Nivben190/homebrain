@@ -162,13 +162,19 @@ describe("item reminders", () => {
     const s = await space(home.householdId, { view: "dates" });
     const spec = { date: todayIn(), repeat: "once", from: "00:00", until: "23:59", every: 1, ahead: 0, carry: false };
     const id = await item(s, { title: "Passport", props: { _dates: spec } });
-    // Let the engine plan it, then bring the planned alert forward to now.
-    const { rescheduleDate } = await import("./execute");
-    await rescheduleDate(db(), id, spec as never, "Asia/Jerusalem", new Set(), new Date(Date.now() - 2 * 60_000));
-    const [{ remind_at }] = await sql<{ remind_at: Date | null }>(`select remind_at from items where id = $1`, [id]);
-    expect(remind_at).not.toBeNull();
-    const outcome = (await tick(db())).outcomes.find((o) => o.automationId === id);
-    expect(outcome?.status === "fired" || outcome?.reason === "handled / edited").toBe(true);
+    // Let the engine plan the next alert, then fire it at exactly that moment.
+    const { rescheduleDate, fireItemReminder } = await import("./execute");
+    const fire = async () => {
+      const [{ remind_at }] = await sql<{ remind_at: Date | null }>(`select remind_at from items where id = $1`, [id]);
+      expect(remind_at).not.toBeNull();
+      const at = new Date(remind_at!);
+      return fireItemReminder(db(), id, at, new Date(at.getTime() + 1000));
+    };
+    await rescheduleDate(db(), id, spec as never, "Asia/Jerusalem", new Set(), new Date(`${todayIn()}T00:00:00+02:00`));
+    expect((await fire()).status).toBe("fired");
+    expect((await fire()).status).toBe("fired");
+    const cards = await runsFor(home.users.owner);
+    expect(cards.map((c) => c.acknowledged_at === null)).toEqual([false, true]);
   });
 
   it("an item with no schedule just clears its reminder", async () => {
