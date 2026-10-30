@@ -5,6 +5,7 @@ import { acceptInvite } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { Button, Card, Toggle } from "@/components/ui";
+import { errorKey } from "@/lib/errors";
 
 /** "Move to this home" for someone who already has one. */
 export function MoveHome({ token, home, current, alone }: { token: string; home: string; current: string; alone: boolean }) {
@@ -18,7 +19,7 @@ export function MoveHome({ token, home, current, alone }: { token: string; home:
       <p className="text-sm text-muted">{fill(t.join.moveHint, { home, current })}</p>
       <div className="flex items-center justify-between gap-4">
         <span className="font-medium">{t.join.bring}</span>
-        <Toggle checked={bring} onChange={setBring} />
+        <Toggle checked={bring} onChange={setBring} label={t.join.bring} />
       </div>
       {alone && !bring && <p className="text-sm text-warn">{fill(t.join.bringAlone, { current })}</p>}
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -29,7 +30,7 @@ export function MoveHome({ token, home, current, alone }: { token: string; home:
           setBusy(true);
           const res = await acceptInvite(token, bring);
           setBusy(false);
-          if (!res.ok) return setError(res.error === "expired" ? t.join.expired : res.error);
+          if (!res.ok) return setError(res.error === "expired" ? t.join.expired : t.failures[errorKey(res.error)]);
           router.replace("/");
           router.refresh();
         }}

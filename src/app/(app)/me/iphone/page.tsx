@@ -115,8 +115,8 @@ export default async function IphonePage() {
         <div className="mt-4">
           <CopyField label={t.iphone.shortcutName} value={ALARM_SHORTCUT_NAME} />
         </div>
-        <a href={alarmShortcutUrl("07:00", "Home Brain test")} className="mt-4 flex h-11 items-center justify-center rounded-2xl bg-sunken font-semibold">
-          ▶︎ Test: 07:00
+        <a href={alarmShortcutUrl("07:00", t.iphone.alarmTest)} className="mt-4 flex h-11 items-center justify-center rounded-2xl bg-sunken font-semibold">
+          ▶︎ {t.iphone.alarmTest}
         </a>
       </Card>
 

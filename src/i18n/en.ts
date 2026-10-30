@@ -500,6 +500,7 @@ export const en = {
       "Tap “Show More”: Method POST.",
     ],
     alarmTitle: "2. “Brain Set Alarm” shortcut",
+    alarmTest: "Try it: an alarm at 07:00",
     alarmSteps: [
       "Open Shortcuts. If you already made “Brain Set Alarm”, delete it first. Then + → tap the title → Rename → paste the exact name below.",
       "Add “Get Dates from Input” (input: Shortcut Input).",

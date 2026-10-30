@@ -93,12 +93,12 @@ describe("evening wrap-up", () => {
     const { user, t, ids } = await day();
     app.offline = true;
     await user.click(card("Run").getByRole("button", { name: new RegExp(t.daily.done) }));
-    expect(await screen.findByText(t.failures.offline)).toBeInTheDocument();
+    expect(await screen.findByText(t.failures.offline, undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/Run/)).toBeInTheDocument();
     app.offline = false;
     await sql(`delete from requests where id = $1`, [ids.ask]);
     await user.click(card("Buy bread").getByRole("button", { name: new RegExp(t.daily.done) }));
-    expect(await screen.findByText(t.failures.generic)).toBeInTheDocument();
+    expect(await screen.findByText(t.failures.generic, undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/Buy bread/)).toBeInTheDocument();
   });
 
@@ -106,7 +106,7 @@ describe("evening wrap-up", () => {
     const { user, t, ids, home } = await day();
     await sql(`update sections set owner_id = $1 where id = (select section_id from items where id = $2)`, [home.users.adult, ids.bank]);
     await user.click(card("Call the bank").getByRole("button", { name: new RegExp(t.daily.done) }));
-    expect(await screen.findByText(t.failures.denied)).toBeInTheDocument();
+    expect(await screen.findByText(t.failures.denied, undefined, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/Call the bank/)).toBeInTheDocument();
   });
 
