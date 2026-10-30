@@ -61,11 +61,11 @@ export async function migratedDb() {
 export type Db = Awaited<ReturnType<typeof migratedDb>>;
 
 /** Runs `sql` as a signed-in member (RLS and grants apply), rolled back afterwards. */
-export async function asUser<T = Record<string, unknown>>(db: Db, userId: string, sql: string, params: unknown[] = []) {
+export async function asUser<T = Record<string, unknown>>(db: Db, userId: string, sql: string, params: readonly unknown[] = []) {
   return db.transaction(async (tx) => {
     await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: userId, role: "authenticated" })]);
     await tx.exec("set local role authenticated");
-    const res = await tx.query<T>(sql, params);
+    const res = await tx.query<T>(sql, [...params]);
     await tx.rollback();
     return res.rows;
   });
