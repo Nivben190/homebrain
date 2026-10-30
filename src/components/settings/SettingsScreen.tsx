@@ -100,7 +100,7 @@ export function SettingsScreen({
           {p.emoji}
         </button>
         <div className="min-w-0 flex-1 space-y-2">
-          <Input value={p.display_name} onChange={(e) => setP({ ...p, display_name: e.target.value })} onBlur={() => save({})} className="h-11 font-bold" />
+          <Input aria-label={t.onboarding.name} value={p.display_name} onChange={(e) => setP({ ...p, display_name: e.target.value })} onBlur={() => save({})} className="h-11 font-bold" />
           <p className="truncate px-1 text-sm text-muted">{p.email}</p>
         </div>
       </Card>
