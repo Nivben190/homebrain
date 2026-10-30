@@ -731,8 +731,10 @@ export async function moveItemToTomorrow(itemId: string): Promise<Result> {
   const schema = ((item.sections as unknown as { schema: PropertyDef[] } | null)?.schema ?? []) as PropertyDef[];
   const dateProp = schema.find((p) => p.type === "date");
   const tomorrow = addDays(todayKey(profile.timezone), 1);
-  const props = dateProp ? { ...(item.props as Record<string, unknown>), [dateProp.id]: tomorrow } : item.props;
-  const due = dateProp ? dueFromProps(schema, props as Record<string, unknown>) : new Date(new Date(item.due_at!).getTime() + 86400000).toISOString();
+  // Keeps a time the date carried ("…T10:30").
+  const was = dateProp ? (item.props as Record<string, unknown>)[dateProp.id] : null;
+  const props = dateProp ? { ...(item.props as Record<string, unknown>), [dateProp.id]: `${tomorrow}${typeof was === "string" ? was.slice(10) : ""}` } : item.props;
+  const due = dateProp ? dueFromProps(schema, props as Record<string, unknown>, profile.timezone) : new Date(new Date(item.due_at!).getTime() + 86400000).toISOString();
   await supabase.from("items").update({ props, due_at: due }).eq("id", itemId);
   revalidatePath("/wrapup");
   return { ok: true };

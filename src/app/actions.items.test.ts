@@ -81,6 +81,17 @@ describe("spaces", () => {
     expect(await sql(`select pet_id from sections where id = $1`, [s])).toEqual([{ pet_id: pet }]);
   });
 
+  it("moving to tomorrow keeps the time the date carried, in the home's timezone", async () => {
+    const home = await homeWith(["owner"]);
+    const s = await space(home.householdId, { schema: [{ id: "when", name: "When", type: "date" }] });
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
+    const id = await item(s, "Dentist", { when: `${today}T10:30` }, new Date().toISOString());
+    expect(await A.moveItemToTomorrow(id)).toEqual({ ok: true });
+    const [row] = await sql<{ props: { when: string }; due_at: Date }>(`select props, due_at from items where id = $1`, [id]);
+    expect(row.props.when).toMatch(/T10:30$/);
+    expect(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit" }).format(new Date(row.due_at))).toBe("10:30");
+  });
+
   it("moves a dated item to tomorrow", async () => {
     const home = await homeWith(["owner"]);
     const s = await space(home.householdId);

@@ -46,7 +46,7 @@ export function ItemSheet({
   const setProp = (id: string, v: unknown) => {
     const props = { ...item.props, [id]: v };
     // Memory dates are when it happened, not something due.
-    const due_at = !spaceType(section.view).datesAreDue ? null : dueFromProps(section.schema, props);
+    const due_at = !spaceType(section.view).datesAreDue ? null : dueFromProps(section.schema, props, Intl.DateTimeFormat().resolvedOptions().timeZone);
     onChange(item.id, remindable ? { props, due_at, remind_at: dueReminderAt(due_at, readLead(props)) } : { props, due_at });
     // Already in Google Calendar: move (or remove) the event with the date.
     if (item.gcal_event_id && due_at !== item.due_at) setTimeout(() => void syncItemToCalendar(item.id), 800);

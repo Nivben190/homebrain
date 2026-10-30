@@ -30,7 +30,7 @@ const photo = (opts: { key?: string; type?: string; body?: Uint8Array; space?: s
     new Request(`https://brain.test/api/fridge/scan${opts.space ? `?space=${opts.space}` : ""}`, {
       method: "POST",
       headers: { "content-type": opts.type ?? "image/jpeg", "x-forwarded-for": `203.0.113.${++ip % 250}`, ...(opts.key ? { "x-brain-token": opts.key } : {}) },
-      body: opts.body ?? jpeg,
+      body: new Blob([(opts.body ?? jpeg) as Uint8Array<ArrayBuffer>]),
     }),
   );
 

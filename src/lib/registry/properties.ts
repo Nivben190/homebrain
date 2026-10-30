@@ -1,5 +1,6 @@
 // Property types a section can define (the Notion-style "database" columns).
 // Adding a new type = one entry here + a case in components/sections/PropertyInput.
+import { zonedTimeToUtc } from "@/lib/engine/time";
 
 export const PROPERTY_TYPES = {
   text: { label: "Text", icon: "Aa" },
@@ -43,9 +44,15 @@ export function formatPropertyValue(def: PropertyDef, value: unknown, locale: st
   }
 }
 
-/** The first date property doubles as the item's due date (Today screen + calendar feed). */
-export function dueFromProps(schema: PropertyDef[], props: Record<string, unknown>): string | null {
+/**
+ * The first date property doubles as the item's due date (Today screen + calendar feed):
+ * its time when it has one ("2026-11-03T10:30" from quick-add), else 09:00, in `timeZone`.
+ */
+export function dueFromProps(schema: PropertyDef[], props: Record<string, unknown>, timeZone: string): string | null {
   const dateProp = schema.find((p) => p.type === "date");
   const v = dateProp ? props[dateProp.id] : null;
-  return typeof v === "string" && v ? new Date(`${v.slice(0, 10)}T09:00:00`).toISOString() : null;
+  if (typeof v !== "string" || !v) return null;
+  const [y, m, d] = v.slice(0, 10).split("-").map(Number);
+  const [hh, mm] = (/T(\d{2}:\d{2})/.exec(v)?.[1] ?? "09:00").split(":").map(Number);
+  return zonedTimeToUtc(y, m, d, hh, mm, timeZone).toISOString();
 }
