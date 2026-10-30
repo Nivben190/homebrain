@@ -406,5 +406,5 @@ export function testClient(db: Db, userId?: string) {
   const fetch = postgrestFetch(db);
   const key = userId ? ANON_KEY : SERVICE_KEY;
   const headers = userId ? { Authorization: `Bearer ${jwt({ sub: userId, role: "authenticated" })}` } : undefined;
-  return createClient(TEST_URL, key, { global: { fetch, headers }, auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(TEST_URL, key, { global: { fetch, headers }, auth: { persistSession: false, autoRefreshToken: false, storageKey: `test-${crypto.randomUUID()}` } });
 }
