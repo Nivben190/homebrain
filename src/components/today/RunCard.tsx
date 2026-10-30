@@ -67,13 +67,14 @@ export function RunActions({ run, onDone }: { run: Run; onDone?: () => void }) {
 }
 
 export function RunCard({ run }: { run: Run }) {
+  const { t } = useI18n();
   const [gone, setGone] = useState(false);
   const [, start] = useTransition();
   if (gone) return null;
   return (
     <motion.div layout className="glass relative rounded-3xl p-4">
       <button
-        aria-label="Dismiss"
+        aria-label={t.common.dismiss}
         onClick={() => {
           setGone(true);
           start(() => dismissRun(run.id));

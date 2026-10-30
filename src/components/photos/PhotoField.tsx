@@ -102,6 +102,7 @@ export function PhotoField({ photos, target, onChange }: { photos: Photo[]; targ
 }
 
 export function Lightbox({ photos, urls, index, onClose, onDelete }: { photos: Photo[]; urls: Record<string, string>; index: number | null; onClose: () => void; onDelete?: (p: Photo) => void }) {
+  const { t } = useI18n();
   const [i, setI] = useState(0);
   const [lastIndex, setLastIndex] = useState<number | null>(null);
   if (index !== lastIndex) {
@@ -114,14 +115,14 @@ export function Lightbox({ photos, urls, index, onClose, onDelete }: { photos: P
       {photo && (
         <motion.div className="fixed inset-0 z-[70] flex flex-col bg-black/95" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <div className="safe-top flex items-center justify-between px-4 pb-2 text-white">
-            <button onClick={onClose} aria-label="Close" className="flex size-10 items-center justify-center rounded-full bg-white/10">
+            <button onClick={onClose} aria-label={t.common.close} className="flex size-10 items-center justify-center rounded-full bg-white/10">
               <X className="size-5" />
             </button>
             <span className="text-sm font-semibold">
               {i + 1} / {photos.length}
             </span>
             {onDelete ? (
-              <button onClick={() => onDelete(photo)} aria-label="Delete" className="flex size-10 items-center justify-center rounded-full bg-white/10">
+              <button onClick={() => onDelete(photo)} aria-label={t.common.delete} className="flex size-10 items-center justify-center rounded-full bg-white/10">
                 <Trash2 className="size-5" />
               </button>
             ) : (
@@ -137,10 +138,10 @@ export function Lightbox({ photos, urls, index, onClose, onDelete }: { photos: P
             )}
             {photos.length > 1 && (
               <>
-                <button onClick={() => setI((i - 1 + photos.length) % photos.length)} aria-label="Previous" className="absolute left-3 flex size-11 items-center justify-center rounded-full bg-white/15 text-white">
+                <button onClick={() => setI((i - 1 + photos.length) % photos.length)} aria-label={t.common.previous} className="absolute left-3 flex size-11 items-center justify-center rounded-full bg-white/15 text-white">
                   <ChevronLeft className="size-6" />
                 </button>
-                <button onClick={() => setI((i + 1) % photos.length)} aria-label="Next" className="absolute right-3 flex size-11 items-center justify-center rounded-full bg-white/15 text-white">
+                <button onClick={() => setI((i + 1) % photos.length)} aria-label={t.common.next} className="absolute right-3 flex size-11 items-center justify-center rounded-full bg-white/15 text-white">
                   <ChevronRight className="size-6" />
                 </button>
               </>

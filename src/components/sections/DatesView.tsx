@@ -140,13 +140,13 @@ export function DatesView({
       {/* Month */}
       <div className="glass rounded-3xl p-3">
         <div className="mb-2 flex items-center justify-between px-1">
-          <button onClick={() => shiftMonth(-1)} className="flex size-9 items-center justify-center rounded-full bg-sunken" aria-label="Previous month">
+          <button onClick={() => shiftMonth(-1)} className="flex size-9 items-center justify-center rounded-full bg-sunken" aria-label={t.common.previousMonth}>
             <ChevronLeft className="size-5 rtl:rotate-180" />
           </button>
           <button onClick={() => (setMonth(today.slice(0, 7)), onSelect(today))} className="text-base font-extrabold">
             {monthFmt.format(asDate(first))}
           </button>
-          <button onClick={() => shiftMonth(1)} className="flex size-9 items-center justify-center rounded-full bg-sunken" aria-label="Next month">
+          <button onClick={() => shiftMonth(1)} className="flex size-9 items-center justify-center rounded-full bg-sunken" aria-label={t.common.nextMonth}>
             <ChevronRight className="size-5 rtl:rotate-180" />
           </button>
         </div>

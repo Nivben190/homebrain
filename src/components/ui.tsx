@@ -203,6 +203,7 @@ export function Sheet({
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   const drag = useDragControls();
   const panel = useRef<HTMLDivElement>(null);
   // Callers pass inline onClose; keep the effect tied to `open` so focus isn't reset on every render.
@@ -285,7 +286,7 @@ export function Sheet({
               {title && (
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-xl font-bold">{title}</h3>
-                  <IconButton onClick={onClose} onPointerDown={(e) => e.stopPropagation()} aria-label="Close" className="size-8">
+                  <IconButton onClick={onClose} onPointerDown={(e) => e.stopPropagation()} aria-label={t.common.close} className="size-8">
                     <X className="size-4" />
                   </IconButton>
                 </div>

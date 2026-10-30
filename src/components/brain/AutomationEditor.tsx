@@ -185,10 +185,10 @@ export function AutomationEditor({
                     {ACTION_META[a.type].icon} {t.actions[a.type]}
                   </span>
                   <span className="flex items-center gap-1 text-faint">
-                    <button aria-label="Up" onClick={() => moveAction(i, -1)} disabled={i === 0} className="p-1 disabled:opacity-30">
+                    <button aria-label={t.common.moveUp} onClick={() => moveAction(i, -1)} disabled={i === 0} className="p-1 disabled:opacity-30">
                       <ChevronUp className="size-5" />
                     </button>
-                    <button aria-label="Down" onClick={() => moveAction(i, 1)} disabled={i === def.actions.length - 1} className="p-1 disabled:opacity-30">
+                    <button aria-label={t.common.moveDown} onClick={() => moveAction(i, 1)} disabled={i === def.actions.length - 1} className="p-1 disabled:opacity-30">
                       <ChevronDown className="size-5" />
                     </button>
                     <button aria-label={t.common.delete} onClick={() => setDef({ ...def, actions: def.actions.filter((_, j) => j !== i) })} className="p-1">
@@ -315,7 +315,7 @@ function ScheduleFields({ trigger, onChange }: { trigger: Extract<Trigger, { typ
                 className="h-11 bg-transparent px-3 font-bold outline-none"
               />
               {trigger.times.length > 1 && (
-                <button aria-label="Remove" onClick={() => onChange({ ...trigger, times: trigger.times.filter((_, j) => j !== i) })} className="p-1 text-faint">
+                <button aria-label={t.common.remove} onClick={() => onChange({ ...trigger, times: trigger.times.filter((_, j) => j !== i) })} className="p-1 text-faint">
                   <X className="size-4" />
                 </button>
               )}
