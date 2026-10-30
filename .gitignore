@@ -51,3 +51,4 @@ public/swe-worker-*.js
 
 /test-results
 /playwright-report
+coverage/
