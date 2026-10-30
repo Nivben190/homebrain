@@ -51,3 +51,21 @@ describe("home info", () => {
     await expect(asUser(db, users.owner, `select secrets from public.home_info where household_id = $1`, [householdId])).rejects.toThrow(/permission/);
   });
 });
+
+describe("functions", () => {
+  // pgcrypto and pg_trgm live in the extensions schema on Supabase; a function pinned
+  // to search_path=public can't see them (rotate_invite and join_household broke this way).
+  it("functions that call extension functions can see the extensions schema", async () => {
+    const fns = "gen_random_bytes|digest|hmac|crypt|gen_salt|similarity|word_similarity";
+    const { rows } = await db.query<{ proname: string }>(
+      `select p.proname from pg_proc p
+      where p.pronamespace = 'public'::regnamespace
+        and p.prosrc ~ $1
+        and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%extensions%')
+        and p.prosrc !~ $2
+      order by 1`,
+      [String.raw`\m(${fns})\(`, String.raw`extensions\.(${fns})\(`],
+    );
+    expect(rows.map((r) => r.proname)).toEqual([]);
+  });
+});
