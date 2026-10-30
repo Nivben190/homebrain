@@ -7,6 +7,9 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 import { HabitCard, useCelebrate } from "@/components/sections/TrackerView";
 import { todayKey } from "@/lib/engine/habits";
 import { useI18n } from "@/i18n/client";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
+import { idbQueue, isNetworkError, type QueuedWrite } from "@/lib/offline-queue";
 import { cn } from "@/lib/cn";
 import type { CheckinRow, Item } from "@/lib/db-types";
 import type { Member } from "@/components/sections/PropertyInput";
@@ -40,6 +43,7 @@ export function TodayPractice({
   const [settling, setSettling] = useState<Set<string>>(new Set());
   const [showDone, setShowDone] = useState(false);
   const { node, celebrate } = useCelebrate();
+  const toast = useToast();
   const today = todayKey(timeZone);
 
   useEffect(() => {
@@ -65,12 +69,35 @@ export function TodayPractice({
   const todo = items.filter((i) => !handled(i.id) || settling.has(i.id));
   const done = items.filter((i) => handled(i.id) && !settling.has(i.id));
 
+  /** Offline, the write waits in the queue (like the space screen); refused, it's undone and explained. */
+  async function save(write: () => PromiseLike<{ error: unknown }>, queued: QueuedWrite, revert: () => void) {
+    let error: unknown;
+    try {
+      ({ error } = await write());
+    } catch (e) {
+      error = e;
+    }
+    if (!error) return;
+    if (isNetworkError(error)) {
+      try {
+        return await idbQueue.add(queued);
+      } catch {
+        // No IndexedDB: undo below.
+      }
+    }
+    revert();
+    toast.error(t.failures[errorKey(error)]);
+  }
+
   async function checkIn(item: Item, status: "done" | null) {
     const sb = supabaseBrowser();
     const existing = checkins.find((c) => c.item_id === item.id && c.day === today);
+    const mine = (c: CheckinRow) => c.item_id === item.id && c.day === today;
+    const revert = () => setCheckins((p) => [...p.filter((c) => !mine(c)), ...(existing ? [existing] : [])]);
     if (status === null) {
       setCheckins((p) => p.filter((c) => c !== existing));
-      await sb.from("checkins").delete().eq("item_id", item.id).eq("day", today);
+      const match = { item_id: item.id, day: today };
+      await save(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", today), { table: "checkins", action: "delete", match }, revert);
       return;
     }
     const row: CheckinRow = { id: crypto.randomUUID(), item_id: item.id, user_id: userId, day: today, status, note: null, created_at: new Date().toISOString() };
@@ -83,7 +110,8 @@ export function TodayPractice({
       return next;
     }), SETTLE_MS);
     celebrate();
-    await sb.from("checkins").upsert({ id: row.id, item_id: item.id, day: today, status }, { onConflict: "item_id,day" });
+    const values = { id: row.id, item_id: item.id, day: today, status };
+    await save(() => sb.from("checkins").upsert(values, { onConflict: "item_id,day" }), { table: "checkins", action: "upsert", values, onConflict: "item_id,day" }, revert);
   }
 
   const card = (i: Item) => (

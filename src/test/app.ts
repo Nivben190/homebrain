@@ -22,13 +22,20 @@ export const app = {
   headers: new Headers({ "x-forwarded-for": "203.0.113.7" }),
   pushes: [] as { userId: string; payload: { title: string; body: string; url?: string } }[],
   outbound: [] as string[],
-  /** Canned replies for outside services, by URL; anything else gets an empty 200. */
   /** Browser writes fail like a phone with no signal. */
   offline: false,
   /** The next browser write fails once with a server error. */
   failNext: false,
+  /** Canned replies for outside services, by URL; anything else gets an empty 200. */
   respond: (_url: string): unknown => undefined, // eslint-disable-line @typescript-eslint/no-unused-vars
+  /** Open realtime subscriptions on screen, by table. */
+  listeners: [] as { table: string; event: string; cb: (payload: unknown) => void }[],
 };
+
+/** A change arriving over realtime, as if made on the partner's phone. */
+export function broadcast(table: string, event: "INSERT" | "UPDATE" | "DELETE", payload: { new?: unknown; old?: unknown }) {
+  for (const l of app.listeners) if (l.table === table && (l.event === "*" || l.event === event)) l.cb({ eventType: event, new: {}, old: {}, ...payload });
+}
 
 process.env.GOOGLE_TOKEN_KEY ??= Buffer.alloc(32, 7).toString("base64");
 process.env.GOOGLE_CLIENT_ID ??= "test-client";
@@ -41,6 +48,7 @@ export async function startApp() {
   app.pushes = [];
   app.outbound = [];
   app.respond = () => undefined;
+  app.listeners = [];
   app.offline = false;
   app.failNext = false;
   // Nothing in a test talks to the internet: Google, Resend, weather all land here.
@@ -81,13 +89,24 @@ export const supabaseServerMock = {
   createSupabaseAdmin: () => testClient(app.db),
 };
 
-/** The browser's Supabase client, as the signed-in test user; realtime is a quiet stand-in. */
+/** The browser's Supabase client, as the signed-in test user; realtime delivers what `broadcast` sends. */
 export const supabaseBrowserMock = {
   supabaseBrowser: () => {
     const client = testClient(app.db, app.userId ?? undefined);
-    const channel = { on: () => channel, subscribe: () => channel, unsubscribe: async () => "ok" };
+    const mine: typeof app.listeners = [];
+    const channel = {
+      on: (_type: string, filter: { table: string; event: string }, cb: (payload: unknown) => void) => {
+        mine.push({ table: filter.table, event: filter.event, cb });
+        return channel;
+      },
+      subscribe: () => (app.listeners.push(...mine), channel),
+      unsubscribe: async () => "ok",
+    };
     client.channel = (() => channel) as never;
-    client.removeChannel = (async () => "ok") as never;
+    client.removeChannel = (async () => {
+      app.listeners = app.listeners.filter((l) => !mine.includes(l));
+      return "ok";
+    }) as never;
     const from = client.from.bind(client);
     client.from = ((table: string) => {
       if (app.offline) throw new TypeError("Failed to fetch");

@@ -7,6 +7,8 @@ import { AlarmClock, ChevronLeft } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { moveItemToTomorrow, setRequestStatus } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 import { Card, SectionTitle } from "@/components/ui";
 import { Ring, useCelebrate } from "@/components/sections/TrackerView";
 import { alarmShortcutUrl } from "@/lib/engine/render";
@@ -48,6 +50,7 @@ export function WrapupScreen({
   const [, start] = useTransition();
   const [handled, setHandled] = useState<Set<string>>(new Set());
   const { node, celebrate } = useCelebrate();
+  const toast = useToast();
 
   const all = [...sessions.map((e) => ({ ...e, kind: "session" as Kind })), ...due.map((e) => ({ ...e, kind: "due" as Kind })), ...requests.map((e) => ({ ...e, kind: "request" as Kind }))];
   const open = all.filter((e) => !e.done && !handled.has(e.id));
@@ -59,13 +62,29 @@ export function WrapupScreen({
     setHandled((h) => new Set(h).add(e.id));
     if (action === "done") celebrate();
     start(async () => {
-      const sb = supabaseBrowser();
-      const day = todayKey(timeZone);
-      if (e.kind === "session") await sb.from("checkins").upsert({ item_id: e.id, day, status: action === "skip" ? "skipped" : "done" }, { onConflict: "item_id,day" });
-      else if (e.kind === "due") {
-        if (action === "tomorrow") await moveItemToTomorrow(e.id);
-        else await sb.from("items").update({ done: true }).eq("id", e.id);
-      } else await setRequestStatus(e.id, "done");
+      let failure: unknown = null;
+      try {
+        const sb = supabaseBrowser();
+        const day = todayKey(timeZone);
+        if (e.kind === "session") ({ error: failure } = await sb.from("checkins").upsert({ item_id: e.id, day, status: action === "skip" ? "skipped" : "done" }, { onConflict: "item_id,day" }));
+        else if (e.kind === "due" && action === "tomorrow") {
+          const res = await moveItemToTomorrow(e.id);
+          if (!res.ok) failure = res.error;
+        } else if (e.kind === "due") {
+          const { data, error } = await sb.from("items").update({ done: true }).eq("id", e.id).select("id");
+          failure = error ?? (data?.length ? null : "permission denied");
+        } else {
+          const res = await setRequestStatus(e.id, "done");
+          if (!res.ok) failure = res.error;
+        }
+      } catch (err) {
+        failure = err;
+      }
+      // Not saved: it goes back on the list, and we say why.
+      if (failure) {
+        setHandled((h) => new Set([...h].filter((id) => id !== e.id)));
+        toast.error(t.failures[errorKey(failure)]);
+      }
       router.refresh();
     });
   }

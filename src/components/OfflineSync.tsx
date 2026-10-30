@@ -41,6 +41,7 @@ export function OfflineSync() {
         busy = false;
       }
     };
+    void count();
     void flush();
     window.addEventListener("online", flush);
     window.addEventListener("offline", flush);

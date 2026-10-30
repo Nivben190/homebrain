@@ -644,6 +644,8 @@ export async function savePushSubscription(sub: unknown, deviceLabel: string): P
   const { supabase, user } = await requireHome();
   const parsed = subInput.safeParse(sub);
   if (!parsed.success) return { ok: false, error: "Invalid subscription" };
+  // One device, several people (a family tablet): pushes go to whoever turned them on last.
+  await createSupabaseAdmin().from("push_subscriptions").delete().eq("endpoint", parsed.data.endpoint).neq("user_id", user.id);
   const { error } = await supabase.from("push_subscriptions").upsert(
     { user_id: user.id, endpoint: parsed.data.endpoint, p256dh: parsed.data.keys.p256dh, auth: parsed.data.keys.auth, device_label: deviceLabel.slice(0, 60) },
     { onConflict: "endpoint" },
@@ -735,7 +737,8 @@ export async function moveItemToTomorrow(itemId: string): Promise<Result> {
   const was = dateProp ? (item.props as Record<string, unknown>)[dateProp.id] : null;
   const props = dateProp ? { ...(item.props as Record<string, unknown>), [dateProp.id]: `${tomorrow}${typeof was === "string" ? was.slice(10) : ""}` } : item.props;
   const due = dateProp ? dueFromProps(schema, props as Record<string, unknown>, profile.timezone) : new Date(new Date(item.due_at!).getTime() + 86400000).toISOString();
-  await supabase.from("items").update({ props, due_at: due }).eq("id", itemId);
+  const { data: moved, error } = await supabase.from("items").update({ props, due_at: due }).eq("id", itemId).select("id");
+  if (error || !moved?.length) return { ok: false, error: error?.message ?? "permission denied" };
   revalidatePath("/wrapup");
   return { ok: true };
 }
