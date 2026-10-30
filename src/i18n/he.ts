@@ -74,6 +74,10 @@ export const he: Dict = {
     nobody: "כל אחד",
     add: "הוספה",
     added: "נוסף ל{space}",
+    pickSpace: "מרחב",
+    pickDay: "יום",
+    pickTime: "שעה",
+    pickPerson: "מי",
   },
   search: {
     placeholder: "חיפוש בכל הבית",

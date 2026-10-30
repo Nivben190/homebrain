@@ -72,6 +72,10 @@ export const en = {
     nobody: "Anyone",
     add: "Add",
     added: "Added to {space}",
+    pickSpace: "Space",
+    pickDay: "Day",
+    pickTime: "Time",
+    pickPerson: "Who",
   },
   search: {
     placeholder: "Search the house",

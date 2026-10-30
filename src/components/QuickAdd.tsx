@@ -116,7 +116,7 @@ export function QuickAdd({ spaces, members, timeZone }: { spaces: QuickSpace[]; 
           <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
             <label className={cn(chip, "relative")}>
               {space ? `${space.icon} ${space.title}` : "—"}
-              <select aria-label="space" className="absolute inset-0 opacity-0" value={space?.id ?? ""} onChange={(e) => setSpaceId(e.target.value)}>
+              <select aria-label={t.quickAdd.pickSpace} className="absolute inset-0 opacity-0" value={space?.id ?? ""} onChange={(e) => setSpaceId(e.target.value)}>
                 {spaces.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.icon} {s.title}
@@ -126,18 +126,18 @@ export function QuickAdd({ spaces, members, timeZone }: { spaces: QuickSpace[]; 
             </label>
             <label className={cn(chip, "relative", finalDay && "bg-accent-soft text-accent")}>
               📅 {dayLabel}
-              <input type="date" aria-label="day" className="absolute inset-0 opacity-0" value={finalDay ?? ""} onChange={(e) => setDay(e.target.value || null)} />
+              <input type="date" aria-label={t.quickAdd.pickDay} className="absolute inset-0 opacity-0" value={finalDay ?? ""} onChange={(e) => setDay(e.target.value || null)} />
             </label>
             {finalDay && (
               <label className={cn(chip, "relative", finalTime && "bg-accent-soft text-accent")}>
                 ⏰ {finalTime ?? "--:--"}
-                <input type="time" aria-label="time" className="absolute inset-0 opacity-0" value={finalTime ?? ""} onChange={(e) => setTime(e.target.value || null)} />
+                <input type="time" aria-label={t.quickAdd.pickTime} className="absolute inset-0 opacity-0" value={finalTime ?? ""} onChange={(e) => setTime(e.target.value || null)} />
               </label>
             )}
             {members.length > 1 && (
               <label className={cn(chip, "relative", who && "bg-accent-soft text-accent")}>
                 {members.find((m) => m.id === who)?.emoji ?? "👥"} {members.find((m) => m.id === who)?.name ?? t.quickAdd.nobody}
-                <select aria-label="person" className="absolute inset-0 opacity-0" value={who ?? ""} onChange={(e) => setWho(e.target.value || null)}>
+                <select aria-label={t.quickAdd.pickPerson} className="absolute inset-0 opacity-0" value={who ?? ""} onChange={(e) => setWho(e.target.value || null)}>
                   <option value="">{t.quickAdd.nobody}</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
