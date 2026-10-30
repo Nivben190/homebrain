@@ -48,7 +48,7 @@ export function SettingsScreen({
   spaces,
 }: {
   profile: ProfileForm;
-  household: { name: string; invite_code: string };
+  household: { name: string; invite_code: string | null }; // null: only owners and adults invite
   members: Member[];
   feedUrl: string;
   daily: DailyPrefs;
@@ -169,13 +169,17 @@ export function SettingsScreen({
             ))}
           </span>
         </div>
-        <Field label={t.settings.invite} hint={t.settings.inviteHint}>
-          <button onClick={() => copy("invite", household.invite_code)} className="flex h-14 w-full items-center justify-between rounded-2xl bg-sunken px-4 font-mono text-2xl font-bold tracking-[0.3em]">
-            {household.invite_code}
-            <span className="font-sans text-sm font-semibold tracking-normal text-accent">{copied === "invite" ? t.common.copied : <Copy className="size-5" />}</span>
-          </button>
-        </Field>
-        <InviteLinkButton />
+        {household.invite_code && (
+          <>
+            <Field label={t.settings.invite} hint={t.settings.inviteHint}>
+              <button onClick={() => copy("invite", household.invite_code!)} className="flex h-14 w-full items-center justify-between rounded-2xl bg-sunken px-4 font-mono text-2xl font-bold tracking-[0.3em]">
+                {household.invite_code}
+                <span className="font-sans text-sm font-semibold tracking-normal text-accent">{copied === "invite" ? t.common.copied : <Copy className="size-5" />}</span>
+              </button>
+            </Field>
+            <InviteLinkButton />
+          </>
+        )}
         <MembersCard members={roster} userId={userId} />
       </Card>
 

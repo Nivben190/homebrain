@@ -29,7 +29,7 @@ export default async function MePage() {
         wake_time: profile.wake_time?.slice(0, 5) ?? "07:00",
         email: profile.email ?? "",
       }}
-      household={{ name: household.name, invite_code: household.invite_code }}
+      household={{ name: household.name, invite_code: ["owner", "adult"].includes(profile.role) ? household.invite_code : null }}
       members={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }))}
       feedUrl={`${origin}/api/cal/${profile.ics_token}.ics`}
       spaces={spaces ?? []}

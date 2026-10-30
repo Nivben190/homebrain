@@ -18,9 +18,9 @@ alter default privileges in schema public grant execute on functions to anon, au
 create schema auth;
 grant usage on schema auth to anon, authenticated, service_role;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb default '{}', created_at timestamptz default now());
-create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
-create function auth.role() returns text language sql stable as $$ select current_setting('request.jwt.claims', true)::jsonb ->> 'role' $$;
-create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(current_setting('request.jwt.claims', true), '{}')::jsonb $$;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', '')::uuid $$;
+create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role' $$;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 
 create schema storage;
 grant usage on schema storage to anon, authenticated, service_role;
@@ -60,16 +60,20 @@ export async function migratedDb() {
 
 export type Db = Awaited<ReturnType<typeof migratedDb>>;
 
-/** Runs `sql` as a signed-in member (RLS and grants apply), rolled back afterwards. */
-export async function asUser<T = Record<string, unknown>>(db: Db, userId: string, sql: string, params: readonly unknown[] = []) {
+/** Runs `sql` as a signed-in member (RLS and grants apply), rolled back afterwards unless `keep`. */
+export async function asUser<T = Record<string, unknown>>(db: Db, userId: string, sql: string, params: readonly unknown[] = [], keep = false) {
   return db.transaction(async (tx) => {
     await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: userId, role: "authenticated" })]);
     await tx.exec("set local role authenticated");
     const res = await tx.query<T>(sql, [...params]);
-    await tx.rollback();
+    if (!keep) await tx.rollback();
     return res.rows;
   });
 }
+
+/** Like asUser, but the change stays. */
+export const actAs = <T = Record<string, unknown>>(db: Db, userId: string, sql: string, params: readonly unknown[] = []) =>
+  asUser<T>(db, userId, sql, params, true);
 
 /** Makes a home with one member per role given; returns their ids. */
 export async function seedHome(db: Db, roles: string[]) {
