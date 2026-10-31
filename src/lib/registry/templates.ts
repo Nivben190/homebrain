@@ -347,6 +347,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   },
   {
     key: "watched",
+    retired: true,
     category: "memories",
     icon: "🎬",
     color: "violet",
@@ -461,6 +462,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   },
   {
     key: "gifts",
+    retired: true,
     category: "us",
     icon: "🎂",
     color: "amber",
@@ -482,8 +484,12 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     color: "violet",
     view: "checklist",
     title: { en: "Watch & read", he: "לראות ולקרוא" },
-    desc: { en: "Movies, series and books you both want.", he: "סרטים, סדרות וספרים ששניכם רוצים." },
-    props: [{ key: "type", name: { en: "Type", he: "סוג" }, type: "select", options: [{ en: "Movie", he: "סרט" }, { en: "Series", he: "סדרה" }, { en: "Book", he: "ספר" }] }],
+    desc: { en: "Movies, series and books you want to get to. Tick one off when it's watched, with the date and how much you loved it.", he: "סרטים, סדרות וספרים שרוצים להגיע אליהם. מסמנים כשראיתם, עם התאריך וכמה אהבתם." },
+    props: [
+      { key: "type", name: { en: "Type", he: "סוג" }, type: "select", options: [{ en: "Movie", he: "סרט" }, { en: "Series", he: "סדרה" }, { en: "Book", he: "ספר" }, { en: "Show / concert", he: "הופעה" }] },
+      { key: "date", name: { en: "Watched on", he: "ראינו ב־" }, type: "date" },
+      { key: "rating", name: { en: "Rating", he: "דירוג" }, type: "rating" },
+    ],
   },
 
   // ---------------------------------------------------------------- Health
@@ -541,8 +547,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     color: "violet",
     view: "checklist",
     shared: false,
-    title: { en: "Business launch", he: "פתיחת העסק" },
-    desc: { en: "Step-by-step launch checklist with status and deadlines.", he: "צ׳קליסט פתיחה שלב אחר שלב עם סטטוס ודדליינים." },
+    title: { en: "Side business: launch", he: "עסק צדדי: פתיחה" },
+    desc: { en: "Starting a business or side gig: each step with its status and deadline.", he: "פותחים עסק או עסק צדדי: כל שלב עם סטטוס ודדליין." },
     props: [
       { key: "status", name: { en: "Status", he: "סטטוס" }, type: "select", options: [{ en: "To do", he: "לעשות" }, { en: "Doing", he: "בתהליך" }, { en: "Waiting", he: "מחכה" }] },
       { key: "due", name: { en: "Due", he: "עד מתי" }, type: "date" },
@@ -565,7 +571,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     color: "sky",
     view: "tracker",
     shared: false,
-    title: { en: "Business routines", he: "שגרת העסק" },
+    title: { en: "Side business: routines", he: "עסק צדדי: שגרה" },
     desc: { en: "Consistency wins: content, follow-ups, books and a weekly review.", he: "עקביות מנצחת: תוכן, פולואפים, הנהלת חשבונות וסיכום שבועי." },
     items: [
       { title: { en: "Post content 📸", he: "פוסט ברשתות 📸" }, every: { kind: "interval", every: 2 }, time: "10:00", nudge: true },
@@ -598,6 +604,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   },
   {
     key: "meals",
+    retired: true,
     category: "plan",
     icon: "🍳",
     color: "amber",
@@ -632,10 +639,10 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "🎂",
     color: "pink",
     view: "dates",
-    title: { en: "Important dates", he: "תאריכים חשובים" },
-    desc: { en: "Birthdays & anniversaries every year, with a heads-up to plan a gift.", he: "ימי הולדת וימי נישואין כל שנה, עם תזכורת מוקדמת למתנה." },
+    title: { en: "Dates & gifts", he: "תאריכים ומתנות" },
+    desc: { en: "Birthdays & anniversaries every year. Jot gift ideas on each date during the year; the heads-up a week before lists them.", he: "ימי הולדת וימי נישואין כל שנה. רושמים רעיונות למתנה על כל תאריך במהלך השנה, והתזכורת שבוע לפני מזכירה אותם." },
     items: [
-      { title: { en: "Naomi's birthday 🎂", he: "יום הולדת לנעמי 🎂" } },
+      { title: { en: "Partner's birthday 🎂", he: "יום הולדת לבן/בת הזוג 🎂" } },
       { title: { en: "Our anniversary 💍", he: "יום הנישואין שלנו 💍" } },
       { title: { en: "Mom's birthday", he: "יום הולדת לאמא" } },
       { title: { en: "Dad's birthday", he: "יום הולדת לאבא" } },

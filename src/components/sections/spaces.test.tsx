@@ -70,7 +70,7 @@ describe("new space", () => {
     await user.click(await screen.findByRole("button", { name: /Look after the dog/ }));
     await user.click(screen.getByRole("button", { name: /Plan meals and eat better/ }));
     await user.click(screen.getByRole("button", { name: t.finder.show }));
-    // Dog care is already there; Dog health and Meal plan are the best start.
+    // Dog care is already there; Dog health and Groceries are the best start.
     const boxes = await details(() => {
       const all = screen.getAllByRole("checkbox");
       expect(all.length).toBeGreaterThan(2);
@@ -78,12 +78,12 @@ describe("new space", () => {
     });
     expect(boxes.filter((b) => b.getAttribute("aria-checked") === "true").map((b) => b.textContent)).toEqual([
       expect.stringContaining("Dog health"),
-      expect.stringContaining("Meal plan"),
+      expect.stringContaining("Groceries"),
     ]);
     expect(screen.queryByText("Dog care")).not.toBeInTheDocument();
-    await user.click(boxes.find((b) => b.textContent?.includes("Groceries"))!);
+    await user.click(boxes.find((b) => b.textContent?.includes("Fridge"))!);
     await user.click(screen.getByRole("button", { name: fill(t.finder.add, { n: "3" }) }));
-    await waitFor(async () => expect((await spaces(home.householdId)).map((s) => s.title).sort()).toEqual(["Dog health", "Groceries", "Meal plan"]));
+    await waitFor(async () => expect((await spaces(home.householdId)).map((s) => s.title).sort()).toEqual(["Dog health", "Fridge", "Groceries"]));
     expect(router.push).toHaveBeenCalledWith("/sections");
   });
 

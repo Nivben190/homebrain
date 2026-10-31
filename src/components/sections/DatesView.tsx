@@ -10,6 +10,7 @@ import { alertTimes, CARRY_DAYS, occursOn, openOccurrence, readDate, type DateSp
 import { RemoveBadge, SwipeRow } from "./SwipeRow";
 import type { CheckinRow, Item } from "@/lib/db-types";
 import { fill } from "@/i18n";
+import { readGifts } from "@/lib/gifts";
 
 const asDate = (day: string) => new Date(`${day}T12:00:00Z`);
 
@@ -118,6 +119,15 @@ export function DatesView({
                   {" · ⏰ "}
                   {alertSummary(t, d.spec)}
                 </span>
+                {readGifts(d.item.props).some((g) => !g.done) && (
+                  <span className="block truncate text-xs font-semibold text-accent">
+                    🎁{" "}
+                    {readGifts(d.item.props)
+                      .filter((g) => !g.done)
+                      .map((g) => g.text)
+                      .join(" · ")}
+                  </span>
+                )}
               </span>
             </button>
             {open === day ? (

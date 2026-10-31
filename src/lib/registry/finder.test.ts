@@ -21,7 +21,7 @@ describe("space finder", () => {
     const r = recommend(["food", "house"]);
     expect(r[0].template.key).toBe("groceries");
     expect(r[0].goals.map((g) => g.key).sort()).toEqual(["food", "house"]);
-    expect(r.filter((x) => x.suggested).map((x) => x.template.key).sort()).toEqual(["cleaning", "meals"]);
+    expect(r.filter((x) => x.suggested).map((x) => x.template.key).sort()).toEqual(["cleaning", "groceries"]);
   });
 
   it("skips what the home already has, and ticks the next best", () => {
@@ -44,6 +44,11 @@ describe("space finder", () => {
     expect(r[0].template.title.en).toBe("Bills & subscriptions");
     expect(keys(r)).not.toContain("bills");
     expect(keys(r)).not.toContain("renewals");
+  });
+
+  it("no template names a real person", () => {
+    const text = JSON.stringify(SECTION_TEMPLATES);
+    expect(text).not.toMatch(/Naomi|נעמי|Niv|ניב/);
   });
 
   it("keeps the list short and ignores unknown goals", () => {

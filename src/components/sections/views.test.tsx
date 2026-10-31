@@ -248,6 +248,12 @@ describe("reminder calendar", () => {
     await waitFor(async () => expect(await sql(`select props->'_gifts' as g from items where id = $1`, [rows[0].id])).toEqual([{ g: [{ text: "Concert tickets", done: true }] }]));
   });
 
+  it("the date's card shows the gift ideas still open", async () => {
+    await open("dates", [{ title: "Mom's birthday", props: { ...on("2027-03-01", { repeat: "yearly" }), _gifts: [{ text: "Scarf" }, { text: "Book", done: true }] } }]);
+    expect(screen.getAllByText(/🎁 Scarf/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Book/)).not.toBeInTheDocument();
+  });
+
   it("tapping a heading in the sheet changes nothing under it", async () => {
     const { user, t } = await open("dates", [{ title: "Vet", props: on("2027-02-01", { ahead: 7, every: 3 }) }]);
     await user.click(screen.getAllByText("Vet")[0]);

@@ -19,15 +19,15 @@ export const FINDER_GOALS: FinderGoal[] = [
   { key: "study", icon: "📚", label: { en: "Study for a test or learn", he: "ללמוד למבחן או משהו חדש" }, picks: ["goals", "commitments"] },
   { key: "habits", icon: "✅", label: { en: "Build better habits", he: "לבנות הרגלים טובים" }, picks: ["goals", "commitments", "meds"] },
   { key: "house", icon: "🧹", label: { en: "Keep the house in order", he: "לשמור על הבית מסודר" }, picks: ["cleaning", "groceries", "maintenance", "projects"] },
-  { key: "food", icon: "🍽️", label: { en: "Plan meals and eat better", he: "לתכנן ארוחות ולאכול טוב" }, picks: ["meals", "groceries", "fridge", "recipes"] },
+  { key: "food", icon: "🍽️", label: { en: "Plan meals and eat better", he: "לתכנן ארוחות ולאכול טוב" }, picks: ["groceries", "fridge", "recipes", "wheels"] },
   { key: "money", icon: "💰", label: { en: "Get on top of money", he: "לשלוט בכסף" }, picks: ["subscriptions", "spending", "savings", "receipts"] },
-  { key: "dates", icon: "🎂", label: { en: "Never forget a date", he: "לא לשכוח תאריכים" }, picks: ["important-dates", "appointments", "documents", "gifts"] },
+  { key: "dates", icon: "🎂", label: { en: "Never forget a date", he: "לא לשכוח תאריכים" }, picks: ["important-dates", "appointments", "documents"] },
   { key: "health", icon: "💊", label: { en: "Health and meds", he: "בריאות ותרופות" }, picks: ["meds", "appointments", "checkups"] },
   { key: "us", icon: "💑", label: { en: "More time together", he: "יותר זמן ביחד" }, picks: ["date-ideas", "us", "wheels", "watch"] },
   { key: "promises", icon: "🤝", label: { en: "Keep what we promise", he: "לעמוד במה שהבטחנו" }, picks: ["commitments", "goals"] },
   { key: "work", icon: "💼", label: { en: "Work or a side business", he: "עבודה או עסק" }, picks: ["business-launch", "business-routine", "projects"] },
   { key: "travel", icon: "✈️", label: { en: "Trips and plans", he: "טיולים ותכנונים" }, picks: ["packing", "places", "savings"] },
-  { key: "memories", icon: "📸", label: { en: "Keep our memories", he: "לשמור זיכרונות" }, picks: ["moments", "places", "watched", "recipes"] },
+  { key: "memories", icon: "📸", label: { en: "Keep our memories", he: "לשמור זיכרונות" }, picks: ["moments", "places", "watch", "recipes"] },
   { key: "move", icon: "🏡", label: { en: "Move or buy a home", he: "לעבור דירה או לקנות בית" }, picks: ["home-buy", "documents", "savings"] },
 ];
 
