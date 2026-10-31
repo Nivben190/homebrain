@@ -55,6 +55,10 @@ describe("space finder", () => {
     expect(keys(recommend(["car"]))[0]).toBe("car");
   });
 
+  it("the move goal starts with the Moving checklist", () => {
+    expect(keys(recommend(["move"]))[0]).toBe("moving");
+  });
+
   it("keeps the list short and ignores unknown goals", () => {
     expect(recommend(FINDER_GOALS.map((g) => g.key))).toHaveLength(MAX_RECOMMENDATIONS);
     expect(recommend(["nope"])).toEqual([]);

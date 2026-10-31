@@ -29,7 +29,7 @@ export const FINDER_GOALS: FinderGoal[] = [
   { key: "work", icon: "💼", label: { en: "Work or a side business", he: "עבודה או עסק" }, picks: ["business-launch", "business-routine", "projects"] },
   { key: "travel", icon: "✈️", label: { en: "Trips and plans", he: "טיולים ותכנונים" }, picks: ["packing", "places", "savings"] },
   { key: "memories", icon: "📸", label: { en: "Keep our memories", he: "לשמור זיכרונות" }, picks: ["moments", "places", "watch", "recipes"] },
-  { key: "move", icon: "🏡", label: { en: "Move or buy a home", he: "לעבור דירה או לקנות בית" }, picks: ["home-buy", "documents", "savings"] },
+  { key: "move", icon: "🏡", label: { en: "Move or buy a home", he: "לעבור דירה או לקנות בית" }, picks: ["moving", "home-buy", "documents", "savings"] },
 ];
 
 export interface Recommendation {
