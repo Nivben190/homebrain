@@ -6,6 +6,7 @@ export const en = {
     invalidLogin: "Wrong email or password.",
     unconfirmed: "Confirm your email first. Check your inbox.",
     tooMany: "Too many tries. Wait a little, then try again.",
+    outdated: "Home Brain was updated. Refresh to keep going.",
     generic: "Something went wrong. Try again.",
   },
   common: {
@@ -96,6 +97,10 @@ export const en = {
   offline: {
     offline: "Offline. Changes will sync later.",
     waiting: "{n} changes waiting",
+  },
+  update: {
+    ready: "New version",
+    refresh: "Tap to refresh",
   },
   activity: {
     added: "{name} added {title}",

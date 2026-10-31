@@ -39,7 +39,12 @@ const securityHeaders = [
   { key: "Content-Security-Policy-Report-Only", value: csp },
 ];
 
+// Which deploy this is. Pages bake it in; /api/version reports the live one, so an
+// app left open across a deploy can offer a refresh (roadmap 1.11).
+const buildId = process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

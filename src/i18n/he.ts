@@ -8,6 +8,7 @@ export const he: Dict = {
     invalidLogin: "אימייל או סיסמה שגויים.",
     unconfirmed: "קודם אשרו את האימייל. בדקו את תיבת הדואר.",
     tooMany: "יותר מדי ניסיונות. חכו קצת ונסו שוב.",
+    outdated: "המוח של הבית התעדכן. רעננו כדי להמשיך.",
     generic: "משהו השתבש. נסו שוב.",
   },
   common: {
@@ -98,6 +99,10 @@ export const he: Dict = {
   offline: {
     offline: "אין חיבור. השינויים יסונכרנו אחר כך.",
     waiting: "{n} שינויים ממתינים",
+  },
+  update: {
+    ready: "גרסה חדשה",
+    refresh: "הקישו לרענון",
   },
   activity: {
     added: "{title} נוסף · {name}",

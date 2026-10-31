@@ -7,5 +7,6 @@ describe("errorKey", () => {
   it("names a bad password", () => expect(errorKey("Invalid login credentials")).toBe("invalidLogin"));
   it("names an unconfirmed email", () => expect(errorKey("Email not confirmed")).toBe("unconfirmed"));
   it("names rate limits", () => expect(errorKey("Email rate limit exceeded")).toBe("tooMany"));
+  it("names a page left over from an older deploy", () => expect(errorKey(new Error('Failed to find Server Action "7f3a". This request might be from an older or newer deployment.'))).toBe("outdated"));
   it("falls back to generic", () => expect(errorKey("weird thing")).toBe("generic"));
 });
