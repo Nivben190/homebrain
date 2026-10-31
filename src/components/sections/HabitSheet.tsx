@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AlarmClock, Trash2 } from "lucide-react";
+import { AlarmClock, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
-import { Button, Chip, Field, Input, Segmented, Sheet, Toggle } from "@/components/ui";
+import { Button, Chip, Field, Input, Segmented, Sheet, Textarea, Toggle } from "@/components/ui";
 import { alarmShortcutUrl } from "@/lib/engine/render";
-import { habitStats, heatmap, HABIT_PROP, nextReminder, readHabit, todayKey, type Habit } from "@/lib/engine/habits";
+import { diffDays, habitStats, HABIT_PROP, monthGrid, nextReminder, readHabit, todayKey, type Habit, type HeatCell } from "@/lib/engine/habits";
 import { Ring } from "./TrackerView";
 import { CopyField } from "@/components/settings/CopyField";
 import { KeyHint } from "@/components/settings/HookKey";
@@ -76,6 +76,119 @@ function Stepper({ value, min, max, onChange }: { value: number; min: number; ma
   );
 }
 
+/** "2026-10" → "2026-11" (or back with -1). */
+function shiftMonth(month: string, by: number) {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7);
+}
+
+/**
+ * The routine's month: what was done, skipped or missed each day, with a dot
+ * where there's a note. Tapping a day shows it; a forgotten day can be marked,
+ * and a note added or changed.
+ */
+function HabitMonth({
+  habit,
+  checkins,
+  members,
+  today,
+  onCheckIn,
+  onNote,
+}: {
+  habit: Habit | null;
+  checkins: CheckinRow[];
+  members: Member[];
+  today: string;
+  onCheckIn: (status: "done" | "skipped" | null, day: string) => void;
+  onNote: (day: string, note: string | null) => void;
+}) {
+  const { t, locale } = useI18n();
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [selected, setSelected] = useState(today);
+  const row = checkins.find((c) => c.day === selected);
+  const [note, setNote] = useState(row?.note ?? "");
+  useEffect(() => setNote(row?.note ?? ""), [selected, row?.note]);
+
+  const cells = monthGrid(habit, checkins, month, today);
+  const notes = new Set(checkins.filter((c) => c.note).map((c) => c.day));
+  const title = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
+  const dayFmt = new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+  const state = cells.find((c) => c.day === selected)?.state;
+  const label: Record<HeatCell["state"], string> = { done: t.tracker.dayDone, skipped: t.tracker.daySkipped, missed: t.tracker.dayMissed, due: t.tracker.dayDue, rest: t.tracker.dayRest, future: t.tracker.dayRest };
+  const by = row?.user_id ? members.find((m) => m.id === row.user_id) : null;
+  const nav = "flex size-9 items-center justify-center rounded-full bg-sunken disabled:opacity-40";
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <button type="button" aria-label={t.tracker.prevMonth} className={nav} onClick={() => setMonth((m) => shiftMonth(m, -1))}>
+          <ChevronLeft className="size-4 rtl:rotate-180" />
+        </button>
+        <span className="font-bold">{title}</span>
+        <button type="button" aria-label={t.tracker.nextMonth} className={nav} disabled={month >= today.slice(0, 7)} onClick={() => setMonth((m) => shiftMonth(m, 1))}>
+          <ChevronRight className="size-4 rtl:rotate-180" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {t.weekdaysShort.map((d) => (
+          <span key={d} className="text-[11px] font-semibold text-faint">
+            {d}
+          </span>
+        ))}
+        {cells.map((c) => (
+          <button
+            key={c.day}
+            type="button"
+            disabled={diffDays(today, c.day) > 0}
+            aria-pressed={c.day === selected}
+            aria-label={`${dayFmt.format(new Date(`${c.day}T12:00:00Z`))}: ${label[c.state]}`}
+            onClick={() => setSelected(c.day)}
+            className={cn(
+              "relative flex aspect-square items-center justify-center rounded-xl text-sm font-semibold transition active:scale-90",
+              HEAT[c.state],
+              c.state === "done" && "text-white",
+              c.outside && "opacity-35",
+              c.day === today && "ring-2 ring-fg/60",
+              c.day === selected && "ring-2 ring-accent",
+            )}
+          >
+            {+c.day.slice(8)}
+            {notes.has(c.day) && <span className="absolute bottom-1 size-1.5 rounded-full bg-current" />}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2 rounded-2xl bg-sunken p-3">
+        <p className="flex items-center justify-between gap-2 text-sm">
+          <span className="font-bold">{dayFmt.format(new Date(`${selected}T12:00:00Z`))}</span>
+          <span className="font-semibold text-muted">
+            {state ? label[state] : ""}
+            {by ? ` · ${by.emoji} ${by.name}` : ""}
+          </span>
+        </p>
+        <div className="flex gap-2">
+          <Chip active={row?.status === "done"} onClick={() => onCheckIn(row?.status === "done" ? null : "done", selected)}>
+            ✓ {t.tracker.markDone}
+          </Chip>
+          <Chip active={row?.status === "skipped"} onClick={() => onCheckIn(row?.status === "skipped" ? null : "skipped", selected)}>
+            ⏭ {t.tracker.markSkipped}
+          </Chip>
+        </div>
+        {row && (
+          <>
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t.tracker.notePlaceholder} maxLength={500} rows={2} aria-label={t.tracker.noteTitle} />
+            {note.trim() !== (row.note ?? "") && (
+              <Button size="sm" variant="soft" onClick={() => onNote(selected, note.trim() || null)}>
+                {t.tracker.saveNote}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function defaultHabit(today: string): Habit {
   return { repeat: { kind: "interval", every: 1, start: today }, time: "18:00", nudge: true, outdoor: false };
 }
@@ -90,6 +203,7 @@ export function HabitSheet({
   onChange,
   onDelete,
   onCheckIn,
+  onNote,
   userId,
   launchToken,
 }: {
@@ -101,7 +215,8 @@ export function HabitSheet({
   onClose: () => void;
   onChange: (id: string, patch: Partial<Item>) => void;
   onDelete: (id: string) => void;
-  onCheckIn: (item: Item, status: "done" | "skipped" | null) => void;
+  onCheckIn: (item: Item, status: "done" | "skipped" | null, day?: string) => void;
+  onNote: (item: Item, day: string, note: string | null) => void;
   userId: string;
   launchToken: string;
 }) {
@@ -122,7 +237,6 @@ export function HabitSheet({
 
   const saved = readHabit(item.props);
   const stats = habitStats(saved, checkins, today);
-  const cells = heatmap(saved, checkins, today, 12);
   const todays = checkins.find((c) => c.day === today);
   const edit = (h: Habit) => {
     setHabit(h);
@@ -179,12 +293,16 @@ export function HabitSheet({
           </div>
         </div>
 
-        {/* Heatmap: 12 weeks, columns = weeks */}
-        <div className="grid grid-flow-col grid-rows-7 gap-1" dir="ltr">
-          {cells.map((c) => (
-            <span key={c.day} title={c.day} className={cn("aspect-square rounded-[4px]", HEAT[c.state], c.day === today && "ring-2 ring-fg/60")} />
-          ))}
-        </div>
+        {/* The month, day by day */}
+        <HabitMonth
+          key={item.id}
+          habit={saved}
+          checkins={checkins}
+          members={members}
+          today={today}
+          onCheckIn={(status, day) => onCheckIn(item, status, day)}
+          onNote={(day, note) => onNote(item, day, note)}
+        />
 
         {/* Today */}
         {(stats.dueToday || !saved) && (
@@ -308,11 +426,14 @@ export function HabitSheet({
               {[...checkins].sort((a, b) => b.day.localeCompare(a.day)).slice(0, 8).map((c) => {
                 const m = members.find((x) => x.id === c.user_id);
                 return (
-                  <li key={c.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span>{dayFmt.format(new Date(`${c.day}T12:00:00Z`))}</span>
-                    <span className="font-semibold">
-                      {c.status === "done" ? "✓" : "⏭"} {m ? `${m.emoji} ${m.name}` : ""}
+                  <li key={c.id} className="px-3 py-2 text-sm">
+                    <span className="flex items-center justify-between">
+                      <span>{dayFmt.format(new Date(`${c.day}T12:00:00Z`))}</span>
+                      <span className="font-semibold">
+                        {c.status === "done" ? "✓" : "⏭"} {m ? `${m.emoji} ${m.name}` : ""}
+                      </span>
                     </span>
+                    {c.note && <span className="mt-0.5 block text-muted">💬 {c.note}</span>}
                   </li>
                 );
               })}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, assigneesFor, habitStats, heatmap, isDue, nextDueDay, nextReminder, type Habit } from "./habits";
+import { addDays, assigneesFor, habitStats, heatmap, isDue, monthGrid, nextDueDay, nextReminder, type Habit } from "./habits";
 import { zonedParts, zonedTimeToUtc } from "./time";
 
 const TZ = "Asia/Jerusalem";
@@ -103,6 +103,18 @@ describe("heatmap", () => {
     expect(at("2026-10-21")).toBe("missed");
     expect(at("2026-10-24")).toBe("due");
     expect(at("2026-10-19")).toBe("rest");
+  });
+});
+
+describe("monthGrid", () => {
+  it("lays a month out in whole weeks, Sunday first, with its days' states", () => {
+    const cells = monthGrid(every3, [{ day: "2026-10-18", status: "done" }, { day: "2026-10-30", status: "skipped" }], "2026-10", "2026-10-31");
+    // October 2026 starts on a Thursday and ends on a Saturday: Sep 27 – Oct 31.
+    expect(cells).toHaveLength(35);
+    expect(cells[0]).toMatchObject({ day: "2026-09-27", outside: true });
+    expect(cells.at(-1)).toMatchObject({ day: "2026-10-31", outside: false });
+    const at = (d: string) => cells.find((c) => c.day === d)?.state;
+    expect([at("2026-10-18"), at("2026-10-21"), at("2026-10-30"), at("2026-10-19")]).toEqual(["done", "missed", "skipped", "rest"]);
   });
 });
 

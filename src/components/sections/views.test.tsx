@@ -17,7 +17,7 @@ vi.mock("@/lib/push", () => import("@/test/app").then((m) => m.pushMock));
 vi.mock("@/lib/photos", async (actual) => ({ ...(await actual<typeof import("@/lib/photos")>()), resizeImage: async (f: Blob) => f }));
 
 const { SectionScreen } = await import("./SectionScreen");
-const { todayKey } = await import("@/lib/engine/habits");
+const { addDays, todayKey } = await import("@/lib/engine/habits");
 
 const TZ = "Asia/Jerusalem";
 
@@ -81,6 +81,33 @@ describe("habit tracker", () => {
     expect(screen.getByText(new RegExp(t.tracker.doneToday))).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: t.tracker.undo }));
     await waitFor(async () => expect(await sql(`select 1 from checkins where item_id = $1`, [rows[0].id])).toEqual([]));
+  });
+
+  it("a note is optional: offered only after done, and saved on that day's check-in", async () => {
+    const { user, t, rows } = await open("tracker", [{ title: "Shower", props: daily }]);
+    expect(screen.queryByRole("button", { name: t.tracker.addNote })).toBeNull();
+    await user.click(screen.getByRole("button", { name: t.tracker.checkIn }));
+    await user.click(await screen.findByRole("button", { name: t.tracker.addNote }));
+    await user.type(await screen.findByPlaceholderText(t.tracker.notePlaceholder), "Cold water only");
+    await user.click(screen.getByRole("button", { name: t.tracker.saveNote }));
+    await waitFor(async () => expect(await sql(`select status, note from checkins where item_id = $1`, [rows[0].id])).toEqual([{ status: "done", note: "Cold water only" }]));
+    // The card shows it once the sheet has closed.
+    await waitFor(() => expect(screen.queryByPlaceholderText(t.tracker.notePlaceholder)).toBeNull());
+    expect(screen.getByText(/Cold water only/)).toBeInTheDocument();
+  });
+
+  it("the month calendar marks a forgotten day and keeps its note", async () => {
+    const { user, t, rows } = await open("tracker", [{ title: "Walk", props: daily }]);
+    const yesterday = addDays(todayKey(TZ), -1);
+    await user.click(screen.getByText("Walk"));
+    const label = new Intl.DateTimeFormat("en", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${yesterday}T12:00:00Z`));
+    // Yesterday may sit in last month's view when today is the 1st.
+    if (!screen.queryByRole("button", { name: new RegExp(`^${label}:`) })) await user.click(screen.getByRole("button", { name: t.tracker.prevMonth }));
+    await user.click(screen.getByRole("button", { name: new RegExp(`^${label}: ${t.tracker.dayMissed}`) }));
+    await user.click(screen.getByRole("button", { name: `✓ ${t.tracker.markDone}` }));
+    await user.type(await screen.findByRole("textbox", { name: t.tracker.noteTitle }), "Late, after work");
+    await user.click(screen.getByRole("button", { name: t.tracker.saveNote }));
+    await waitFor(async () => expect(await sql(`select day::text, status, note from checkins where item_id = $1`, [rows[0].id])).toEqual([{ day: yesterday, status: "done", note: "Late, after work" }]));
   });
 
   it("skipping today from the sheet keeps the streak and is saved as skipped", async () => {

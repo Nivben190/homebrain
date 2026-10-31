@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chargesFrom, detectCycle, findAmounts, htmlToText, parseLooseDate, pickAmount, rollForward, summarize, type MailMessage } from "./parse";
+import { chargesFrom, detectCycle, findAmounts, htmlToText, needsAttachments, parseLooseDate, pickAmount, rollForward, summarize, type MailMessage } from "./parse";
 
 const msg = (from: string, subject: string, text: string, day: string, id = `${from}-${day}`): MailMessage => ({ id, from, subject, text, date: new Date(`${day}T08:00:00Z`) });
 
@@ -134,6 +134,25 @@ describe("household bills", () => {
     const subs = summarize([water("2026-08-25", "15/09/2026"), water("2026-09-25", "15/10/2026"), water("2026-10-25", "15/11/2026")].flatMap(chargesFrom), today);
     expect(subs).toHaveLength(1);
     expect(subs[0]).toMatchObject({ name: "מי אביבים", category: "water", bill: true, cycle: "monthly", amount: 182.4, currency: "ILS", next: "2026-11-15" });
+  });
+
+  it("a payment site's receipt: the biller and the amount only in the PDF", () => {
+    // As unpdf reads the Kfar Saba water receipt (columns come out in logical order).
+    const pdf = [
+      "חשבונית מס/קבלה למשלם",
+      "הוז דב 30/3 יתרות חוב מים 004953.38 22903000300 2026",
+      "מ . ע . מ 000258.65 0",
+      '1,695.40 סה"כ לתשלום בש"ח',
+      "עמוד1מתוך2 ט . ל . ח הופק עבור מפעל המים כפר סבא",
+    ].join("\n");
+    const mail = { ...msg("תשלומים <noreply@payments-site.co.il>", "קבלת תשלום", "שלום, מצורפת קבלה על התשלום שביצעת.", "2026-10-26"), attachments: pdf };
+    expect(needsAttachments(mail)).toBe(true);
+    const [c] = chargesFrom(mail);
+    expect(c).toMatchObject({ name: "מפעל המים כפר סבא", category: "water", bill: true, amount: 1695.4, currency: "ILS" });
+    // Paid once is enough to list it; water comes every two months.
+    expect(summarize([c], today)[0]).toMatchObject({ cycle: "bimonthly", amount: 1695.4, next: "2026-12-26" });
+    // Without the PDF there's nothing to go on.
+    expect(chargesFrom({ ...mail, attachments: undefined })).toEqual([]);
   });
 
   it("arnona from the city, every two months", () => {

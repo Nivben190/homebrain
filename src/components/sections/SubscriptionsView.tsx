@@ -120,8 +120,9 @@ export function SubscriptionsView({
         const s = (await (await fetch(`/api/google/scan?sectionId=${section.id}`)).json()) as { lastScanAt: string | null; status: string | null; failed: boolean };
         if (!s.lastScanAt || Date.parse(s.lastScanAt) < started - 5000) continue;
         await onReload();
-        if (s.status === "expired") router.refresh();
-        else if (s.failed) flash(t.subs.resultFailed);
+        // The "checked … ago" line and the scan's counts come from the server page.
+        router.refresh();
+        if (s.failed) flash(t.subs.resultFailed);
         else flash(t.subs.done);
         return;
       }

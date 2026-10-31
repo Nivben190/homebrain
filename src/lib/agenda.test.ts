@@ -19,6 +19,28 @@ describe("buildAgenda", () => {
     expect(week.get("2026-11-03")).toEqual([]);
   });
 
+  it("shows what was done, by whom, with its note, also on a day it wasn't planned", () => {
+    const week = buildAgenda("2026-11-01", 7, {
+      ...empty,
+      sessions: [
+        {
+          id: "s",
+          title: "Shower",
+          icon: "🚿",
+          sectionId: "x",
+          fallback: "a",
+          habit: { repeat: { kind: "weekly", days: [1] }, time: "08:00", nudge: false, outdoor: false },
+          checkins: [
+            { day: "2026-11-02", status: "done", note: "Cold water only", user_id: "b" },
+            { day: "2026-11-05", status: "done", note: null, user_id: "a" },
+          ],
+        },
+      ],
+    });
+    expect(week.get("2026-11-02")).toEqual([expect.objectContaining({ title: "Shower", status: "done", note: "Cold water only", who: ["b"] })]);
+    expect(week.get("2026-11-05")).toEqual([expect.objectContaining({ status: "done", who: ["a"] })]);
+  });
+
   it("puts all-day things first, then by time, and drops what falls outside", () => {
     const week = buildAgenda("2026-11-01", 7, {
       ...empty,

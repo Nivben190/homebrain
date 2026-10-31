@@ -41,6 +41,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     getJewishCalendar(profile.lat ?? DEFAULT_PLACE.lat, profile.lon ?? DEFAULT_PLACE.lon, tz, from, to).catch(() => []),
     access ? listEvents(access, start, end).catch(() => []) : Promise.resolve([]),
   ]);
+  const { data: checkins } = trackers?.length
+    ? await supabase.from("checkins").select("item_id,day,status,note,user_id").in("item_id", trackers.map((i) => i.id)).gte("day", from).lt("day", to).returns<{ item_id: string; day: string; status: "done" | "skipped"; note: string | null; user_id: string | null }[]>()
+    : { data: [] };
   const icon = new Map((sections ?? []).map((s) => [s.id, s.icon]));
   const owner = new Map((sections ?? []).map((s) => [s.id, s.owner_id]));
 
@@ -49,7 +52,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     items: (items ?? []).map((i) => ({ id: i.id, title: i.title, icon: icon.get(i.section_id) ?? "📌", sectionId: i.section_id, ...local(i.due_at!), who: i.assignee_id })),
     sessions: (trackers ?? []).flatMap((i) => {
       const habit = readHabit(i.props);
-      return habit ? [{ id: i.id, title: i.title, icon: icon.get(i.section_id) ?? "🔁", sectionId: i.section_id, habit, fallback: i.assignee_id ?? owner.get(i.section_id) ?? i.created_by }] : [];
+      return habit ? [{ id: i.id, title: i.title, icon: icon.get(i.section_id) ?? "🔁", sectionId: i.section_id, habit, fallback: i.assignee_id ?? owner.get(i.section_id) ?? i.created_by, checkins: (checkins ?? []).filter((c) => c.item_id === i.id) }] : [];
     }),
     automations: (automations ?? []).map((a) => ({ id: a.id, name: a.name, icon: a.icon, ...local(a.next_run_at!), who: a.target_user_id })),
     holidays: holidays
@@ -116,7 +119,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                         ))}
                       </span>
                       <span aria-hidden>{e.icon}</span>
-                      <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className={e.status ? "block truncate text-muted" : "block truncate"}>
+                          {e.status === "done" ? "✓ " : e.status === "skipped" ? "⏭ " : ""}
+                          {e.title}
+                        </span>
+                        {e.note && <span className="block truncate text-xs text-muted">💬 {e.note}</span>}
+                      </span>
                     </>
                   );
                   return (

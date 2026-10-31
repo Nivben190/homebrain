@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Flame } from "lucide-react";
+import { Check, Flame, MessageCircle } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
 import { diffDays, habitStats, readHabit, todayKey, type HabitStats } from "@/lib/engine/habits";
@@ -114,6 +114,7 @@ export function HabitCard({
   timeZone,
   onOpen,
   onCheckIn,
+  onNote,
   assignees,
   warning,
 }: {
@@ -123,6 +124,8 @@ export function HabitCard({
   timeZone: string;
   onOpen: () => void;
   onCheckIn: (status: "done" | null) => void;
+  /** Once done today: add or edit an optional note. */
+  onNote?: () => void;
   /** User ids on it today; shown as avatars when assigned. */
   assignees?: string[];
   warning?: string | null;
@@ -162,9 +165,10 @@ export function HabitCard({
               <Flame className="size-3.5" fill={stats.streak > 0 ? "currentColor" : "none"} /> {stats.streak}
             </span>
             {todays ? (
-              <span className="text-success">
+              <span className="min-w-0 truncate text-success">
                 ✓ {t.tracker.doneToday}
                 {by ? ` · ${by.emoji}` : ""}
+                {todays.note && <span className="font-normal text-muted"> · {todays.note}</span>}
               </span>
             ) : (
               habit && <span className="text-muted">{t.tracker.next}: {describeNext(stats, today, t)}</span>
@@ -172,6 +176,16 @@ export function HabitCard({
           </span>
         </span>
       </button>
+      {todays?.status === "done" && onNote && (
+        <button
+          onClick={onNote}
+          aria-label={t.tracker.addNote}
+          title={t.tracker.addNote}
+          className={cn("flex size-10 shrink-0 items-center justify-center rounded-full transition active:scale-90", todays.note ? "bg-accent-soft text-accent" : "bg-sunken text-faint")}
+        >
+          <MessageCircle className="size-5" fill={todays.note ? "currentColor" : "none"} />
+        </button>
+      )}
       {canCheck && (
         <motion.button
           whileTap={{ scale: 0.85 }}

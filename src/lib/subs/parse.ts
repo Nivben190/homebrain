@@ -3,7 +3,7 @@
 // utility bills (electricity, water, arnona, gas…) by sender or wording, and any
 // other sender that charges the same way at a regular interval.
 import { addDays, diffDays } from "@/lib/engine/habits";
-import { APPLE_CANCEL, billerFor, domainMatches, domainOf, PAYPAL_CANCEL, PLAY_CANCEL, senderName, SERVICES, type Category } from "./catalog";
+import { APPLE_CANCEL, billerFor, billerIn, domainMatches, domainOf, PAYPAL_CANCEL, PLAY_CANCEL, senderName, SERVICES, type Category } from "./catalog";
 
 export type Currency = "ILS" | "USD" | "EUR" | "GBP";
 export type Cycle = "weekly" | "monthly" | "bimonthly" | "yearly";
@@ -15,6 +15,8 @@ export interface MailMessage {
   /** Plain text of the body (see htmlToText). */
   text: string;
   date: Date;
+  /** Text of its PDF attachments, read when the body itself has no amount (see needsAttachments). */
+  attachments?: string;
 }
 
 /** One charge (or renewal notice) for one subscription, from one email. */
@@ -112,6 +114,9 @@ export function findAmounts(text: string) {
 const TOTAL = /total|סה["״']?כ|לתשלום|amount (paid|charged|due)|you paid|charged|billed|שולם|סכום החיוב|סכום/i;
 const NOT_TOTAL = /sub-?total|tax|vat|מע["״']?מ|discount|הנחה|credit|זיכוי/i;
 
+const CUR_ANYWHERE = new RegExp(CUR);
+const DECIMAL = /\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2}/;
+
 /** The charged amount: the "Total" line when there is one, else the first price. */
 export function pickAmount(text: string): { value: number; currency: Currency } | null {
   const lines = text.split("\n");
@@ -119,6 +124,10 @@ export function pickAmount(text: string): { value: number; currency: Currency } 
     if (!TOTAL.test(lines[i]) || (NOT_TOTAL.test(lines[i]) && !/^\s*total\b|סה["״']?כ/i.test(lines[i]))) continue;
     const near = findAmounts(lines[i])[0] ?? findAmounts(lines[i + 1] ?? "")[0];
     if (near) return near;
+    // Tables in PDFs: "1,695.40 סה"כ לתשלום בש"ח", the currency named apart from the number.
+    const cur = lines[i].match(CUR_ANYWHERE);
+    const n = lines[i].match(DECIMAL);
+    if (cur && n && toNumber(n[0]) > 0 && toNumber(n[0]) < 100000) return { value: toNumber(n[0]), currency: currencyOf(cur[0]) };
   }
   return findAmounts(text)[0] ?? null;
 }
@@ -205,7 +214,7 @@ export function rollForward(last: string, cycle: Cycle, today: string) {
 
 const norm = (s: string) => s.toLowerCase().replace(/\(.*?\)/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const dayOf = (d: Date) => d.toISOString().slice(0, 10);
-const RECEIPT = /receipt|invoice|your (order|payment)|payment (received|confirmation|successful)|subscription|renew|membership|billing|charged|קבלה|חשבונית|מנוי|חידוש|אישור תשלום|חיוב/i;
+const RECEIPT = /receipt|invoice|your (order|payment)|payment (received|confirmation|successful)|subscription|renew|membership|billing|charged|קבלה|קבלת תשלום|חשבונית|מנוי|חידוש|אישור (על )?תשלום|חיוב/i;
 const SUBSCRIPTIONY = /subscription|renew|membership|monthly|annual|yearly|your plan|מנוי|חידוש|חודשי|שנתי/i;
 /** A known service's email only counts when its subject is about money, not news or policy updates. */
 const BILLING_SUBJECT = /receipt|invoice|payment|paid|charged|billing|\bbill\b|renew|subscription|membership|your order|your plan|קבלה|חשבונית|תשלום|חיוב|חידוש|מנוי/i;
@@ -246,13 +255,19 @@ function appleItems(msg: MailMessage): Omit<Charge, "messageId" | "day" | "subje
   return out;
 }
 
+/** A bill or receipt whose body has no amount: it's worth opening its PDF. */
+export function needsAttachments(msg: Pick<MailMessage, "subject" | "text">) {
+  return (BILL_SUBJECT.test(msg.subject) || RECEIPT.test(msg.subject)) && !FAILED.test(msg.subject) && !PROMO.test(msg.subject) && !pickAmount(msg.text);
+}
+
 /** Everything a single email says about subscriptions (usually 0 or 1). */
 export function chargesFrom(msg: MailMessage): Charge[] {
   const domain = domainOf(msg.from);
-  const all = `${msg.subject}\n${msg.text}`;
+  const doc = msg.attachments ?? "";
+  const all = `${msg.subject}\n${msg.text}\n${doc}`;
   const base = { messageId: msg.id, day: dayOf(msg.date), subject: msg.subject };
   if (FAILED.test(msg.subject)) return [];
-  const amount = pickAmount(msg.text);
+  const amount = pickAmount(msg.text) ?? (doc ? pickAmount(doc) : null);
 
   if (domainMatches(domain, "apple.com")) {
     if (!/receipt|קבלה|subscription|מנוי/i.test(msg.subject)) return [];
@@ -274,10 +289,13 @@ export function chargesFrom(msg: MailMessage): Charge[] {
   }
 
   // Household bills: the electric company, the water corporation, the city (arnona)…
-  const biller = billerFor(domain, senderName(msg.from), msg.subject);
+  // A payment site's receipt names the biller only inside: "הופק עבור מפעל המים כפר סבא".
+  const listed = SERVICES.some((s) => s.domains.some((d) => domainMatches(domain, d)));
+  const billLike = BILL_SUBJECT.test(msg.subject) || RECEIPT.test(msg.subject);
+  const biller = billerFor(domain, senderName(msg.from), msg.subject) ?? (!listed && billLike ? billerIn(domain, `${msg.text.slice(0, 4000)}\n${doc.slice(0, 4000)}`) : null);
   if (biller) {
-    if (PROMO.test(msg.subject) || !BILL_SUBJECT.test(`${msg.subject} ${senderName(msg.from)}`)) return [];
-    return [{ ...base, key: biller.key, name: biller.name, icon: biller.icon, cancel: null, known: true, strong: true, bill: true, category: biller.category, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text, DUE) }];
+    if (PROMO.test(msg.subject) || !(billLike || BILL_SUBJECT.test(senderName(msg.from)))) return [];
+    return [{ ...base, key: biller.key, name: biller.name, icon: biller.icon, cancel: null, known: true, strong: true, bill: true, category: biller.category, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(`${msg.text}\n${doc}`, DUE) }];
   }
 
   const sender = SERVICES.find((s) => s.domains.some((d) => domainMatches(domain, d)));
@@ -381,9 +399,9 @@ export function summarize(charges: Charge[], today: string): DetectedSub[] {
   return out.sort((a, b) => (a.next ?? "9").localeCompare(b.next ?? "9"));
 }
 
-/** Electricity and arnona come every two months in Israel; the rest monthly, until the emails say otherwise. */
+/** Electricity, water and arnona come every two months in Israel; the rest monthly, until the emails say otherwise. */
 function defaultCycle(category: Category): Cycle {
-  return category === "electricity" || category === "arnona" ? "bimonthly" : "monthly";
+  return category === "electricity" || category === "arnona" || category === "water" ? "bimonthly" : "monthly";
 }
 
 /** Rough monthly cost, for totals. */

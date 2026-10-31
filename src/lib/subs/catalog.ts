@@ -94,7 +94,7 @@ export interface Biller {
 export const BILLERS: Biller[] = [
   { key: "bill:iec", name: "חברת החשמל", icon: "⚡", category: "electricity", domains: ["iec.co.il"], words: /חברת החשמל|חשבון (ה)?חשמל|electricity bill|israel electric/i },
   { key: "bill:electricity", name: "חשמל", icon: "⚡", category: "electricity", domains: ["electra-power.co.il", "amisragas-energy.co.il", "cellcom-energy.co.il", "bezeq-energy.co.il"], words: /צריכת חשמל|ספק חשמל/i },
-  { key: "bill:water", name: "מים", icon: "💧", category: "water", domains: ["meiavivim.co.il", "mei-avivim.co.il", "hagihon.co.il", "meisheva.co.il", "meicarmel.co.il", "mei-netanya.co.il", "meiraanana.co.il", "mei-raanana.co.il", "plagey.co.il", "yuvalim.co.il", "mainet.co.il"], words: /חשבון (ה)?מים|תאגיד (ה)?מים|צריכת מים|water bill|מי אביבים|הגיחון|מי שבע|מי כרמל|מי נתניה|מי רעננה|מי מודיעין|מי הרצליה|מי רמת גן|מי כפר סבא|מי הוד השרון|מי ציונה|מי אשקלון|מי עכו|מי לוד|מי שמש|פלגי מוצקין|יובלים|מניב ראשון|עין אפק|מיתב|הרי נצרת|מי רהט|מי ברק|מי נע["״]?ם/i },
+  { key: "bill:water", name: "מים", icon: "💧", category: "water", domains: ["meiavivim.co.il", "mei-avivim.co.il", "hagihon.co.il", "meisheva.co.il", "meicarmel.co.il", "mei-netanya.co.il", "meiraanana.co.il", "mei-raanana.co.il", "plagey.co.il", "yuvalim.co.il", "mainet.co.il"], words: /מפעל (ה)?מים(?: [א-ת"״']{2,}){0,3}|חשבון (ה)?מים|תאגיד (ה)?מים|אגרת ביוב|מים וביוב|צריכת מים|water bill|מי אביבים|הגיחון|מי שבע|מי כרמל|מי נתניה|מי רעננה|מי מודיעין|מי הרצליה|מי רמת גן|מי כפר סבא|מי הוד השרון|מי ציונה|מי אשקלון|מי עכו|מי לוד|מי שמש|פלגי מוצקין|יובלים|מניב ראשון|עין אפק|מיתב|הרי נצרת|מי רהט|מי ברק|מי נע["״]?ם/i },
   { key: "bill:arnona", name: "ארנונה", icon: "🏛️", category: "arnona", domains: ["muni.il"], words: /ארנונה|arnona|עיריית|מועצה (מקומית|אזורית)|municipality/i },
   { key: "bill:gas", name: "גז", icon: "🔥", category: "gas", domains: ["supergas.co.il", "amisragas.co.il", "pazgas.co.il", "dorgas.co.il"], words: /חשבון (ה)?גז|סופרגז|אמישראגז|פזגז|דורגז|גז בישול/i },
   { key: "bill:internet", name: "אינטרנט", icon: "🌐", category: "internet", domains: ["012.net.il", "triplec.co.il", "netvision.co.il", "xfone.co.il", "we4g.co.il"], words: /חשבון (ה)?אינטרנט|ספק (ה)?אינטרנט|internet bill/i },
@@ -112,6 +112,20 @@ export function billerFor(domain: string, sender: string, subject: string): Bill
   const name = sender && !/no-?reply|service|mailer/i.test(sender) && sender.length <= 30 ? sender : b.name;
   const site = domain.split(".").slice(/\.(co|org|net|ac|gov|muni)\.[a-z]{2}$/.test(domain) ? -3 : -2).join(".");
   return { ...b, key: `${b.key}:${site || "mail"}`, name };
+}
+
+/**
+ * The biller named inside a bill or receipt (body or PDF), for mail sent by a
+ * payment site. Keeps the name as written ("מפעל המים כפר סבא") when it's short.
+ */
+export function billerIn(domain: string, text: string): Biller | null {
+  for (const b of BILLERS) {
+    const said = (b.words && text.match(b.words)?.[0].trim()) || "";
+    if (!said) continue;
+    const site = domain.split(".").slice(/\.(co|org|net|ac|gov|muni)\.[a-z]{2}$/.test(domain) ? -3 : -2).join(".");
+    return { ...b, key: `${b.key}:${site || "mail"}`, name: said.includes(" ") && said.length <= 25 ? said : b.name };
+  }
+  return null;
 }
 
 /** Where to manage subscriptions bought through a store. */

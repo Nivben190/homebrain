@@ -13,12 +13,15 @@ export interface AgendaEntry {
   /** Member ids, for coloring by person. */
   who: string[];
   href?: string;
+  /** A routine's session that was checked in, and its note. */
+  status?: "done" | "skipped";
+  note?: string | null;
 }
 
 export interface AgendaSources {
   /** Items with a due date, already in local day + time. */
   items: { id: string; title: string; icon: string; sectionId: string; day: string; time: string | null; who: string | null }[];
-  sessions: { id: string; title: string; icon: string; sectionId: string; habit: Habit; fallback: string | null }[];
+  sessions: { id: string; title: string; icon: string; sectionId: string; habit: Habit; fallback: string | null; checkins?: { day: string; status: "done" | "skipped"; note: string | null; user_id: string | null }[] }[];
   automations: { id: string; name: string; icon: string; day: string; time: string; who: string }[];
   holidays: { day: string; title: string }[];
   google: { day: string; time: string | null; title: string; who: string }[];
@@ -34,8 +37,13 @@ export function buildAgenda(from: string, days: number, s: AgendaSources): Map<s
 
   for (const i of s.items) put({ day: i.day, time: i.time, title: i.title, icon: i.icon, kind: "item", who: i.who ? [i.who] : [], href: `/sections/${i.sectionId}` });
   for (const x of s.sessions) {
-    for (const day of dueDaysBetween(x.habit, from, to)) {
-      put({ day, time: x.habit.time, title: x.title, icon: x.icon, kind: "session", who: assigneesFor(x.habit, day, s.members, x.fallback), href: `/sections/${x.sectionId}` });
+    const checked = new Map((x.checkins ?? []).map((c) => [c.day, c]));
+    // Planned days, and any other day it was done anyway.
+    const days = new Set([...dueDaysBetween(x.habit, from, to), ...[...checked.keys()].filter((d) => d >= from && d <= to)]);
+    for (const day of days) {
+      const c = checked.get(day);
+      const who = c?.user_id ? [c.user_id] : assigneesFor(x.habit, day, s.members, x.fallback);
+      put({ day, time: x.habit.time, title: x.title, icon: x.icon, kind: "session", who, href: `/sections/${x.sectionId}`, ...(c ? { status: c.status, note: c.note } : {}) });
     }
   }
   for (const a of s.automations) put({ day: a.day, time: a.time, title: a.name, icon: a.icon, kind: "automation", who: [a.who], href: `/brain/${a.id}` });

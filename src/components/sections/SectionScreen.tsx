@@ -14,6 +14,7 @@ import { ItemSheet } from "./ItemSheet";
 import { SectionSettingsSheet } from "./SectionSettingsSheet";
 import { HabitSheet } from "./HabitSheet";
 import { HabitCard, useCelebrate } from "./TrackerView";
+import { CheckinNoteSheet } from "./CheckinNoteSheet";
 import { GalleryView } from "./GalleryView";
 import { DatesView } from "./DatesView";
 import { DateSheet, datePatch } from "./DateSheet";
@@ -78,6 +79,7 @@ export function SectionScreen({
   const [items, setItems] = useState(initialItems);
   const [draft, setDraft] = useState("");
   const [openItem, setOpenItem] = useState<Item | null>(null);
+  const [noteFor, setNoteFor] = useState<{ item: Item; day: string } | null>(null);
   const [settings, setSettings] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [checkins, setCheckins] = useState(initialCheckins);
@@ -325,11 +327,10 @@ export function SectionScreen({
     if (ok && handled) celebrate();
   }
 
-  /** Check in (or undo) today's session for a tracker item. */
-  async function checkIn(item: Item, status: "done" | "skipped" | null) {
-    const day = todayKey(timeZone);
+  /** Check in (or undo) a tracker item's session: today, or an earlier day from its calendar. */
+  async function checkIn(item: Item, status: "done" | "skipped" | null, day = todayKey(timeZone)) {
     const existing = checkins.find((c) => c.item_id === item.id && c.day === day);
-    const retry = () => void checkIn(item, status);
+    const retry = () => void checkIn(item, status, day);
     // Undo only today's row for this item, so other pending check-ins survive.
     const revert = () => setCheckins((p) => [...p.filter((c) => !(c.item_id === item.id && c.day === day)), ...(existing ? [existing] : [])]);
     if (status === null) {
@@ -337,11 +338,25 @@ export function SectionScreen({
       await persist(() => sb.from("checkins").delete().eq("item_id", item.id).eq("day", day), revert, retry, { table: "checkins", action: "delete", match: { item_id: item.id, day } });
       return;
     }
-    const row: CheckinRow = { id: existing?.id ?? crypto.randomUUID(), item_id: item.id, user_id: userId, day, status, note: null, created_at: new Date().toISOString() };
+    const row: CheckinRow = { id: existing?.id ?? crypto.randomUUID(), item_id: item.id, user_id: existing?.user_id ?? userId, day, status, note: existing?.note ?? null, created_at: existing?.created_at ?? new Date().toISOString() };
     setCheckins((p) => [...p.filter((c) => c !== existing), row]);
     const values = { id: row.id, item_id: item.id, day, status };
     const ok = await persist(() => sb.from("checkins").upsert(values, { onConflict: "item_id,day" }), revert, retry, { table: "checkins", action: "upsert", values, onConflict: "item_id,day" });
-    if (ok && status === "done") celebrate();
+    if (ok && status === "done" && day === todayKey(timeZone)) celebrate();
+  }
+
+  /** An optional note on a day's check-in. */
+  async function saveNote(item: Item, day: string, note: string | null) {
+    const existing = checkins.find((c) => c.item_id === item.id && c.day === day);
+    if (!existing || (existing.note ?? null) === note) return;
+    setCheckins((p) => p.map((c) => (c === existing ? { ...c, note } : c)));
+    const values = { note };
+    await persist(
+      () => sb.from("checkins").update(values).eq("item_id", item.id).eq("day", day),
+      () => setCheckins((p) => p.map((c) => (c.item_id === item.id && c.day === day ? { ...c, note: existing.note } : c))),
+      () => void saveNote(item, day, note),
+      { table: "checkins", action: "update", values, match: { item_id: item.id, day } },
+    );
   }
 
   const update = useCallback(
@@ -533,6 +548,7 @@ export function SectionScreen({
                   timeZone={timeZone}
                   onOpen={() => setOpenItem(i)}
                   onCheckIn={(status) => checkIn(i, status)}
+                  onNote={() => setNoteFor({ item: i, day: todayKey(timeZone) })}
                   assignees={(() => {
                     const habit = readHabit(i.props);
                     return habit ? assigneesFor(habit, todayKey(timeZone), members.map((m) => m.id), i.assignee_id ?? section.owner_id ?? i.created_by) : undefined;
@@ -667,6 +683,7 @@ export function SectionScreen({
           onChange={update}
           onDelete={remove}
           onCheckIn={checkIn}
+          onNote={saveNote}
           userId={userId}
           launchToken={launch.checkin}
         />
@@ -674,6 +691,14 @@ export function SectionScreen({
         <ItemSheet item={openItem} section={section} members={members} onClose={() => setOpenItem(null)} onChange={update} onDelete={remove} />
       )}
       {celebration}
+      <CheckinNoteSheet
+        open={!!noteFor}
+        title={noteFor?.item.title ?? ""}
+        day={noteFor?.day ?? ""}
+        note={noteFor ? (checkins.find((c) => c.item_id === noteFor.item.id && c.day === noteFor.day)?.note ?? null) : null}
+        onClose={() => setNoteFor(null)}
+        onSave={(note) => noteFor && void saveNote(noteFor.item, noteFor.day, note)}
+      />
       <SectionSettingsSheet
         open={settings}
         section={section}

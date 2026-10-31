@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { HabitCard, useCelebrate } from "@/components/sections/TrackerView";
+import { CheckinNoteSheet } from "@/components/sections/CheckinNoteSheet";
 import { todayKey } from "@/lib/engine/habits";
 import { useI18n } from "@/i18n/client";
 import { useToast } from "@/components/Toaster";
@@ -42,6 +43,7 @@ export function TodayPractice({
   const [checkins, setCheckins] = useState(initialCheckins);
   const [settling, setSettling] = useState<Set<string>>(new Set());
   const [showDone, setShowDone] = useState(false);
+  const [noteFor, setNoteFor] = useState<Item | null>(null);
   const { node, celebrate } = useCelebrate();
   const toast = useToast();
   const today = todayKey(timeZone);
@@ -114,6 +116,18 @@ export function TodayPractice({
     await save(() => sb.from("checkins").upsert(values, { onConflict: "item_id,day" }), { table: "checkins", action: "upsert", values, onConflict: "item_id,day" }, revert);
   }
 
+  /** An optional note on today's check-in. */
+  async function saveNote(item: Item, note: string | null) {
+    const existing = checkins.find((c) => c.item_id === item.id && c.day === today);
+    if (!existing || (existing.note ?? null) === note) return;
+    setCheckins((p) => p.map((c) => (c === existing ? { ...c, note } : c)));
+    const sb = supabaseBrowser();
+    const values = { note };
+    const match = { item_id: item.id, day: today };
+    const revert = () => setCheckins((p) => p.map((c) => (c.item_id === item.id && c.day === today ? { ...c, note: existing.note } : c)));
+    await save(() => sb.from("checkins").update(values).eq("item_id", item.id).eq("day", today), { table: "checkins", action: "update", values, match }, revert);
+  }
+
   const card = (i: Item) => (
     <motion.div key={i.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -40, height: 0, marginTop: 0 }} transition={{ duration: 0.3 }}>
       <HabitCard
@@ -123,6 +137,7 @@ export function TodayPractice({
         timeZone={timeZone}
         onOpen={() => router.push(`/sections/${i.section_id}`)}
         onCheckIn={(status) => checkIn(i, status)}
+        onNote={() => setNoteFor(i)}
         assignees={meta[i.id]?.assignees}
         warning={meta[i.id]?.warning}
       />
@@ -157,6 +172,14 @@ export function TodayPractice({
         </div>
       )}
       {node}
+      <CheckinNoteSheet
+        open={!!noteFor}
+        title={noteFor?.title ?? ""}
+        day={today}
+        note={noteFor ? (checkins.find((c) => c.item_id === noteFor.id && c.day === today)?.note ?? null) : null}
+        onClose={() => setNoteFor(null)}
+        onSave={(note) => noteFor && void saveNote(noteFor, note)}
+      />
     </div>
   );
 }

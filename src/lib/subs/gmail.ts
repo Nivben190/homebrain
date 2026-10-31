@@ -87,9 +87,24 @@ export async function listMessageIds(access: string, q: string, max: number) {
 
 interface Part {
   mimeType?: string;
+  filename?: string;
   headers?: { name: string; value: string }[];
-  body?: { data?: string };
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: Part[];
+}
+
+/** A PDF attached to a message, fetched only when needed (getAttachment). */
+export interface PdfRef {
+  attachmentId: string;
+  size: number;
+}
+
+/** Bills and receipts are small; anything bigger is a brochure or a scan. */
+const MAX_PDF = 2_000_000;
+
+function pdfParts(p: Part): PdfRef[] {
+  const own = p.body?.attachmentId && (p.mimeType === "application/pdf" || /\.pdf$/i.test(p.filename ?? "")) && (p.body.size ?? 0) <= MAX_PDF ? [{ attachmentId: p.body.attachmentId, size: p.body.size ?? 0 }] : [];
+  return [...own, ...(p.parts ?? []).flatMap(pdfParts)];
 }
 
 function decode(part: Part) {
@@ -111,13 +126,18 @@ function findPart(p: Part, type: string): Part | null {
   return null;
 }
 
-export async function getMessage(access: string, id: string): Promise<MailMessage> {
+export async function getMessage(access: string, id: string): Promise<MailMessage & { pdfs: PdfRef[] }> {
   const m = await gmail<{ id: string; internalDate: string; payload: Part }>(access, `/messages/${id}?format=full`);
   const header = (n: string) => m.payload.headers?.find((h) => h.name.toLowerCase() === n)?.value ?? "";
   const html = findPart(m.payload, "text/html");
   const plain = findPart(m.payload, "text/plain");
   const text = html ? htmlToText(decode(html)) : plain ? decode(plain) : "";
-  return { id: m.id, from: header("from"), subject: header("subject"), text: text.slice(0, 50000), date: new Date(Number(m.internalDate)) };
+  return { id: m.id, from: header("from"), subject: header("subject"), text: text.slice(0, 50000), date: new Date(Number(m.internalDate)), pdfs: pdfParts(m.payload).slice(0, 2) };
+}
+
+export async function getAttachment(access: string, messageId: string, attachmentId: string) {
+  const r = await gmail<{ data: string }>(access, `/messages/${messageId}/attachments/${attachmentId}`);
+  return new Uint8Array(Buffer.from(r.data, "base64url"));
 }
 
 // ---------------------------------------------------------------------------- OAuth state

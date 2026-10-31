@@ -210,9 +210,21 @@ export type HeatCell = { day: string; state: "done" | "skipped" | "missed" | "du
 
 /** Last `weeks` weeks ending this week (Sun–Sat columns), for the calendar heatmap. */
 export function heatmap(habit: Habit | null, checkins: Checkin[], today: string, weeks = 12): HeatCell[] {
-  const byDay = new Map(checkins.map((c) => [c.day, c.status]));
   const end = addDays(today, 6 - weekdayOf(today));
-  const start = addDays(end, -(weeks * 7 - 1));
+  return dayCells(habit, checkins, addDays(end, -(weeks * 7 - 1)), end, today);
+}
+
+/** A month as calendar weeks (Sun–Sat); days outside the month are still filled in, marked `outside`. */
+export function monthGrid(habit: Habit | null, checkins: Checkin[], month: string, today: string): (HeatCell & { outside: boolean })[] {
+  const first = `${month}-01`;
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const cells = dayCells(habit, checkins, addDays(first, -weekdayOf(first)), addDays(last, 6 - weekdayOf(last)), today);
+  return cells.map((c) => ({ ...c, outside: !c.day.startsWith(month) }));
+}
+
+function dayCells(habit: Habit | null, checkins: Checkin[], start: string, end: string, today: string): HeatCell[] {
+  const byDay = new Map(checkins.map((c) => [c.day, c.status]));
   const cells: HeatCell[] = [];
   for (let day = start; diffDays(day, end) >= 0; day = addDays(day, 1)) {
     const status = byDay.get(day);

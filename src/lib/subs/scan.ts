@@ -5,8 +5,9 @@ import { sendPush } from "@/lib/push";
 import { todayKey } from "@/lib/engine/habits";
 import type { Item, Profile } from "@/lib/db-types";
 import { BILLERS, SERVICES } from "./catalog";
-import { getMessage, GoogleAuthError, listMessageIds, openToken, refreshAccess } from "./gmail";
-import { chargesFrom, rollForward, summarize, type DetectedSub, type MailMessage } from "./parse";
+import { getAttachment, getMessage, GoogleAuthError, listMessageIds, openToken, refreshAccess, type PdfRef } from "./gmail";
+import { chargesFrom, needsAttachments, rollForward, summarize, type DetectedSub, type MailMessage } from "./parse";
+import { pdfText } from "./pdf";
 import { readSub, subPatch, type SubProps } from "./types";
 
 type Db = SupabaseClient;
@@ -34,6 +35,9 @@ const QUERIES: [string, number][] = [
   [`newer_than:400d (from:(${BILLER_FROM.join(" OR ")}) OR subject:(חשבון OR ארנונה OR "דרישת תשלום" OR "הודעת חיוב" OR שובר OR bill OR statement OR "ועד בית" OR "דמי ביטוח"))`, 300],
 ];
 
+/** How many PDFs one scan opens: enough for a year of bills, short enough for one cron call. */
+const MAX_PDFS = 60;
+
 async function pool<T, R>(xs: T[], size: number, fn: (x: T) => Promise<R>) {
   const out: R[] = [];
   for (let i = 0; i < xs.length; i += size) out.push(...(await Promise.all(xs.slice(i, i + size).map(fn))));
@@ -55,12 +59,18 @@ export async function scanGmail(db: Db, sectionId: string, opts: { notify?: bool
     const hits: string[] = [];
     for (const [q, max] of QUERIES) hits.push(...(await listMessageIds(access, q, max)));
     const ids = [...new Set(hits)].slice(0, 800);
-    const messages = (await pool(ids, 4, (id) => getMessage(access, id).catch(() => null))).filter(Boolean) as MailMessage[];
+    const messages = (await pool(ids, 4, (id) => getMessage(access, id).catch(() => null))).filter(Boolean) as (MailMessage & { pdfs: PdfRef[] })[];
+    // Bills and receipts that carry the amount (and sometimes the biller) only in the PDF: newest first.
+    const withPdf = messages.filter((m) => m.pdfs.length && needsAttachments(m)).sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, MAX_PDFS);
+    await pool(withPdf, 4, async (m) => {
+      const texts = await Promise.all(m.pdfs.map((p) => getAttachment(access, m.id, p.attachmentId).then(pdfText).catch(() => "")));
+      m.attachments = texts.join("\n").slice(0, 20000);
+    });
     const today = todayKey(profile.timezone, now);
     const found = summarize(messages.flatMap(chargesFrom), today);
     const changes = await mergeSubs(db, profile, sectionId, found, today, now);
 
-    const stats = { read: messages.length, subs: found.filter((d) => !d.bill).length, bills: found.filter((d) => d.bill).length };
+    const stats = { read: messages.length, pdfs: withPdf.length, subs: found.filter((d) => !d.bill).length, bills: found.filter((d) => d.bill).length };
     await mark({ status: "ok", last_scan_at: now.toISOString(), scan_error: null, scan_stats: stats });
     if (opts.notify) await notifyChanges(db, profile, sectionId, changes);
     return { ok: true, found: found.length, added: changes.added.length };
