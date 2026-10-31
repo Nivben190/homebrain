@@ -20,6 +20,7 @@ import { reminderAudience } from "./audience";
 import { readLead } from "./due";
 import { pickLine, themeOf } from "./voice";
 import { commitProps, readCommit, status, type CommitSpec } from "@/lib/commit";
+import { nextPlanReminder, planProgress, planProps, readLog, readPlan, sessionOn, weekOf, weekStarts, weekView, type PlanCheckin, type PlanSpec } from "@/lib/plan";
 import { giftLine, wantsGift } from "@/lib/gifts";
 import { calendarAccess, upsertEvent } from "@/lib/gcal";
 import { minuteOfDay, parseHHmm, zonedParts } from "./time";
@@ -200,6 +201,7 @@ export async function tick(db: Admin, now = new Date()) {
     ["daily", async () => (await dailyJobs(db, now)).map((job) => ({ automationId: job, status: "fired" as const, reason: "daily" }))],
     ["item reminders", () => fireDueItems(db, now)],
     ["queued jobs", () => runDueJobs(db, now)],
+    ["plan cheers", () => sendPlanCheers(db, now)],
   ]);
 }
 
@@ -269,6 +271,8 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
   if (item && section && spec && !item.done) return fireDateReminder(db, item, section, spec, dueAt, now);
   const commit = item ? readCommit(item.props ?? {}) : null;
   if (item && section && commit) return fireCommitEnd(db, item, section, commit, now);
+  const plan = item ? readPlan(item.props ?? {}) : null;
+  if (item && section && plan) return firePlan(db, item, section, plan, dueAt, now);
   const habit = item ? readHabit(item.props ?? {}) : null;
   if (item && section && !habit && !item.done && item.due_at && readLead(item.props ?? {}) !== null) return fireDueReminder(db, item, section, dueAt, now);
   if (!item || !section || !habit || item.done) {
@@ -344,6 +348,131 @@ async function fireCommitEnd(db: Admin, item: { id: string; title: string; props
     return { title: fill(title, { item: item.title }), body, rendered: [{ kind: "link", icon: "🤝", label: section.title, href: `/sections/${section.id}` }] };
   });
   return { automationId: item.id, status: fired ? "fired" : "skipped", reason: result };
+}
+
+type PlanItem = { id: string; title: string; props: Record<string, unknown>; assignee_id: string | null; created_by: string | null };
+
+async function planCheckins(db: Admin, itemId: string): Promise<PlanCheckin[]> {
+  const { data } = await db.from("checkins").select("id,day,status,user_id,data").eq("item_id", itemId);
+  return (data ?? []) as PlanCheckin[];
+}
+
+/** What a session is called in a message: its own name when the plan has several. */
+const sessionLabel = (item: { title: string }, spec: PlanSpec, sessionId: string | undefined, day: string) => {
+  const session = spec.sessions.find((s) => s.id === sessionId) ?? sessionOn(spec, day) ?? spec.sessions[0];
+  return spec.sessions.length > 1 ? `${item.title} · ${session.name}` : item.title;
+};
+
+/** Points a plan's remind_at at its next session, nudge or weekly look back. */
+export async function reschedulePlan(db: Admin, itemId: string, spec: PlanSpec, timeZone: string, now = new Date()) {
+  const next = nextPlanReminder(spec, await planCheckins(db, itemId), now, timeZone);
+  await db.from("items").update({ remind_at: next?.at.toISOString() ?? null }).eq("id", itemId);
+}
+
+/**
+ * A plan's moment: the session time or the evening nudge (to whoever committed,
+ * unless it's done or the week is already kept), or Saturday evening's look
+ * back on the week, which everyone in the space hears: kept, or missed and the
+ * stake. The last week settles the plan.
+ */
+async function firePlan(db: Admin, item: PlanItem, section: Section, spec: PlanSpec, dueAt: Date, now: Date): Promise<FireOutcome> {
+  const { eligible, timeZone: tz } = await audienceOf(db, section);
+  const checkins = await planCheckins(db, item.id);
+  const due = nextPlanReminder(spec, checkins, new Date(dueAt.getTime() - 1000), tz);
+  const owner = item.assignee_id ?? item.created_by ?? section.owner_id;
+  const ownerName = eligible.find((m) => m.user_id === owner)?.display_name ?? "";
+  const late = now.getTime() - dueAt.getTime() > MAX_LATENESS_MS;
+  const link = (): RenderedAction => ({ kind: "link", icon: section.icon, label: section.title, href: `/sections/${section.id}` });
+
+  if (!due || due.at.getTime() !== dueAt.getTime()) {
+    await reschedulePlan(db, item.id, spec, tz, now);
+    return { automationId: item.id, status: "skipped", reason: "nothing due / already done" };
+  }
+
+  if (due.kind === "review") {
+    const week = weekOf(due.day);
+    const view = weekView(spec, checkins, week, due.day);
+    const next: PlanSpec = { ...spec, reviewed: { ...spec.reviewed, [week]: view.done } };
+    const final = week === weekStarts(spec).at(-1);
+    if (final) next.result = planProgress(next, checkins, addDays(due.day, 1)).result ?? "broken";
+    await db.from("items").update({ props: planProps(item.props, next) }).eq("id", item.id);
+    if (!final) await reschedulePlan(db, item.id, next, tz, now);
+    else await db.from("items").update({ remind_at: null }).eq("id", item.id);
+    if (view.target === 0 || late) return { automationId: item.id, status: "skipped", reason: late ? "too late" : "week not counted" };
+
+    const kept = view.done >= view.target;
+    const progress = planProgress(next, checkins, addDays(due.day, 1));
+    const fired = await sendReminders(db, section, item.id, eligible, now, (target) => {
+      const t = getDict(target.locale).plan;
+      const mine = target.user_id === owner;
+      const vars = { n: view.number, item: item.title, name: ownerName, done: view.done, target: view.target };
+      const stake = !kept && spec.stake ? ` ${fill(mine ? t.stakeOwed : t.partnerStake, { stake: spec.stake })}` : "";
+      if (final) {
+        const title = fill(t.endTitle, { item: item.title, kept: progress.kept, total: progress.kept + progress.missed });
+        return { title, body: `${next.result === "kept" ? t.endKept : t.endBroken}${stake}`, rendered: [link()] };
+      }
+      const title = fill(mine ? (kept ? t.weekKeptTitle : t.weekMissedTitle) : kept ? t.partnerKeptTitle : t.partnerMissedTitle, vars);
+      const body = `${fill(mine ? (kept ? t.weekKeptBody : t.weekMissedBody) : t.partnerBody, vars)}${stake}`;
+      return { title, body, rendered: [link()] };
+    });
+    return { automationId: item.id, status: fired ? "fired" : "skipped", reason: kept ? "week kept" : "week missed" };
+  }
+
+  await reschedulePlan(db, item.id, spec, tz, now);
+  if (late) return { automationId: item.id, status: "skipped", reason: "too late" };
+  const targets = eligible.filter((m) => m.user_id === owner);
+  const view = weekView(spec, checkins, weekOf(due.day), due.day);
+  const label = sessionLabel(item, spec, undefined, due.day);
+  const fired = await sendReminders(db, section, item.id, targets, now, (target) => {
+    const dict = getDict(target.locale);
+    const voice = dict.voice[themeOf(section, item.title)];
+    const seed = `${item.id}:${due.day}`;
+    const line = due.kind === "nudge" ? fill(pickLine(voice.nudge, seed), { item: label }) : pickLine(voice.start, seed);
+    return {
+      title: fill(due.kind === "nudge" ? dict.plan.nudgeTitle : dict.plan.remindTitle, { session: label }),
+      body: `${line} · ${fill(dict.plan.weekLeft, { week: view.number, done: view.done, target: view.target })}`,
+      rendered: [{ kind: "done", label: dict.tracker.doneButton }, link()],
+    };
+  });
+  return { automationId: item.id, status: fired ? "fired" : "skipped", reason: fired ? `${fired} people` : "quiet / nobody assigned" };
+}
+
+/**
+ * "Niv finished Push day 💪": a fresh session on a plan, however it was logged,
+ * goes to everyone else in the space as a push (no card: nothing to do but
+ * smile, or react in the space).
+ */
+async function sendPlanCheers(db: Admin, now: Date): Promise<FireOutcome[]> {
+  // Claiming by flipping the flag: a second tick running at once gets nothing.
+  const { data: rows } = await db.from("checkins").update({ cheer_pending: false }).eq("cheer_pending", true).select("id,item_id,user_id,day,data,created_at");
+  const outcomes: FireOutcome[] = [];
+  for (const row of (rows ?? []) as { id: string; item_id: string; user_id: string | null; day: string; data: unknown; created_at: string }[]) {
+    if (!row.user_id || now.getTime() - Date.parse(row.created_at) > 6 * 3600_000) continue;
+    const { data: item } = await db.from("items").select("*, sections(*)").eq("id", row.item_id).single();
+    const section = item?.sections as Section | undefined;
+    const spec = item ? readPlan(item.props ?? {}) : null;
+    if (!item || !section || !spec) continue;
+    const { eligible, timeZone: tz } = await audienceOf(db, section);
+    const name = eligible.find((m) => m.user_id === row.user_id)?.display_name ?? "";
+    const log = readLog(row.data);
+    const view = weekView(spec, await planCheckins(db, item.id), weekOf(row.day), todayKey(tz, now));
+    const label = sessionLabel(item, spec, log?.session, row.day);
+    let sent = 0;
+    for (const target of eligible) {
+      if (target.user_id === row.user_id || (await isQuiet(target, now)) || !pushAllowed(target, section.id, now)) continue;
+      const t = getDict(target.locale).plan;
+      const minutes = log?.minutes ? ` · ${fill(t.minutesShort, { n: log.minutes })}` : "";
+      const feel = log?.feel ? ` ${t.feelings[log.feel - 1]}` : "";
+      await sendPush(db, target.user_id, {
+        title: `${section.icon} ${fill(t.cheerTitle, { name, session: label })}`,
+        body: `${fill(t.cheerBody, { week: view.number, done: view.done, target: view.target })}${minutes}${feel}`,
+        url: `/sections/${section.id}`,
+      });
+      sent++;
+    }
+    outcomes.push({ automationId: item.id, status: sent ? "fired" : "skipped", reason: sent ? "cheer" : "nobody to tell" });
+  }
+  return outcomes;
 }
 
 /** A dated item's "remind me before" alert, to its assignee (or the space's audience). One-off: clears remind_at. */

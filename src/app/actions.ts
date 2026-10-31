@@ -25,6 +25,7 @@ import type { Automation, RequestRow, Role } from "@/lib/db-types";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
+import { readPlan } from "@/lib/plan";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
 import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib/guest-links";
 import { INGREDIENTS_PROP, parseIngredients, readIngredients, shoppingFor } from "@/lib/meals";
@@ -576,7 +577,9 @@ export async function markRun(id: string, done: boolean) {
     .single<{ item_id: string | null; automation_id: string | null; user_id: string; rendered: RenderedAction[] }>();
   // Tracker reminders: "Done" checks the session in for today. Reminder-calendar
   // alerts carry the date they're about ("No more needed" handles that date).
-  if (run?.item_id) {
+  // A plan's card without a Done button (the weekly result) is just read: marking it doesn't log a session.
+  const readOnly = !!run?.item_id && !run.rendered?.some((r) => r.kind === "done") && !!readPlan((await supabase.from("items").select("props").eq("id", run.item_id).maybeSingle()).data?.props ?? {});
+  if (run?.item_id && !readOnly) {
     const doneAction = run.rendered.find((r) => r.kind === "done");
     const dateDay = doneAction?.kind === "done" ? doneAction.day : undefined;
     const day = dateDay ?? todayKey(profile.timezone);

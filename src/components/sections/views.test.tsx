@@ -435,3 +435,30 @@ describe("subscriptions", () => {
     expect(screen.getByRole("link", { name: t.subs.reconnect })).toBeInTheDocument();
   });
 });
+
+describe("plans", () => {
+  it("start from a preset, log today's session with real numbers, and see it in the week", async () => {
+    const { user, t, section } = await open("plan");
+    await user.click(screen.getByRole("button", { name: new RegExp(t.plan.newGoal) }));
+    await user.click(await screen.findByRole("button", { name: /Home workout 4× a week/ }));
+    // Every day planned, so today has a session whatever day the test runs.
+    for (const d of [2, 5, 6]) await user.click(screen.getByRole("button", { name: t.weekdaysShort[d] }));
+    await user.click(screen.getByRole("button", { name: t.plan.create }));
+    await waitFor(async () => expect((await props(section.id))[0]?.props._plan).toBeTruthy());
+    const card = await screen.findByRole("region", { name: "Home workout 4× a week" });
+    // A plan made midweek asks only for the sessions still ahead this week.
+    expect(within(card).getByText(/^0 of [1-4] this week$/)).toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: new RegExp(t.plan.start) }));
+    const reps = await screen.findByRole("textbox", { name: `Squats ${t.plan.reps}` });
+    await user.clear(reps);
+    await user.type(reps, "20");
+    await user.click(screen.getByRole("button", { name: "🤩" }));
+    await user.click(screen.getByRole("button", { name: t.plan.saveSession }));
+    await waitFor(async () => {
+      const [row] = await sql<{ data: { steps: { reps?: number }[]; feel?: number } }>(`select c.data from checkins c join items i on i.id = c.item_id where i.section_id = $1`, [section.id]);
+      expect(row?.data).toMatchObject({ feel: 5, steps: [{ reps: 20 }, {}, {}] });
+    });
+    expect(await within(card).findByText(/^1 of [1-4] this week$/)).toBeInTheDocument();
+  });
+});

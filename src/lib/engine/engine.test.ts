@@ -194,7 +194,7 @@ describe("item reminders", () => {
 describe("heartbeat", () => {
   it("every phase reports, even when there's nothing to do", async () => {
     const { phases } = await tick(db());
-    expect(phases.map((p) => p.phase)).toEqual(["schedules", "fixed wakes", "daily", "item reminders", "queued jobs"]);
+    expect(phases.map((p) => p.phase)).toEqual(["schedules", "fixed wakes", "daily", "item reminders", "queued jobs", "plan cheers"]);
     expect(phases.every((p) => p.ok)).toBe(true);
   });
 });

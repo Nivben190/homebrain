@@ -51,6 +51,7 @@ export const SPACE_TYPES: Record<SectionView, SpaceType> = {
   fridge: { ...base, addPlaceholder: (t) => t.fridge.addPlaceholder, ownEmptyState: true, datesAreDue: false },
   spend: { ...base, ownEmptyState: true, datesAreDue: false, quickAdd: false },
   wheel: { ...base, addPlaceholder: (t) => t.wheel.addPlaceholder, ownEmptyState: true, datesAreDue: false },
+  plan: { ...base, ownEmptyState: true, datesAreDue: false, reminds: true, quickAdd: false },
 };
 
 export const spaceType = (view: SectionView): SpaceType => SPACE_TYPES[view] ?? base;

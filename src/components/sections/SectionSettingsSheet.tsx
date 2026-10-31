@@ -105,6 +105,7 @@ export function SectionSettingsSheet({
                 ["commit", "🤝"],
                 ["spend", "💸"],
                 ["fridge", "🧊"],
+                ["plan", "🎯"],
               ] as [SectionView, string][]
             ).map(([view, icon]) => (
               <button

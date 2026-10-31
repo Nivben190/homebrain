@@ -83,7 +83,7 @@ export interface RequestRow {
   updated_at: string;
 }
 
-export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions" | "wheel" | "commit" | "spend" | "fridge";
+export type SectionView = "list" | "checklist" | "notes" | "tracker" | "gallery" | "dates" | "subscriptions" | "wheel" | "commit" | "spend" | "fridge" | "plan";
 
 export interface Section {
   pet_id?: string | null;
@@ -161,6 +161,10 @@ export interface CheckinRow {
   status: "done" | "skipped";
   note: string | null;
   created_at: string;
+  /** A plan session's log: what was done, how long, how it felt. */
+  data?: unknown;
+  /** Reactions to a plan session, by user id. */
+  reactions?: Record<string, string> | null;
 }
 
 export interface Job {

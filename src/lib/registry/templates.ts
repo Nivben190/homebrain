@@ -677,6 +677,26 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     title: { en: "Commitments", he: "התחייבויות" },
     desc: { en: "\"Under ₪300 on Cibus this month\", \"laundry today\" — at the end you find out if you made it, with a scoreboard.", he: "\"עד 300 ₪ בסיבוס החודש\", \"כביסה היום\" — בסוף מגלים אם עמדתם בזה, עם לוח תוצאות." },
   },
+  // A goal over weeks with planned sessions, a real log of each one, the partner
+  // watching, and a stake for a missed week.
+  {
+    key: "training",
+    category: "health",
+    icon: "🏋️",
+    color: "coral",
+    view: "plan",
+    title: { en: "Training plan", he: "תוכנית אימונים" },
+    desc: { en: "Plan the week's workouts, log what you really lifted or ran, move a missed one, and let your partner cheer (or collect the stake).", he: "מתכננים את האימונים של השבוע, רושמים מה באמת הרמתם או רצתם, מזיזים אימון שהתפספס, והבן/בת זוג מעודדים (או גובים את ההימור)." },
+  },
+  {
+    key: "goals",
+    category: "plan",
+    icon: "🎯",
+    color: "violet",
+    view: "plan",
+    title: { en: "Goals", he: "יעדים" },
+    desc: { en: "Study 4× a week, read, train the dog — a plan for each, a log of what you did, weekly results your partner sees.", he: "ללמוד 4 פעמים בשבוע, לקרוא, לאלף את הכלב — תוכנית לכל אחד, תיעוד של מה שעשיתם, ותוצאה שבועית שגם הבן/בת זוג רואים." },
+  },
   // A photo of the fridge becomes the inventory; staples running out go on the shopping list.
   {
     key: "fridge",

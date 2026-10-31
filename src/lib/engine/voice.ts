@@ -16,7 +16,7 @@ const RULES: { theme: Theme; templates: string[]; icons: string[]; words: RegExp
   },
   {
     theme: "workout",
-    templates: ["fitness"],
+    templates: ["fitness", "training"],
     icons: ["🏋️", "🏋", "💪", "🏃", "🏃‍♀️", "🏃‍♂️", "🚴", "🏊", "🤸", "⚽", "🥊", "🤾", "⛹️"],
     words: /\b(gym|workout|work out|fitness|exercise|a run|running|pilates|crossfit|swim|cardio|push-?ups|squats|training)\b|כושר|אימון|אימונ|ריצה|חדר כושר|פילאטיס|שחייה|כפיפות|סקוואט/i,
   },

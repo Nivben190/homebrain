@@ -44,6 +44,7 @@ import { errorKey } from "@/lib/errors";
 import { WheelView } from "./WheelView";
 import { WHEEL_PROP } from "@/lib/wheel";
 import { CommitView } from "./CommitView";
+import { PlanView } from "./PlanView";
 import { SpendView } from "./SpendView";
 import { FridgeView } from "./FridgeView";
 import { FRIDGE_PROP } from "@/lib/fridge";
@@ -485,6 +486,19 @@ export function SectionScreen({
               toast.error(t.failures[error ? errorKey(error) : "denied"]);
             }
           }}
+        />
+      ) : section.view === "plan" ? (
+        <PlanView
+          section={section}
+          items={sorted}
+          checkins={checkins}
+          members={members}
+          userId={userId}
+          timeZone={timeZone}
+          onItem={(item) => setItems((p) => (p.some((i) => i.id === item.id) ? p.map((i) => (i.id === item.id ? item : i)) : [...p, item]))}
+          onCheckin={(row) => setCheckins((p) => [...p.filter((c) => c.id !== row.id && !(c.item_id === row.item_id && c.day === row.day)), row])}
+          onCheckinGone={(itemId, day) => setCheckins((p) => p.filter((c) => !(c.item_id === itemId && c.day === day)))}
+          onDelete={remove}
         />
       ) : section.view === "commit" ? (
         <CommitView items={sorted} onUpdate={update} onDelete={remove} onAdd={addCommit} />

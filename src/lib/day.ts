@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CheckinRow, Item, Profile, RequestRow, Section } from "@/lib/db-types";
-import { assigneesFor, isDue, readHabit, todayKey, addDays, type Habit } from "@/lib/engine/habits";
+import { assigneesFor, isDue, readHabit, todayKey, addDays, weekdayOf, type Habit } from "@/lib/engine/habits";
+import { readPlan, sessionOn } from "@/lib/plan";
 import { zonedTimeToUtc } from "@/lib/engine/time";
 import { DEFAULT_PLACE, getForecast, outdoorWarning, walkAdvice, weatherAt, type DayWeather, type Forecast, type WalkAdvice } from "@/lib/weather";
 import { getJewishCalendar, holyStatus, type HolyStatus } from "@/lib/jewish";
@@ -56,7 +57,7 @@ export async function buildDay(db: SupabaseClient, me: Profile, memberIds: strin
       .from("items")
       .select("*, checkins(*), sections!inner(*)")
       .eq("sections.household_id", me.household_id)
-      .eq("sections.view", "tracker")
+      .in("sections.view", ["tracker", "plan"])
       .eq("done", false)
       .eq("checkins.day", today)
       .returns<(Item & { checkins: CheckinRow[]; sections: Section })[]>(),
@@ -80,6 +81,22 @@ export async function buildDay(db: SupabaseClient, me: Profile, memberIds: strin
   const sessions: DaySession[] = [];
   for (const row of trackerQ.data ?? []) {
     const { checkins, sections: section, ...item } = row;
+    // A plan's session planned today shows like a routine's, for whoever committed.
+    const plan = readPlan(item.props);
+    const planned = plan ? sessionOn(plan, today) : null;
+    if (plan && !plan.result && planned && visible(section)) {
+      const owner = item.assignee_id ?? item.created_by ?? me.user_id;
+      sessions.push({
+        item: { ...(item as Item), title: plan.sessions.length > 1 ? `${item.title} · ${planned.name}` : item.title },
+        section,
+        habit: { repeat: { kind: "weekly", days: [weekdayOf(today)] }, time: plan.time, nudge: plan.nudge, outdoor: false, assign: { kind: "person", userId: owner } },
+        done: checkins?.[0] ?? null,
+        assignees: [owner],
+        mine: owner === me.user_id,
+        warning: null,
+      });
+      continue;
+    }
     const habit = readHabit(item.props);
     if (!habit || !visible(section) || !isDue(habit, today)) continue;
     const assignees = assigneesFor(habit, today, memberIds, item.assignee_id ?? section.owner_id ?? item.created_by);
