@@ -5,7 +5,8 @@ import { useI18n } from "@/i18n/client";
 import { Button, Field, Input, Segmented, Select, Sheet, Toggle } from "@/components/ui";
 import { todayKey } from "@/lib/engine/habits";
 import type { Currency, Cycle } from "@/lib/subs/parse";
-import { readSub, RENEW_AHEAD, subPatch, type SubProps } from "@/lib/subs/types";
+import { categoryOf, isBill, readSub, RENEW_AHEAD, subPatch, type SubProps } from "@/lib/subs/types";
+import { CATEGORIES, CATEGORY_ICON, type Category } from "@/lib/subs/catalog";
 import { money } from "./SubscriptionsView";
 import type { CheckinRow, Item, Section } from "@/lib/db-types";
 import { fill } from "@/i18n";
@@ -96,8 +97,8 @@ export function SubscriptionSheet({
 
         {sub.chargedAfterCancel && <p className="rounded-2xl bg-danger/12 p-3 text-sm font-bold text-danger">{t.subs.chargedAgain}</p>}
 
-        {/* Cancel */}
-        {sub.status !== "hidden" && (
+        {/* Cancel (a bill is paid, not cancelled) */}
+        {sub.status !== "hidden" && !isBill(sub) && (
           <div className="space-y-2 rounded-2xl bg-sunken p-3">
             {sub.status === "active" ? (
               <>
@@ -135,10 +136,20 @@ export function SubscriptionSheet({
             onChange={(cycle: Cycle) => edit({ cycle })}
             options={[
               { value: "monthly", label: t.subs.monthly },
+              { value: "bimonthly", label: t.subs.bimonthly },
               { value: "yearly", label: t.subs.yearly },
               { value: "weekly", label: t.subs.weekly },
             ]}
           />
+        </Field>
+        <Field label={t.subs.category}>
+          <Select value={categoryOf(sub)} onChange={(e) => edit({ category: e.target.value as Category, categoryByHand: true })} className="h-12">
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_ICON[c]} {t.subs.categories[c]}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label={t.subs.next}>
           <Input type="date" value={sub.next ?? ""} onChange={(e) => edit({ next: e.target.value || null })} className="h-12" />

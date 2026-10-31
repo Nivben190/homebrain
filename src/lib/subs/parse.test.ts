@@ -117,3 +117,45 @@ describe("emails → subscriptions", () => {
     expect(subs.map((s) => s.next)).toEqual(["2026-11-02", "2026-11-03", "2026-11-05"]);
   });
 });
+
+describe("household bills", () => {
+  const today = "2026-10-31";
+
+  it("the electric company every two months, even when the amount is only in the PDF", () => {
+    const iec = (d: string) => msg("חברת החשמל <noreply@iec.co.il>", "חשבון החשמל שלך מוכן לצפייה", "שלום, החשבון מצורף כקובץ PDF.", d, d);
+    const subs = summarize([iec("2026-05-10"), iec("2026-07-09"), iec("2026-09-10")].flatMap(chargesFrom), today);
+    expect(subs).toHaveLength(1);
+    expect(subs[0]).toMatchObject({ key: "bill:iec", name: "חברת החשמל", category: "electricity", bill: true, cycle: "bimonthly", amount: null, next: "2026-11-10" });
+  });
+
+  it("a water bill: the corporation's own name, the amount and its pay-by date", () => {
+    const water = (d: string, due: string) =>
+      msg("מי אביבים <bills@some-mailer.co.il>", "הודעת חיוב - חשבון מים", `סכום לתשלום: 182.40 ₪\nלתשלום עד ${due}`, d, d);
+    const subs = summarize([water("2026-08-25", "15/09/2026"), water("2026-09-25", "15/10/2026"), water("2026-10-25", "15/11/2026")].flatMap(chargesFrom), today);
+    expect(subs).toHaveLength(1);
+    expect(subs[0]).toMatchObject({ name: "מי אביבים", category: "water", bill: true, cycle: "monthly", amount: 182.4, currency: "ILS", next: "2026-11-15" });
+  });
+
+  it("arnona from the city, every two months", () => {
+    const city = (d: string) => msg("עיריית תל אביב-יפו <arnona@tel-aviv.muni.il>", "שובר תשלום ארנונה", "סה״כ לתשלום 1,240.00 ₪", d, d);
+    const subs = summarize([city("2026-07-01"), city("2026-09-01")].flatMap(chargesFrom), today);
+    expect(subs[0]).toMatchObject({ category: "arnona", cycle: "bimonthly", amount: 1240, next: "2026-11-01" });
+  });
+
+  it("news from the same city or company isn't a bill", () => {
+    expect(chargesFrom(msg("עיריית תל אביב-יפו <news@tel-aviv.muni.il>", "אירועי סוף השבוע בעיר", "…", "2026-10-20"))).toEqual([]);
+    expect(chargesFrom(msg("חברת החשמל <noreply@iec.co.il>", "טיפים לחיסכון בחשמל | פרסומת", "…", "2026-10-20"))).toEqual([]);
+  });
+
+  it("phone and internet providers are bills; streaming is a subscription", () => {
+    expect(chargesFrom(msg("Partner <bill@partner.co.il>", "החשבונית שלך לחודש אוקטובר", "סה״כ 99.90 ₪", "2026-10-05"))[0]).toMatchObject({ category: "phone", bill: true });
+    expect(chargesFrom(msg("Netflix <info@account.netflix.com>", "Your payment receipt", "Total ₪54.90", "2026-10-05"))[0]).toMatchObject({ category: "streaming" });
+  });
+
+  it("reads 'every two months' in Hebrew and English", () => {
+    expect(detectCycle("חיוב דו-חודשי")).toBe("bimonthly");
+    expect(detectCycle("Billed every 2 months")).toBe("bimonthly");
+    expect(detectCycle("חיוב חודשי")).toBe("monthly");
+    expect(rollForward("2026-09-10", "bimonthly", today)).toBe("2026-11-10");
+  });
+});

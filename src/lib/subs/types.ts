@@ -3,6 +3,7 @@
 // with `remind` on, the item also gets a `_dates` spec for its next renewal.
 import { DATES_PROP, datePlan, type DateSpec } from "@/lib/engine/dates";
 import type { Currency, Cycle } from "./parse";
+import { CATEGORIES, isBillCategory, SERVICES, type Category } from "./catalog";
 
 export const SUB_PROP = "_sub";
 /** Days before a renewal to send the heads-up. */
@@ -38,7 +39,23 @@ export interface SubProps {
   cancelledOn?: string | null;
   chargedAfterCancel?: boolean;
   charges?: SubCharge[];
+  /** What kind of expense (electricity, streaming…); older items get one from their key. */
+  category?: Category;
+  /** Chosen in the sheet: later scans keep it. */
+  categoryByHand?: boolean;
 }
+
+/** An item's category: stored, else from the known service behind its key, else "other". */
+export function categoryOf(sub: SubProps): Category {
+  if (sub.category && CATEGORIES.includes(sub.category)) return sub.category;
+  const service = SERVICES.find((s) => s.key === sub.key);
+  if (service) return service.category;
+  if (sub.key?.startsWith("apple:") || sub.key?.startsWith("play:")) return "apps";
+  return "other";
+}
+
+/** Bills (electricity, water, phone…) are shown and counted apart from subscriptions. */
+export const isBill = (sub: SubProps) => isBillCategory(categoryOf(sub));
 
 export function readSub(props: Record<string, unknown>): SubProps | null {
   const s = props[SUB_PROP];
@@ -54,7 +71,7 @@ export function subPatch(props: Record<string, unknown>, sub: SubProps, timeZone
   const { [DATES_PROP]: _old, ...rest } = props; // eslint-disable-line @typescript-eslint/no-unused-vars
   const alerting = sub.remind && sub.status === "active" && !!sub.next && sub.cycle !== "weekly";
   if (!alerting) return { props: { ...rest, [SUB_PROP]: sub }, remind_at: null, due_at: null };
-  const spec: DateSpec = { date: sub.next!, repeat: sub.cycle === "yearly" ? "yearly" : "monthly", from: "09:00", until: "21:00", every: 0, ahead: RENEW_AHEAD, carry: false };
+  const spec: DateSpec = { date: sub.next!, repeat: sub.cycle === "yearly" ? "yearly" : sub.cycle === "bimonthly" ? "bimonthly" : "monthly", from: "09:00", until: "21:00", every: 0, ahead: RENEW_AHEAD, carry: false };
   const plan = datePlan(spec, now, timeZone, (d) => handled.has(d));
   return { props: { ...rest, [SUB_PROP]: sub, [DATES_PROP]: spec }, remind_at: plan.remindAt?.toISOString() ?? null, due_at: plan.dueAt?.toISOString() ?? null };
 }

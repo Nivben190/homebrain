@@ -18,7 +18,7 @@ export default async function SectionPage({ params }: { params: Promise<{ id: st
   // gmail_connections is service-role only; read just this space's connection status (RLS already let us see the space).
   const gmail =
     section.view === "subscriptions"
-      ? (await createSupabaseAdmin().from("gmail_connections").select("email,status,last_scan_at").eq("section_id", section.id).maybeSingle()).data
+      ? (await createSupabaseAdmin().from("gmail_connections").select("email,status,last_scan_at,scan_stats").eq("section_id", section.id).maybeSingle()).data
       : null;
   return (
     <SectionScreen
@@ -28,7 +28,7 @@ export default async function SectionPage({ params }: { params: Promise<{ id: st
       initialCheckins={checkins}
       timeZone={profile.timezone}
       launch={{ notes: launchTokenFor(user.id, "notes"), checkin: launchTokenFor(user.id, "checkin") }}
-      gmail={gmail ? { email: gmail.email, status: gmail.status, lastScanAt: gmail.last_scan_at } : null}
+      gmail={gmail ? { email: gmail.email, status: gmail.status, lastScanAt: gmail.last_scan_at, stats: gmail.scan_stats ?? null } : null}
       userId={user.id}
       members={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }))}
     />

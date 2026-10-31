@@ -9,7 +9,8 @@ import { Button, Spinner } from "@/components/ui";
 import { disconnectGmail } from "@/app/actions";
 import { diffDays, todayKey } from "@/lib/engine/habits";
 import { monthlyCost, type Currency } from "@/lib/subs/parse";
-import { readSub, type SubProps } from "@/lib/subs/types";
+import { categoryOf, isBill, readSub, type SubProps } from "@/lib/subs/types";
+import { CATEGORIES, CATEGORY_ICON } from "@/lib/subs/catalog";
 import { relativeDay } from "./DatesView";
 import { RemoveBadge, SwipeRow } from "./SwipeRow";
 import type { Item, Section } from "@/lib/db-types";
@@ -19,6 +20,8 @@ export interface GmailStatus {
   email: string | null;
   status: "ok" | "expired";
   lastScanAt: string | null;
+  /** What the last scan did: emails read, subscriptions and bills found. */
+  stats?: { read: number; subs: number; bills: number } | null;
 }
 
 export function money(locale: string, amount: number, currency: Currency) {
@@ -41,8 +44,10 @@ function totals(locale: string, subs: SubProps[], months: number) {
 }
 
 /**
- * Subscriptions: the monthly total, then what you pay for sorted by the next
- * renewal. Gmail finds them; anything can also be added by hand.
+ * Subscriptions and bills: the monthly total, then bills (electricity, water,
+ * arnona…) and subscriptions, each grouped by category with its own monthly
+ * total and sorted by what's due next. Gmail finds them; anything can also be
+ * added by hand.
  */
 export function SubscriptionsView({
   section,
@@ -95,6 +100,11 @@ export function SubscriptionsView({
 
   const subs = useMemo(() => items.map((item) => ({ item, sub: readSub(item.props) })).filter((x): x is { item: Item; sub: SubProps } => !!x.sub), [items]);
   const active = subs.filter((x) => x.sub.status === "active").sort((a, b) => (a.sub.next ?? "9").localeCompare(b.sub.next ?? "9"));
+  const bills = active.filter((x) => isBill(x.sub));
+  const paidFor = active.filter((x) => !isBill(x.sub));
+  /** Category groups in a fixed order (electricity before water…), each with its rows. */
+  const groups = (list: typeof active) =>
+    CATEGORIES.map((c) => ({ category: c, rows: list.filter((x) => categoryOf(x.sub) === c) })).filter((g) => g.rows.length > 0);
   const cancelled = subs.filter((x) => x.sub.status === "cancelled");
   const hidden = subs.filter((x) => x.sub.status === "hidden");
 
@@ -141,7 +151,7 @@ export function SubscriptionsView({
                   : sub.stale && sub.last
                     ? fill(t.subs.stale, { date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${sub.last}T12:00:00Z`)) })
                     : sub.status === "active" && sub.next
-                      ? `${sub.remind ? "🔔 " : ""}${fill(t.subs.renews, { when: relativeDay(t, today, sub.next).toLowerCase() })}`
+                      ? `${sub.remind ? "🔔 " : ""}${fill(isBill(sub) ? t.subs.due : t.subs.renews, { when: relativeDay(t, today, sub.next).toLowerCase() })}`
                       : sub.unpriced && sub.amount === null
                         ? `👤 ${t.subs.accountOnly}`
                         : sub.source === "gmail"
@@ -193,6 +203,7 @@ export function SubscriptionsView({
           <p className="min-w-0 flex-1 text-xs text-muted">
             <span className="block truncate font-semibold">{fill(t.subs.connectedAs, { email: gmail.email ?? "" })}</span>
             {scanning ? t.subs.scanning : gmail.lastScanAt ? fill(t.subs.checked, { when: ago(locale, gmail.lastScanAt) }) : t.subs.never}
+            {!scanning && gmail.stats && <span className="block">{fill(t.subs.stats, { read: gmail.stats.read, subs: gmail.stats.subs, bills: gmail.stats.bills })}</span>}
           </p>
           <Button size="sm" variant="soft" onClick={scan} disabled={scanning}>
             {scanning ? <Spinner className="size-4" /> : <RefreshCw className="size-4" />} {t.subs.scanNow}
@@ -222,10 +233,45 @@ export function SubscriptionsView({
           <p className="mt-3 text-xs text-muted">
             {fill(t.subs.perYear, { amount: totals(locale, active.map((x) => x.sub), 12) })} · {fill(t.subs.active, { n: String(active.length) })}
           </p>
+          {bills.length > 0 && paidFor.length > 0 && (
+            <p className="mt-1 text-xs font-semibold text-muted">
+              {fill(t.subs.split, { bills: totals(locale, bills.map((x) => x.sub), 1), subs: totals(locale, paidFor.map((x) => x.sub), 1) })}
+            </p>
+          )}
         </div>
       )}
 
-      {active.length ? <div className="space-y-2">{active.map(row)}</div> : <p className="glass rounded-3xl px-4 py-8 text-center text-sm text-muted">{t.subs.empty}</p>}
+      {active.length ? (
+        (
+          [
+            ["bills", bills, t.subs.billsTitle],
+            ["subs", paidFor, t.subs.subsTitle],
+          ] as const
+        ).map(
+          ([key, list, label]) =>
+            list.length > 0 && (
+              <section key={key} aria-label={label} className="space-y-3">
+                {bills.length > 0 && paidFor.length > 0 && <h2 className="px-1 text-lg font-extrabold">{label}</h2>}
+                {groups(list).map((g) => (
+                  <div key={g.category} className="space-y-2">
+                    <h3 className="flex items-baseline justify-between px-1 text-sm font-bold text-muted">
+                      <span>
+                        {CATEGORY_ICON[g.category]} {t.subs.categories[g.category]}
+                      </span>
+                      <span className="tabular-nums">
+                        {totals(locale, g.rows.map((x) => x.sub), 1)}
+                        {t.subs.cycleShort.monthly}
+                      </span>
+                    </h3>
+                    {g.rows.map(row)}
+                  </div>
+                ))}
+              </section>
+            ),
+        )
+      ) : (
+        <p className="glass rounded-3xl px-4 py-8 text-center text-sm text-muted">{t.subs.empty}</p>
+      )}
 
       {(
         [

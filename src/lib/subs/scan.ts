@@ -4,7 +4,7 @@ import { getDict, fill } from "@/i18n";
 import { sendPush } from "@/lib/push";
 import { todayKey } from "@/lib/engine/habits";
 import type { Item, Profile } from "@/lib/db-types";
-import { SERVICES } from "./catalog";
+import { BILLERS, SERVICES } from "./catalog";
 import { getMessage, GoogleAuthError, listMessageIds, openToken, refreshAccess } from "./gmail";
 import { chargesFrom, rollForward, summarize, type DetectedSub, type MailMessage } from "./parse";
 import { readSub, subPatch, type SubProps } from "./types";
@@ -26,9 +26,12 @@ export type ScanResult = { ok: true; found: number; added: number } | { ok: fals
 
 const SKIP_DOMAINS = new Set(["google.com"]);
 const KNOWN_FROM = ["apple.com", "paypal.com", ...SERVICES.flatMap((s) => s.domains).filter((d) => !SKIP_DOMAINS.has(d))];
+const BILLER_FROM = BILLERS.flatMap((b) => b.domains);
 const QUERIES: [string, number][] = [
   [`newer_than:400d from:(${[...new Set(KNOWN_FROM)].join(" OR ")})`, 300],
   [`newer_than:400d -category:promotions subject:(receipt OR invoice OR subscription OR renewal OR renews OR membership OR payment OR "order receipt" OR קבלה OR חשבונית OR מנוי OR חידוש OR תשלום OR חיוב)`, 400],
+  // Household bills: electricity, water, arnona, gas, insurance… by sender or by what the subject says.
+  [`newer_than:400d (from:(${BILLER_FROM.join(" OR ")}) OR subject:(חשבון OR ארנונה OR "דרישת תשלום" OR "הודעת חיוב" OR שובר OR bill OR statement OR "ועד בית" OR "דמי ביטוח"))`, 300],
 ];
 
 async function pool<T, R>(xs: T[], size: number, fn: (x: T) => Promise<R>) {
@@ -51,13 +54,14 @@ export async function scanGmail(db: Db, sectionId: string, opts: { notify?: bool
     // One search at a time and a few reads at once: Gmail limits how much one mailbox may ask per minute.
     const hits: string[] = [];
     for (const [q, max] of QUERIES) hits.push(...(await listMessageIds(access, q, max)));
-    const ids = [...new Set(hits)].slice(0, 600);
+    const ids = [...new Set(hits)].slice(0, 800);
     const messages = (await pool(ids, 4, (id) => getMessage(access, id).catch(() => null))).filter(Boolean) as MailMessage[];
     const today = todayKey(profile.timezone, now);
     const found = summarize(messages.flatMap(chargesFrom), today);
     const changes = await mergeSubs(db, profile, sectionId, found, today, now);
 
-    await mark({ status: "ok", last_scan_at: now.toISOString(), scan_error: null });
+    const stats = { read: messages.length, subs: found.filter((d) => !d.bill).length, bills: found.filter((d) => d.bill).length };
+    await mark({ status: "ok", last_scan_at: now.toISOString(), scan_error: null, scan_stats: stats });
     if (opts.notify) await notifyChanges(db, profile, sectionId, changes);
     return { ok: true, found: found.length, added: changes.added.length };
   } catch (e) {
@@ -82,7 +86,8 @@ async function mergeSubs(db: Db, profile: Profile, sectionId: string, found: Det
   for (const d of found) {
     const existing = byKey.get(d.key);
     if (!existing) {
-      const sub: SubProps = { key: d.key, source: "gmail", status: "active", amount: d.amount, currency: d.currency ?? "ILS", cycle: d.cycle, next: d.next, last: d.last, cancel: d.cancel, icon: d.icon, remind: d.cycle === "yearly", stale: d.stale, charges: d.charges, ...(d.unpriced ? { unpriced: true } : {}) };
+      // Bills and yearly renewals warn ahead by default: those are the ones that hurt when missed.
+      const sub: SubProps = { key: d.key, source: "gmail", status: "active", amount: d.amount, currency: d.currency ?? "ILS", cycle: d.cycle, next: d.next, last: d.last, cancel: d.cancel, icon: d.icon, remind: d.cycle === "yearly" || !!d.bill, stale: d.stale, charges: d.charges, category: d.category, ...(d.unpriced ? { unpriced: true } : {}) };
       await db.from("items").insert({ section_id: sectionId, title: d.name, created_by: profile.user_id, position: position++, ...subPatch({}, sub, profile.timezone, new Set(), now) });
       added.push(d.name);
       continue;
@@ -90,7 +95,7 @@ async function mergeSubs(db: Db, profile: Profile, sectionId: string, found: Det
     const old = readSub(existing.props)!;
     if (old.status === "hidden") continue;
     const { unpriced: _was, ...kept } = old; // eslint-disable-line @typescript-eslint/no-unused-vars
-    const sub: SubProps = { ...kept, last: d.last, stale: d.stale, charges: d.charges, cancel: old.cancel ?? d.cancel, ...(d.unpriced && !old.edited ? { unpriced: true } : {}) };
+    const sub: SubProps = { ...kept, last: d.last, stale: d.stale, charges: d.charges, cancel: old.cancel ?? d.cancel, category: old.categoryByHand ? old.category : d.category, ...(d.unpriced && !old.edited ? { unpriced: true } : {}) };
     if (old.edited) sub.next = rollForward(d.last, old.cycle, today);
     else Object.assign(sub, { amount: d.amount, currency: d.currency ?? old.currency, cycle: d.cycle, next: d.next });
     if (old.status === "cancelled" && old.cancelledOn && d.last > old.cancelledOn && !old.chargedAfterCancel) {

@@ -29,7 +29,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 /** A subscription's share of one month in ₪, or 0 when unpriced, cancelled or in another currency. */
 export function monthlyShare(s: SubProps) {
   if (s.status !== "active" || !s.amount || s.currency !== "ILS") return 0;
-  return s.cycle === "yearly" ? s.amount / 12 : s.amount;
+  return s.cycle === "yearly" ? s.amount / 12 : s.cycle === "bimonthly" ? s.amount / 2 : s.amount;
 }
 
 export function buildMonth(input: MoneyInput): MoneyMonth {

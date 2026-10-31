@@ -72,3 +72,13 @@ describe("currentOccurrence", () => {
     expect(currentOccurrence(spec({ date: "2026-10-30" }), "2026-10-27", () => false)).toBe("2026-10-30");
   });
 });
+
+describe("every two months (bills)", () => {
+  it("falls on the same day every other month, across the new year", () => {
+    const spec = { ...defaultDate("2026-11-10"), repeat: "bimonthly" as const };
+    expect(occursOn(spec, "2026-11-10")).toBe(true);
+    expect(occursOn(spec, "2026-12-10")).toBe(false);
+    expect(occursOn(spec, "2027-01-10")).toBe(true);
+    expect(nextOccurrence(spec, "2026-11-11")).toBe("2027-01-10");
+  });
+});

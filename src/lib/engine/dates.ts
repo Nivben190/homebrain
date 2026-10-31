@@ -1,5 +1,5 @@
-// Reminder calendar ("dates" spaces): an item is a date — once, monthly or
-// yearly — and on that day it alerts every few hours until someone says it's
+// Reminder calendar ("dates" spaces): an item is a date — once, monthly, every
+// two months (Israeli water/electricity/arnona bills) or yearly — and on that day it alerts every few hours until someone says it's
 // handled ("No more needed"). Optionally a heads-up some days before, and
 // optionally it keeps nagging on the following days while still open.
 // Pure functions over local "YYYY-MM-DD" days, like habits.ts.
@@ -12,7 +12,7 @@ const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const dateSpecSchema = z.object({
   date: dayKey,
-  repeat: z.enum(["once", "monthly", "yearly"]).default("once"),
+  repeat: z.enum(["once", "monthly", "bimonthly", "yearly"]).default("once"),
   /** Alert window on the day, and hours between alerts (0 = a single alert at `from`). */
   from: hhmm.default("09:00"),
   until: hhmm.default("21:00"),
@@ -47,6 +47,7 @@ export function occursOn(spec: DateSpec, day: string): boolean {
   if (spec.repeat === "once") return day === spec.date;
   const [y, m, d] = [+day.slice(0, 4), +day.slice(5, 7), +day.slice(8, 10)];
   if (spec.repeat === "yearly" && m !== +spec.date.slice(5, 7)) return false;
+  if (spec.repeat === "bimonthly" && (y * 12 + m - (+spec.date.slice(0, 4) * 12 + +spec.date.slice(5, 7))) % 2 !== 0) return false;
   return d === Math.min(+spec.date.slice(8, 10), lastDayOfMonth(y, m));
 }
 

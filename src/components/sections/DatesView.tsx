@@ -112,7 +112,7 @@ export function DatesView({
                   {d.spec.repeat !== "once" && (
                     <>
                       {" · "}
-                      <Repeat className="size-3" /> {d.spec.repeat === "yearly" ? t.dates.yearly : t.dates.monthly}
+                      <Repeat className="size-3" /> {d.spec.repeat === "yearly" ? t.dates.yearly : d.spec.repeat === "bimonthly" ? t.dates.bimonthly : t.dates.monthly}
                     </>
                   )}
                   {" · ⏰ "}

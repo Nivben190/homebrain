@@ -1,11 +1,12 @@
-// Finds paid subscriptions in receipt emails, by rules (no AI): known senders,
-// App Store / Google Play / PayPal receipts itemized per subscription, and any
+// Finds paid subscriptions and household bills in emails, by rules (no AI): known
+// senders, App Store / Google Play / PayPal receipts itemized per subscription,
+// utility bills (electricity, water, arnona, gas…) by sender or wording, and any
 // other sender that charges the same way at a regular interval.
 import { addDays, diffDays } from "@/lib/engine/habits";
-import { APPLE_CANCEL, domainMatches, domainOf, PAYPAL_CANCEL, PLAY_CANCEL, senderName, SERVICES } from "./catalog";
+import { APPLE_CANCEL, billerFor, domainMatches, domainOf, PAYPAL_CANCEL, PLAY_CANCEL, senderName, SERVICES, type Category } from "./catalog";
 
 export type Currency = "ILS" | "USD" | "EUR" | "GBP";
-export type Cycle = "weekly" | "monthly" | "yearly";
+export type Cycle = "weekly" | "monthly" | "bimonthly" | "yearly";
 
 export interface MailMessage {
   id: string;
@@ -35,6 +36,9 @@ export interface Charge {
   subject: string;
   /** Not a charge: account mail (logins, passcodes, terms) that shows an account exists. */
   account?: boolean;
+  category: Category;
+  /** A household bill (electricity, water…): `renews` is its pay-by date. */
+  bill?: boolean;
 }
 
 export interface DetectedSub {
@@ -51,6 +55,8 @@ export interface DetectedSub {
   stale: boolean;
   /** An active account with no receipts in this mailbox (billed elsewhere): price unknown. */
   unpriced?: boolean;
+  category: Category;
+  bill?: boolean;
   charges: { id: string; day: string; amount: number | null; currency: Currency | null; subject: string }[];
 }
 
@@ -144,12 +150,14 @@ export function parseLooseDate(s: string): string | null {
 }
 
 const RENEWS = /renews?\b|renewal date|auto-?renews?|next (billing|payment|charge|bill)|will be (charged|billed|renewed)|מתחדש|יתחדש|חידוש|החיוב הבא|תאריך החיוב/i;
+/** A bill's pay-by date. */
+const DUE = /due (date|by|on)|pay(ment)? by|payment due|לתשלום עד|מועד (אחרון )?(ל)?תשלום|תאריך (אחרון )?(ל)?תשלום|יש לשלם עד|עד לתאריך|תאריך חיוב|ייגבה ב/i;
 
-/** "Renews 3 Nov 2026" / "next billing date: …" anywhere in the text. */
-export function findRenewal(text: string): string | null {
+/** "Renews 3 Nov 2026" / "next billing date: …" anywhere in the text (or a bill's "pay by"). */
+export function findRenewal(text: string, words = RENEWS): string | null {
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(RENEWS);
+    const m = lines[i].match(words);
     if (!m) continue;
     const d = parseLooseDate(lines[i].slice(m.index)) ?? parseLooseDate(lines[i + 1] ?? "");
     if (d) return d;
@@ -159,9 +167,12 @@ export function findRenewal(text: string): string | null {
 
 const YEARLY = /\b(yearly|annual(ly)?|per year|a year|1 year|12 months)\b|\/\s?(yr|year)\b|שנתי|לשנה|שנה אחת/gi;
 const MONTHLY = /\b(monthly|per month|a month|1 month)\b|\/\s?(mo|month)\b|חודשי|לחודש/gi;
+const BIMONTHLY = /\bbi-?monthly\b|every (2|two) months|דו[-־ ]?חודשי|לחודשיים|כל חודשיים|תקופת חיוב של חודשיים/gi;
 const WEEKLY = /\b(weekly|per week|1 week)\b|\/\s?(wk|week)\b|שבועי|לשבוע/gi;
 
 export function detectCycle(text: string): Cycle | null {
+  // "דו-חודשי" contains "חודשי": two-monthly wins when it's said at all.
+  if (BIMONTHLY.test(text)) return (BIMONTHLY.lastIndex = 0), "bimonthly";
   const y = text.match(YEARLY)?.length ?? 0;
   const mo = text.match(MONTHLY)?.length ?? 0;
   const w = text.match(WEEKLY)?.length ?? 0;
@@ -170,12 +181,13 @@ export function detectCycle(text: string): Cycle | null {
   return y > mo ? "yearly" : "monthly";
 }
 
-const CYCLE_DAYS: Record<Cycle, number> = { weekly: 7, monthly: 30, yearly: 365 };
+const CYCLE_DAYS: Record<Cycle, number> = { weekly: 7, monthly: 30, bimonthly: 61, yearly: 365 };
+const CYCLE_MONTHS: Record<Exclude<Cycle, "weekly">, number> = { monthly: 1, bimonthly: 2, yearly: 12 };
 
 function addCycle(day: string, cycle: Cycle) {
   if (cycle === "weekly") return addDays(day, 7);
   const [y, m, d] = day.split("-").map(Number);
-  const months = cycle === "monthly" ? 1 : 12;
+  const months = CYCLE_MONTHS[cycle];
   const ty = y + Math.floor((m - 1 + months) / 12);
   const tm = ((m - 1 + months) % 12) + 1;
   const last = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
@@ -197,6 +209,8 @@ const RECEIPT = /receipt|invoice|your (order|payment)|payment (received|confirma
 const SUBSCRIPTIONY = /subscription|renew|membership|monthly|annual|yearly|your plan|מנוי|חידוש|חודשי|שנתי/i;
 /** A known service's email only counts when its subject is about money, not news or policy updates. */
 const BILLING_SUBJECT = /receipt|invoice|payment|paid|charged|billing|\bbill\b|renew|subscription|membership|your order|your plan|קבלה|חשבונית|תשלום|חיוב|חידוש|מנוי/i;
+/** A bill email (not news or a survey from the same company). */
+const BILL_SUBJECT = /\bbill\b|invoice|statement|payment|receipt|חשבון|חשבונית|דרישת תשלום|שובר|תשלום|קבלה|חיוב|ארנונה|הודעת חיוב|דמי ביטוח|פוליסה/i;
 /** Failed or paused payments aren't charges. */
 const FAILED = /unsuccessful|failed|declined|couldn['’]t (be )?(process|charge|complete)|unable to (process|charge)|paused|past due|action required|נכשל|לא הצליח|נדחה|לא עבר/i;
 /** Account mail from a known service: proof of an account, though not of a price. */
@@ -227,7 +241,7 @@ function appleItems(msg: MailMessage): Omit<Charge, "messageId" | "day" | "subje
     const cycle = detectCycle(name) ?? detectCycle(lines[i]);
     const price = findAmounts([lines[i], lines[i + 1] ?? "", lines[i + 2] ?? "", lines[i + 3] ?? ""].join("\n"))[0] ?? null;
     const clean = name.replace(CYCLE_IN_NAME, " ").replace(/\s+/g, " ").trim();
-    out.push({ key: `apple:${norm(clean)}`, name: clean, icon: "🍎", cancel: APPLE_CANCEL, known: true, strong: true, amount: price?.value ?? null, currency: price?.currency ?? null, cycle, renews });
+    out.push({ key: `apple:${norm(clean)}`, name: clean, icon: "🍎", cancel: APPLE_CANCEL, known: true, strong: true, amount: price?.value ?? null, currency: price?.currency ?? null, cycle, renews, category: "apps" });
   }
   return out;
 }
@@ -249,25 +263,32 @@ export function chargesFrom(msg: MailMessage): Charge[] {
     const lines = msg.text.split("\n");
     const at = lines.findIndex((l) => /auto-renewing|מנוי מתחדש/i.test(l));
     const name = (at > 0 ? lines[at - 1] : msg.subject).replace(/\s*\(.*?\)\s*$/, "").trim();
-    return [{ ...base, key: `play:${norm(name)}`, name, icon: "📲", cancel: PLAY_CANCEL, known: true, strong: true, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text) }];
+    return [{ ...base, key: `play:${norm(name)}`, name, icon: "📲", cancel: PLAY_CANCEL, known: true, strong: true, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text), category: "apps" }];
   }
 
   if (/(^|\.)paypal\./.test(domain)) {
     if (!/automatic|recurring|subscription|preapproved|אוטומטי|מנוי/i.test(all)) return [];
     const merchant = (msg.subject.match(/(?:payment to|paid|sent .*? to|ל)\s*:?\s*([^,]+?)\s*$/i)?.[1] ?? msg.text.match(/merchant\s*:?\s*\n?([^\n]{2,40})/i)?.[1] ?? "").trim();
     if (!merchant) return [];
-    return [{ ...base, key: `paypal:${norm(merchant)}`, name: merchant, icon: "🅿️", cancel: PAYPAL_CANCEL, known: true, strong: true, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text) }];
+    return [{ ...base, key: `paypal:${norm(merchant)}`, name: merchant, icon: "🅿️", cancel: PAYPAL_CANCEL, known: true, strong: true, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text), category: "other" }];
+  }
+
+  // Household bills: the electric company, the water corporation, the city (arnona)…
+  const biller = billerFor(domain, senderName(msg.from), msg.subject);
+  if (biller) {
+    if (PROMO.test(msg.subject) || !BILL_SUBJECT.test(`${msg.subject} ${senderName(msg.from)}`)) return [];
+    return [{ ...base, key: biller.key, name: biller.name, icon: biller.icon, cancel: null, known: true, strong: true, bill: true, category: biller.category, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text, DUE) }];
   }
 
   const sender = SERVICES.find((s) => s.domains.some((d) => domainMatches(domain, d)));
   if (sender && !BILLING_SUBJECT.test(msg.subject) && ACCOUNT.test(msg.subject) && !PROMO.test(msg.subject))
-    return [{ ...base, key: sender.key, name: sender.name, icon: sender.icon, cancel: sender.cancel, known: true, strong: false, account: true, amount: null, currency: null, cycle: null, renews: null }];
+    return [{ ...base, key: sender.key, name: sender.name, icon: sender.icon, cancel: sender.cancel, known: true, strong: false, account: true, amount: null, currency: null, cycle: null, renews: null, category: sender.category, bill: sender.bill }];
 
   // Several services can share a domain; the receipt's wording picks which.
   const service = SERVICES.find((s) => s.domains.some((d) => domainMatches(domain, d)) && (!s.match || s.match.test(all)));
   if (service) {
     if (!BILLING_SUBJECT.test(msg.subject)) return [];
-    return [{ ...base, key: service.key, name: service.name, icon: service.icon, cancel: service.cancel, known: true, strong: true, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text) }];
+    return [{ ...base, key: service.key, name: service.name, icon: service.icon, cancel: service.cancel, known: true, strong: true, category: service.category, bill: service.bill, amount: amount?.value ?? null, currency: amount?.currency ?? null, cycle: detectCycle(all), renews: findRenewal(msg.text, service.bill ? DUE : RENEWS) }];
   }
   // Mail from a known service that isn't a charge (newsletters, shopping orders).
   if (SERVICES.some((s) => s.domains.some((d) => domainMatches(domain, d))) || domainMatches(domain, "google.com") || domainMatches(domain, "apple.com")) return [];
@@ -276,7 +297,7 @@ export function chargesFrom(msg: MailMessage): Charge[] {
   if (ONE_OFF_DOMAINS.some((d) => domainMatches(domain, d)) || ONE_OFF.test(msg.subject) || ONE_OFF.test(senderName(msg.from))) return [];
   const labels = domain.split(".");
   const site = labels.slice(/\.(co|org|net|ac|gov)\.[a-z]{2}$/.test(domain) ? -3 : -2).join(".");
-  return [{ ...base, key: `mail:${site}`, name: senderName(msg.from), icon: "💳", cancel: null, known: false, strong: SUBSCRIPTIONY.test(all), amount: amount.value, currency: amount.currency, cycle: detectCycle(all), renews: findRenewal(msg.text) }];
+  return [{ ...base, key: `mail:${site}`, name: senderName(msg.from), icon: "💳", cancel: null, known: false, strong: SUBSCRIPTIONY.test(all), amount: amount.value, currency: amount.currency, cycle: detectCycle(all), renews: findRenewal(msg.text), category: "other" }];
 }
 
 // ---------------------------------------------------------------------------- all emails
@@ -290,6 +311,7 @@ function cycleFromGaps(days: string[]): Cycle | null {
   const g = median(gaps);
   if (g >= 5 && g <= 9) return "weekly";
   if (g >= 25 && g <= 35) return "monthly";
+  if (g >= 50 && g <= 70) return "bimonthly";
   if (g >= 330 && g <= 400) return "yearly";
   return null;
 }
@@ -313,7 +335,7 @@ export function summarize(charges: Charge[], today: string): DetectedSub[] {
     if (accountOnly) {
       // Logins and passcodes lately, but no receipt here: the account is live and billed somewhere else.
       const latest = list.at(-1)!;
-      if (diffDays(latest.day, today) <= 60) out.push({ key, name: latest.name, icon: latest.icon, cancel: latest.cancel, amount: null, currency: null, cycle: "monthly", last: latest.day, next: null, stale: false, unpriced: true, charges: [] });
+      if (diffDays(latest.day, today) <= 60) out.push({ key, name: latest.name, icon: latest.icon, cancel: latest.cancel, amount: null, currency: null, cycle: "monthly", last: latest.day, next: null, stale: false, unpriced: true, category: latest.category, bill: latest.bill, charges: [] });
       continue;
     }
     list.splice(0, list.length, ...list.filter((c) => !c.account));
@@ -325,11 +347,15 @@ export function summarize(charges: Charge[], today: string): DetectedSub[] {
     const renewsAhead = [...list].reverse().find((c) => c.renews && diffDays(today, c.renews) >= 0)?.renews ?? null;
 
     const known = list.some((c) => c.known);
-    if (known ? !paid.length && !renewsAhead : !(gapCycle && paid.length >= 2) && !(latest.strong && renewsAhead && paid.length)) continue;
+    const bill = list.some((c) => c.bill);
+    // A bill's amount is often only in the attached PDF: two bills from the same biller are enough.
+    if (bill ? !paid.length && !renewsAhead && list.length < 2 : known ? !paid.length && !renewsAhead : !(gapCycle && paid.length >= 2) && !(latest.strong && renewsAhead && paid.length)) continue;
 
     const votes = list.map((c) => c.cycle).filter(Boolean) as Cycle[];
-    const textCycle = votes.length ? (["yearly", "monthly", "weekly"] as Cycle[]).sort((a, b) => votes.filter((v) => v === b).length - votes.filter((v) => v === a).length)[0] : null;
-    const cycle = textCycle ?? gapCycle ?? "monthly";
+    const textCycle = votes.length ? (["yearly", "bimonthly", "monthly", "weekly"] as Cycle[]).sort((a, b) => votes.filter((v) => v === b).length - votes.filter((v) => v === a).length)[0] : null;
+    // Bills mention "per month" in passing; the real rhythm is when they arrive.
+    const billGaps = bill ? cycleFromGaps([...new Set(list.map((c) => c.day))]) : null;
+    const cycle = bill ? (billGaps ?? textCycle ?? defaultCycle(latest.category)) : (textCycle ?? gapCycle ?? "monthly");
     const lastPaid = paid.at(-1) ?? null;
     const last = (lastPaid ?? latest).day;
     const next = renewsAhead ?? rollForward(last, cycle, today);
@@ -338,6 +364,8 @@ export function summarize(charges: Charge[], today: string): DetectedSub[] {
       name: latest.name,
       icon: latest.icon,
       cancel: latest.cancel,
+      category: latest.category,
+      ...(bill ? { bill: true } : {}),
       amount: lastPaid?.amount ?? null,
       currency: lastPaid?.currency ?? null,
       cycle,
@@ -353,7 +381,12 @@ export function summarize(charges: Charge[], today: string): DetectedSub[] {
   return out.sort((a, b) => (a.next ?? "9").localeCompare(b.next ?? "9"));
 }
 
+/** Electricity and arnona come every two months in Israel; the rest monthly, until the emails say otherwise. */
+function defaultCycle(category: Category): Cycle {
+  return category === "electricity" || category === "arnona" ? "bimonthly" : "monthly";
+}
+
 /** Rough monthly cost, for totals. */
 export function monthlyCost(amount: number, cycle: Cycle) {
-  return cycle === "yearly" ? amount / 12 : cycle === "weekly" ? (amount * 52) / 12 : amount;
+  return cycle === "yearly" ? amount / 12 : cycle === "bimonthly" ? amount / 2 : cycle === "weekly" ? (amount * 52) / 12 : amount;
 }

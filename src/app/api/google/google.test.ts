@@ -95,6 +95,8 @@ describe("scanning", () => {
     expect(await (await scan.POST(new Request("https://brain.test/api/google/scan", { method: "POST", body: JSON.stringify({ sectionId: s }) }))).json()).toEqual({ ok: true, started: true });
     await vi.waitFor(async () => expect(await sql(`select title from items where section_id = $1`, [s])).toEqual([{ title: "Netflix" }]));
     expect(await (await scan.GET(new Request(`https://brain.test/api/google/scan?sectionId=${s}`))).json()).toMatchObject({ ok: true, status: "ok", failed: false });
+    // The space can say what the scan did.
+    await vi.waitFor(async () => expect((await sql<{ scan_stats: unknown }>(`select scan_stats from gmail_connections where section_id = $1`, [s]))[0].scan_stats).toMatchObject({ subs: 1, bills: 0 }));
 
     await sql(`update gmail_connections set last_scan_at = now() - interval '2 days' where section_id = $1`, [s]);
     await sql(`delete from items where section_id = $1`, [s]);

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { app, homeWith, router, signIn, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
 import type { Item, Section } from "@/lib/db-types";
@@ -369,13 +369,37 @@ describe("subscriptions", () => {
       { title: "Cloud", props: sub({ amount: 120, cycle: "yearly" }) },
     ]);
     expect(screen.getByText(new RegExp(t.subs.active.replace("{n}", "2")))).toBeInTheDocument();
-    expect(screen.getByText(/₪30/)).toBeInTheDocument();
+    expect(screen.getByText("₪30")).toBeInTheDocument();
     await user.click(screen.getByText("Spotify"));
     await user.click(await screen.findByRole("button", { name: new RegExp(t.subs.markCancelled) }));
     await waitFor(async () => expect((await subOf(section.id))[0].props._sub).toMatchObject({ status: "cancelled" }));
     await user.click(screen.getByRole("button", { name: t.common.close }));
     await user.click(await screen.findByRole("button", { name: (n) => n.startsWith(`${t.subs.cancelled} (1)`) }));
-    expect(screen.getByText(/₪10/)).toBeInTheDocument();
+    expect(screen.getByText("₪10")).toBeInTheDocument();
+  });
+
+  it("bills apart from subscriptions, grouped by category with a monthly total each; every-2-months counts half", async () => {
+    const { user, t, section } = await open("subscriptions", [
+      { title: "חברת החשמל", props: sub({ amount: 600, cycle: "bimonthly", category: "electricity" }) },
+      { title: "מי אביבים", props: sub({ amount: 150, category: "water" }) },
+      { title: "Netflix", props: sub({ amount: 50, key: "netflix" }) },
+      { title: "Spotify", props: sub({ amount: 20, key: "spotify" }) },
+    ]);
+    const bills = screen.getByRole("region", { name: t.subs.billsTitle });
+    const subs = screen.getByRole("region", { name: t.subs.subsTitle });
+    expect(within(bills).getByText(new RegExp(t.subs.categories.electricity))).toBeInTheDocument();
+    expect(within(bills).getByText("₪300/mo")).toBeInTheDocument();
+    expect(within(bills).getByText("מי אביבים")).toBeInTheDocument();
+    expect(within(subs).getByText(new RegExp(t.subs.categories.streaming))).toBeInTheDocument();
+    expect(within(subs).getByText(new RegExp(t.subs.categories.music))).toBeInTheDocument();
+    expect(screen.getByText("₪520")).toBeInTheDocument();
+    expect(screen.getByText(t.subs.split.replace("{bills}", "₪450").replace("{subs}", "₪70"))).toBeInTheDocument();
+    // A bill is paid, not cancelled; its category can be changed by hand.
+    await user.click(screen.getByText("מי אביבים"));
+    expect(screen.queryByRole("button", { name: new RegExp(t.subs.markCancelled) })).not.toBeInTheDocument();
+    await user.selectOptions(await screen.findByLabelText(t.subs.category, { selector: "select" }), "gas");
+    await user.click(screen.getByRole("button", { name: t.common.saveChanges }));
+    await waitFor(async () => expect((await subOf(section.id)).find((r) => r.title === "מי אביבים")!.props._sub).toMatchObject({ category: "gas", categoryByHand: true }));
   });
 
   it("one found in Gmail isn't deleted but set aside, so a scan won't bring it back", async () => {
