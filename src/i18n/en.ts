@@ -530,6 +530,9 @@ export const en = {
     notFoundBody: "This space or reminder was deleted, or the link is old.",
   },
   run: {
+    snooze: "Snooze",
+    snoozeChoices: { hour: "1 hour", tonight: "Tonight 20:00", tomorrow: "Tomorrow 08:00" },
+    snoozed: "Snoozed",
     markDone: "Mark done",
     completed: "Completed",
     firedAt: "Fired",

@@ -28,6 +28,7 @@ import { newCommit } from "@/lib/commit";
 import { readPlan } from "@/lib/plan";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
 import { rowsFromShape, shapeOf, type SpaceShape } from "@/lib/space-copy";
+import { snoozeUntil, type SnoozeChoice } from "@/lib/snooze";
 import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib/guest-links";
 import { INGREDIENTS_PROP, parseIngredients, readIngredients, shoppingFor } from "@/lib/meals";
 import { AMOUNT_PROP } from "@/lib/money";
@@ -680,6 +681,21 @@ export async function handleDate(itemId: string, handled: boolean) {
   if (error) throw new Error(error.message);
   await afterDateHandled(supabase, itemId, profile.timezone);
   revalidatePath("/");
+}
+
+/** Hides a reminder until the chosen time; the engine tick brings it back as a push. */
+export async function snoozeRun(id: string, choice: SnoozeChoice): Promise<Result> {
+  const { supabase, profile } = await requireHome();
+  if (!["hour", "tonight", "tomorrow"].includes(choice)) return { ok: false, error: "invalid" };
+  const now = new Date();
+  const { data, error } = await supabase
+    .from("runs")
+    .update({ snoozed_until: snoozeUntil(choice, now, profile.timezone).toISOString(), acknowledged_at: now.toISOString() })
+    .eq("id", id)
+    .select("id");
+  revalidatePath("/");
+  if (error) return { ok: false, error: error.message };
+  return data?.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 export async function dismissRun(id: string) {

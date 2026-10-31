@@ -150,7 +150,7 @@ describe("automation cards on Today", () => {
 
   it("shows notes and links; 'done' is saved and the card leaves", async () => {
     const { row } = await run([{ kind: "note", icon: "💧", text: "Half a can each" }, { kind: "link", icon: "🛒", label: "List", href: "/sections/x" }, { kind: "done", label: "Watered" }]);
-    const { user, t } = renderUi(<RunCard run={row} />);
+    const { user, t } = renderUi(<RunCard run={row} timeZone="Asia/Jerusalem" />);
     expect(screen.getByText("Half a can each")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /List/ })).toHaveAttribute("href", "/sections/x");
     await user.click(screen.getByRole("button", { name: /Watered/ }));
@@ -161,10 +161,34 @@ describe("automation cards on Today", () => {
 
   it("dismissing hides it and marks it seen", async () => {
     const { row } = await run([]);
-    const { user, t } = renderUi(<RunCard run={row} />);
+    const { user, t } = renderUi(<RunCard run={row} timeZone="Asia/Jerusalem" />);
     await user.click(screen.getByRole("button", { name: t.common.dismiss }));
     expect(screen.queryByText("Water plants")).not.toBeInTheDocument();
     await waitFor(async () => expect((await sql<{ seen: boolean }>(`select acknowledged_at is not null as seen from runs where id = $1`, [row.id]))[0].seen).toBe(true));
+  });
+
+  it("snooze for tomorrow: it leaves Today and the tick brings it back as a push", async () => {
+    const { home, row } = await run([]);
+    signIn(home.users.owner);
+    const { user, t } = renderUi(<RunCard run={row} timeZone="Asia/Jerusalem" />);
+    await user.click(screen.getByRole("button", { name: new RegExp(t.run.snooze) }));
+    await user.click(screen.getByRole("button", { name: t.run.snoozeChoices.tomorrow }));
+    expect(screen.queryByText("Water plants")).not.toBeInTheDocument();
+    let until = "";
+    await waitFor(async () => {
+      const [r] = await sql<{ snoozed_until: string | null; seen: boolean }>(`select snoozed_until::text, acknowledged_at is not null as seen from runs where id = $1`, [row.id]);
+      expect(r.seen).toBe(true);
+      expect(r.snoozed_until).not.toBeNull();
+      until = r.snoozed_until!;
+    });
+    const { tick } = await import("@/lib/engine/execute");
+    const { createSupabaseAdmin } = await import("@/lib/supabase/server");
+    app.pushes.length = 0;
+    await tick(createSupabaseAdmin() as never, new Date(Date.parse(until) - 60_000));
+    expect(app.pushes.filter((p) => p.payload.url === `/runs/${row.id}`)).toHaveLength(0);
+    await tick(createSupabaseAdmin() as never, new Date(Date.parse(until) + 1000));
+    expect(app.pushes.filter((p) => p.payload.url === `/runs/${row.id}`)).toHaveLength(1);
+    expect(await sql(`select snoozed_until, acknowledged_at from runs where id = $1`, [row.id])).toEqual([{ snoozed_until: null, acknowledged_at: null }]);
   });
 });
 

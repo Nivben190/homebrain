@@ -202,7 +202,22 @@ export async function tick(db: Admin, now = new Date()) {
     ["item reminders", () => fireDueItems(db, now)],
     ["queued jobs", () => runDueJobs(db, now)],
     ["plan cheers", () => sendPlanCheers(db, now)],
+    ["snoozed", () => wakeSnoozedRuns(db, now)],
   ]);
+}
+
+/** Snoozed reminders whose time has come: back on Today, and pushed again. */
+async function wakeSnoozedRuns(db: Admin, now: Date) {
+  const outcomes: FireOutcome[] = [];
+  const { data: due } = await db.from("runs").select("id,user_id,title,body,icon,automation_id").lte("snoozed_until", now.toISOString()).limit(50);
+  for (const run of due ?? []) {
+    // Claim it first, so an overlapping tick doesn't push it twice.
+    const { data: claimed } = await db.from("runs").update({ snoozed_until: null, acknowledged_at: null, fired_at: now.toISOString() }).eq("id", run.id).not("snoozed_until", "is", null).select("id");
+    if (!claimed?.length) continue;
+    await sendPush(db, run.user_id, { title: `${run.icon} ${run.title}`, body: run.body, url: `/runs/${run.id}` }, { runId: run.id });
+    outcomes.push({ automationId: run.automation_id ?? run.id, status: "fired", reason: "snoozed" });
+  }
+  return outcomes;
 }
 
 async function fireDueSchedules(db: Admin, now: Date) {

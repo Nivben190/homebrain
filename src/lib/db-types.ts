@@ -149,6 +149,7 @@ export interface Run {
   rendered: RenderedAction[];
   fired_at: string;
   acknowledged_at: string | null;
+  snoozed_until?: string | null;
   done_at: string | null;
   item_id: string | null;
 }

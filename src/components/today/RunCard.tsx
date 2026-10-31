@@ -2,11 +2,15 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Check, X } from "lucide-react";
-import { dismissRun, markRun } from "@/app/actions";
+import { AlarmClock, Check, X } from "lucide-react";
+import { dismissRun, markRun, snoozeRun } from "@/app/actions";
+import { snoozeChoices } from "@/lib/snooze";
+import { useToast } from "@/components/Toaster";
+import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
 import type { Run } from "@/lib/db-types";
+import type { SnoozeChoice } from "@/lib/snooze";
 import type { RenderedAction } from "@/lib/engine/types";
 
 export function RunActions({ run, onDone }: { run: Run; onDone?: () => void }) {
@@ -66,11 +70,23 @@ export function RunActions({ run, onDone }: { run: Run; onDone?: () => void }) {
   );
 }
 
-export function RunCard({ run }: { run: Run }) {
+export function RunCard({ run, timeZone }: { run: Run; timeZone: string }) {
   const { t } = useI18n();
+  const toast = useToast();
   const [gone, setGone] = useState(false);
+  const [snoozing, setSnoozing] = useState(false);
   const [, start] = useTransition();
   if (gone) return null;
+
+  async function snooze(choice: SnoozeChoice) {
+    setGone(true);
+    const res = await snoozeRun(run.id, choice);
+    if (res.ok) toast.success(`⏰ ${t.run.snoozed} · ${t.run.snoozeChoices[choice]}`);
+    else {
+      setGone(false);
+      toast.error(t.failures[errorKey(res.error)]);
+    }
+  }
   return (
     <motion.div layout className="glass relative rounded-3xl p-4">
       <button
@@ -95,6 +111,19 @@ export function RunCard({ run }: { run: Run }) {
           <RunActions run={run} onDone={() => setTimeout(() => setGone(true), 900)} />
         </div>
       )}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {snoozing ? (
+          snoozeChoices(new Date(), timeZone).map((c) => (
+            <button key={c} type="button" onClick={() => snooze(c)} className="rounded-full bg-sunken px-3 py-1.5 text-xs font-bold">
+              {t.run.snoozeChoices[c]}
+            </button>
+          ))
+        ) : (
+          <button type="button" onClick={() => setSnoozing(true)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-muted">
+            <AlarmClock className="size-3.5" /> {t.run.snooze}
+          </button>
+        )}
+      </div>
     </motion.div>
   );
 }

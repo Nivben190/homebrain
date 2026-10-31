@@ -237,14 +237,14 @@ export default async function TodayPage() {
       ) : (
         <div className="space-y-3">
           {now3.map((r) => (
-            <RunCard key={r.id} run={r} />
+            <RunCard key={r.id} run={r} timeZone={profile.timezone} />
           ))}
         </div>
       )}
       {pending.length > 3 && (
         <div className="mt-3 space-y-3">
           {pending.slice(3).map((r) => (
-            <RunCard key={r.id} run={r} />
+            <RunCard key={r.id} run={r} timeZone={profile.timezone} />
           ))}
         </div>
       )}

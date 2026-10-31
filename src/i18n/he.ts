@@ -531,6 +531,9 @@ export const he: Dict = {
     notFoundBody: "המרחב או התזכורת נמחקו, או שהקישור ישן.",
   },
   run: {
+    snooze: "נודניק",
+    snoozeChoices: { hour: "שעה", tonight: "הערב 20:00", tomorrow: "מחר 08:00" },
+    snoozed: "נדחה",
     markDone: "סימון כבוצע",
     completed: "בוצע",
     firedAt: "נשלח",
