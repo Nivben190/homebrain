@@ -133,6 +133,7 @@ export const he: Dict = {
     tooMany: "יותר מדי ניסיונות. נסו שוב בעוד שעה.",
   },
   join: {
+    whatsapp: "לשלוח בוואטסאפ",
     title: "הצטרפות ל{home}",
     invitedBy: "{name} מזמינים אתכם לבית משותף ב-Home Brain.",
     signUp: "יצירת חשבון",
@@ -418,6 +419,7 @@ export const he: Dict = {
     likeThis: "ליצור מרחב כמו זה",
     likeThisHint: "אותו מבנה, שדות ופריטים, בלי מה שמולא בהם.",
     copyTitle: "{title} (חדש)",
+    swipeHint: "טיפ: מחליקים פריט הצידה כדי למחוק אותו.",
     automate: "להפוך לאוטומטי",
     automateHint: "תזכורת בזמנים שתבחרו שפותחת את המרחב הזה.",
     automateOpen: "לפתוח",

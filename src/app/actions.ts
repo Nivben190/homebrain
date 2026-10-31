@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { getSession, requireHome } from "@/lib/session";
+import { getLocale, getSession, requireHome } from "@/lib/session";
 import { seedStarterBrain } from "@/lib/starter";
 import { fireAutomation, handledDays, handleEvent, rescheduleDate } from "@/lib/engine/execute";
 import { currentOccurrence, readDate } from "@/lib/engine/dates";
@@ -434,10 +434,12 @@ export async function setupHome(input: {
   const { supabase, user, profile } = await getSession();
   if (!user || !profile) return { ok: false, error: "Not signed in" };
   const p = profileInput.parse(input);
+  // The language the person set up in (the switch, or the phone's) becomes theirs.
+  const locale = await getLocale();
 
   await supabase
     .from("profiles")
-    .update({ display_name: p.displayName, emoji: p.emoji, phone: p.phone || null, timezone: p.timezone })
+    .update({ display_name: p.displayName, emoji: p.emoji, phone: p.phone || null, timezone: p.timezone, locale })
     .eq("user_id", user.id);
 
   const invite = input.inviteCode?.trim() ?? "";
@@ -453,7 +455,7 @@ export async function setupHome(input: {
     await seedStarterBrain(supabase, {
       userId: user.id,
       householdId: rpc.data.id,
-      locale: profile.locale,
+      locale,
       timezone: p.timezone,
       shared: input.mode === "create",
     });

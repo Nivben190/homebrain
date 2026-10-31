@@ -132,6 +132,21 @@ describe("people and invites", () => {
     expect((await A.setupHome({ mode: "join", inviteCode: "WRONG000", starter: false, displayName: "L", emoji: "🙂" })).ok).toBe(false);
   });
 
+  it("a Hebrew phone sets up in Hebrew: the profile and the starter spaces", async () => {
+    const [{ id }] = await sql<{ id: string }>(`insert into auth.users (email) values ('ivrit@test') returning id`);
+    signIn(id);
+    app.cookies.clear();
+    app.headers.set("accept-language", "he-IL,he;q=0.9,en;q=0.8");
+    try {
+      expect(await A.setupHome({ mode: "create", homeName: "בית", starter: true, displayName: "דנה", emoji: "🐣" })).toEqual({ ok: true });
+    } finally {
+      app.headers.delete("accept-language");
+    }
+    const [{ household_id, locale }] = await sql<{ household_id: string; locale: string }>(`select household_id, locale from profiles where user_id = $1`, [id]);
+    expect(locale).toBe("he");
+    expect((await sql<{ title: string }>(`select title from sections where household_id = $1`, [household_id])).map((s) => s.title)).toContain("קניות לסופר");
+  });
+
   it("signed out, actions that need a home send you to log in", async () => {
     signIn(null);
     await expect(A.saveHomeInfo(info("x"))).rejects.toThrow(/login/);

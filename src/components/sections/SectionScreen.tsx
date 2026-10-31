@@ -572,6 +572,8 @@ export function SectionScreen({
           ))}
         </div>
       ) : (
+        <>
+        {open.length > 0 && <SwipeHint />}
         <ul className="glass divide-y divide-card-border overflow-hidden rounded-3xl empty:hidden">
           <AnimatePresence initial={false}>
             {open.map((i) => (
@@ -579,6 +581,7 @@ export function SectionScreen({
             ))}
           </AnimatePresence>
         </ul>
+        </>
       )}
 
       {done.length > 0 && (
@@ -779,4 +782,23 @@ function ExpiryLeft({ section, item, today }: { section: Section; item: Item; to
   const n = daysLeft(expires, today);
   const label = n < 0 ? t.expiry.ended : n < 60 ? fill(t.expiry.days, { n: String(n) }) : fill(t.expiry.months, { n: String(Math.floor(n / 30)) });
   return <span className={cn("mt-0.5 block text-xs font-semibold", n < 0 ? "text-muted" : n <= 30 ? "text-danger" : "text-accent")}>🛡️ {label}</span>;
+}
+
+const SWIPE_HINT = "swipe-hint-seen";
+
+/** Once per phone, on a touch screen: rows can be swiped to delete. */
+function SwipeHint() {
+  const { t } = useI18n();
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      if (!window.matchMedia?.("(pointer: coarse)").matches || localStorage.getItem(SWIPE_HINT)) return;
+      localStorage.setItem(SWIPE_HINT, "1");
+      setShow(true);
+    } catch {
+      // Storage blocked: no hint rather than one on every visit.
+    }
+  }, []);
+  if (!show) return null;
+  return <p className="mb-2 px-1 text-xs font-semibold text-muted">👆 {t.sections.swipeHint}</p>;
 }

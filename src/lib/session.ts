@@ -1,9 +1,10 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { getDict, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n";
+import { localeFromAcceptLanguage } from "@/lib/locale";
 import { PUBLIC_PROFILE_COLUMNS, type Household, type Member, type Profile } from "@/lib/db-types";
 
 /**
@@ -44,9 +45,13 @@ export async function requireHome() {
 
 export const getLocale = cache(async (): Promise<Locale> => {
   const s = await getSession();
-  if (s.profile && isLocale(s.profile.locale)) return s.profile.locale;
+  // Until a home is set up, the profile's language is only the default: the
+  // switch (cookie) or the phone decides.
+  if (s.profile?.household_id && isLocale(s.profile.locale)) return s.profile.locale;
   const c = (await cookies()).get(LOCALE_COOKIE)?.value;
-  return isLocale(c) ? c : "en";
+  if (isLocale(c)) return c;
+  // Nobody chose yet: the phone's language.
+  return localeFromAcceptLanguage((await headers()).get("accept-language"));
 });
 
 export async function getT() {

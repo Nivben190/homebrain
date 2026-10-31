@@ -132,6 +132,7 @@ export const en = {
     tooMany: "Too many tries. Wait an hour, then try again.",
   },
   join: {
+    whatsapp: "Send on WhatsApp",
     title: "Join {home}",
     invitedBy: "{name} invited you to share a home on Home Brain.",
     signUp: "Create my account",
@@ -417,6 +418,7 @@ export const en = {
     likeThis: "Make a space like this",
     likeThisHint: "Same layout, properties and items, without what's filled in.",
     copyTitle: "{title} (new)",
+    swipeHint: "Tip: swipe an item sideways to delete it.",
     automate: "Automate this",
     automateHint: "A reminder on your schedule that opens this space.",
     automateOpen: "Open",

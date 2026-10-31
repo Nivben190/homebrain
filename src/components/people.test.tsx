@@ -117,6 +117,7 @@ describe("links to share", () => {
     const url = await screen.findByText(/\/join\/[0-9a-f]+/);
     await user.click(url);
     expect(await navigator.clipboard.readText()).toBe(url.textContent);
+    expect(screen.getByRole("link", { name: t.join.whatsapp }).getAttribute("href")).toContain(encodeURIComponent(url.textContent!));
   });
 });
 

@@ -36,6 +36,14 @@ export function InviteLinkButton({ variant = "soft" }: { variant?: "primary" | "
             <button onClick={() => navigator.clipboard.writeText(url)} className="w-full break-all rounded-2xl bg-sunken px-4 py-3 font-mono text-sm" dir="ltr">
               {url}
             </button>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(`${t.join.shareText} ${url}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-12 w-full items-center justify-center rounded-2xl bg-[#25d366] font-bold text-white"
+            >
+              {t.join.whatsapp}
+            </a>
             <p className="text-sm text-muted">{t.join.linkHint}</p>
           </div>
         )}
