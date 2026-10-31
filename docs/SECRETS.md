@@ -25,7 +25,7 @@ Last checked 31 Oct 2026 (roadmap 1.12).
 | `VAPID_PRIVATE_KEY` | Sending Web Push to the subscribed phones. | Vercel (Secret), `.env.local` | Someone could send notifications to your phones | [E](#e-vapid-keys) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public half of the above. | Vercel (Config), browsers | Nothing | With E |
 | `GEMINI_API_KEY` | Fridge photo scanning (Google AI Studio). | Vercel (Secret), `.env.local` | Usage billed to you or your quota used up | [F](#f-third-party-api-keys) |
-| `RESEND_API_KEY` | Sending email (weekly check-in, Brain email actions, the new sign-up alert). | `.env.local` only, **not in Vercel**, so production sends no email yet | Mail sent as you | [F](#f-third-party-api-keys) |
+| `RESEND_API_KEY` | Sending email (weekly check-in, Brain email actions, the new sign-up alert). | `.env.local` and Vercel Production (Sensitive, since 2026-10-31) | Mail sent as you | [F](#f-third-party-api-keys) |
 | `HOOK_LAUNCH_SECRET` | Optional. Signs the 30-minute tokens the app hands a Shortcut it launches. Unset: the service role key signs them. | Not set | Forged launch tokens (one user, one purpose, 30 min) | Set any long random string and redeploy. Open launch tokens just expire. |
 | `SUPABASE_DB_URL` | Direct Postgres access, password included, for the nightly backup. | GitHub Actions secret | Full database | [A](#a-supabase-service-role-key), step 4 |
 | `BACKUP_PASSPHRASE` | Decrypts the nightly backup files. | GitHub Actions secret, plus your password manager | With a backup file: the whole database | [G](#g-backup_passphrase) |
