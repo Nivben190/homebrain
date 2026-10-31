@@ -20,7 +20,7 @@ export const app = {
   userId: null as string | null,
   cookies: new Map<string, string>(),
   headers: new Headers({ "x-forwarded-for": "203.0.113.7" }),
-  pushes: [] as { userId: string; payload: { title: string; body: string; url?: string } }[],
+  pushes: [] as { userId: string; payload: { title: string; body: string; url?: string }; opts?: { runId?: string; subscriptionId?: string } }[],
   outbound: [] as string[],
   /** Browser writes fail like a phone with no signal. */
   offline: false,
@@ -160,8 +160,8 @@ export const nextNavigationMock = {
 };
 
 export const pushMock = {
-  sendPush: async (_db: unknown, userId: string, payload: { title: string; body: string; url?: string }) => {
-    app.pushes.push({ userId, payload });
+  sendPush: async (_db: unknown, userId: string, payload: { title: string; body: string; url?: string }, opts?: { runId?: string; subscriptionId?: string }) => {
+    app.pushes.push({ userId, payload, opts });
     return 1;
   },
 };

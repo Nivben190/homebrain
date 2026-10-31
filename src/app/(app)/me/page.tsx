@@ -8,7 +8,7 @@ export default async function MePage() {
   const { supabase, user, profile, household, members } = await requireHome();
   const admin = createSupabaseAdmin();
   const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const [{ data: gmail }, { data: gcal }, { data: engine }, { count: failedJobs }, origin, { data: spaces }] = await Promise.all([
+  const [{ data: gmail }, { data: gcal }, { data: engine }, { count: failedJobs }, origin, { data: spaces }, { data: subs }, { data: deliveries }] = await Promise.all([
     // Inboxes this user connected (one per Subscriptions space).
     admin.from("gmail_connections").select("section_id,email,status,sections(title,icon)").eq("user_id", user.id).returns<{ section_id: string; email: string | null; status: string; sections: { title: string; icon: string } | null }[]>(),
     admin.from("calendar_connections").select("email,status").eq("user_id", user.id).maybeSingle(),
@@ -16,7 +16,13 @@ export default async function MePage() {
     admin.from("jobs").select("id", { count: "exact", head: true }).in("user_id", members.map((m) => m.user_id)).eq("status", "failed").gte("created_at", weekAgo),
     appOrigin(),
     supabase.from("sections").select("id,icon,title").order("position"),
+    supabase.from("push_subscriptions").select("id,device_label,last_seen_at").order("created_at"),
+    supabase.from("push_deliveries").select("subscription_id,ok").not("subscription_id", "is", null).order("created_at", { ascending: false }).limit(100),
   ]);
+  // The newest delivery per device says whether its pushes arrive.
+  const lastOk = new Map<string, boolean>();
+  for (const d of deliveries ?? []) if (!lastOk.has(d.subscription_id!)) lastOk.set(d.subscription_id!, d.ok);
+  const now = Date.now();
   const expiredGoogle = (gmail ?? []).filter((g) => g.status === "expired").length + (gcal?.status === "expired" ? 1 : 0);
   return (
     <SettingsScreen
@@ -33,6 +39,12 @@ export default async function MePage() {
       members={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }))}
       feedUrl={`${origin}/api/cal/${profile.ics_token}.ics`}
       spaces={spaces ?? []}
+      devices={(subs ?? []).map((s) => ({
+        id: s.id,
+        label: s.device_label ?? "Device",
+        seenAgo: Math.max(0, Math.round((now - Date.parse(s.last_seen_at)) / 1000)),
+        lastOk: lastOk.get(s.id) ?? null,
+      }))}
       userId={user.id}
       roster={members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji, role: m.role }))}
       partners={members.filter((m) => m.user_id !== user.id).map((m) => m.display_name)}

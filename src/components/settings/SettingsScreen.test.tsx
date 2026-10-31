@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { homeWith, sql, startApp } from "@/test/app";
+import { app, homeWith, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
 
 vi.mock("@/lib/supabase/server", () => import("@/test/app").then((m) => m.supabaseServerMock));
@@ -12,6 +12,7 @@ vi.mock("next/link", () => import("@/test/app").then((m) => m.nextLinkMock));
 vi.mock("@/lib/push", () => import("@/test/app").then((m) => m.pushMock));
 
 const { SettingsScreen } = await import("./SettingsScreen");
+const { PushDevicesCard } = await import("./PushDevicesCard");
 
 beforeAll(startApp, 120_000);
 
@@ -90,5 +91,46 @@ describe("settings", () => {
     unmount();
     await setup("child", null);
     expect(screen.queryByText(t.settings.invite)).not.toBeInTheDocument();
+  });
+});
+
+describe("devices (roadmap 1.10)", () => {
+  async function devices() {
+    const home = await homeWith(["adult"]);
+    const add = async (label: string) =>
+      (await sql<{ id: string }>(`insert into push_subscriptions (user_id, endpoint, p256dh, auth, device_label) values ($1, $2, 'k', 'a', $3) returning id`, [home.users.adult, `https://push/${crypto.randomUUID()}`, label]))[0].id;
+    const phone = await add("iPhone");
+    const mac = await add("MacIntel");
+    const ui = renderUi(
+      <PushDevicesCard
+        devices={[
+          { id: phone, label: "iPhone", seenAgo: 3 * 86400, lastOk: false },
+          { id: mac, label: "MacIntel", seenAgo: 30, lastOk: true },
+        ]}
+      />,
+    );
+    return { ...ui, home, phone, mac };
+  }
+
+  it("shows each phone, when it was seen and whether the last push arrived", async () => {
+    const { t } = await devices();
+    expect(screen.getByText(t.settings.deviceSeen.replace("{ago}", t.settings.daysAgo.replace("{n}", "3")))).toBeInTheDocument();
+    expect(screen.getByText(t.settings.deviceLastFailed)).toBeInTheDocument();
+    expect(screen.getByText(t.settings.deviceLastOk)).toBeInTheDocument();
+  });
+
+  it("tests one phone at a time", async () => {
+    const { user, t, mac } = await devices();
+    app.pushes.length = 0;
+    await user.click(screen.getByRole("button", { name: t.settings.deviceTest.replace("{name}", "MacIntel") }));
+    expect(await screen.findByText("✓ 🔔")).toBeInTheDocument();
+    expect(app.pushes.map((p) => p.opts)).toEqual([{ subscriptionId: mac }]);
+  });
+
+  it("removes a phone you no longer use", async () => {
+    const { user, t, phone, home } = await devices();
+    await user.click(screen.getByRole("button", { name: t.settings.deviceRemove.replace("{name}", "iPhone") }));
+    await waitFor(async () => expect(await sql(`select id from push_subscriptions where user_id = $1`, [home.users.adult])).toHaveLength(1));
+    expect(await sql(`select id from push_subscriptions where id = $1`, [phone])).toEqual([]);
   });
 });

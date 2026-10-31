@@ -38,6 +38,8 @@ async function item(sectionId: string, fields: Record<string, unknown>) {
   if (error) throw new Error(error.message);
   return data!.id as string;
 }
+// Card pushes only: between 09:30 and 10:00 Israel time the daily briefing also buzzes these new homes.
+const cardPushes = () => app.pushes.filter((p) => p.opts?.runId);
 const runsFor = (userId: string) => sql<{ title: string; item_id: string | null; acknowledged_at: unknown }>(`select title, item_id, acknowledged_at from runs where user_id = $1 order by fired_at`, [userId]);
 
 describe("schedules", () => {
@@ -48,7 +50,7 @@ describe("schedules", () => {
     const { phases, outcomes } = await tick(db());
     expect(phases.every((p) => p.ok)).toBe(true);
     expect(outcomes.filter((o) => o.automationId === a.id).map((o) => o.status)).toEqual(["fired"]);
-    expect(app.pushes.filter((p) => p.userId === home.users.owner).map((p) => p.payload.title)).toEqual(["⚡ Hello"]);
+    expect(cardPushes().filter((p) => p.userId === home.users.owner).map((p) => p.payload.title)).toEqual(["⚡ Hello"]);
     expect(await sql(`select status from automation_log where automation_id = $1`, [a.id])).toEqual([{ status: "fired" }]);
     const [{ next_run_at }] = await sql<{ next_run_at: Date }>(`select next_run_at from automations where id = $1`, [a.id]);
     expect(new Date(next_run_at).getTime()).toBeGreaterThan(Date.now());
@@ -138,7 +140,7 @@ describe("item reminders", () => {
     app.pushes = [];
     const first = await tick(db());
     expect(first.outcomes.find((o) => o.automationId === walk)?.status).toBe("fired");
-    expect(app.pushes.map((p) => p.userId)).toEqual([home.users.owner]);
+    expect(cardPushes().map((p) => p.userId)).toEqual([home.users.owner]);
     // Checked in: the next reminder that comes due today stays silent.
     await sql(`insert into checkins (item_id, day, user_id) values ($1, $2, $3)`, [walk, todayIn(), home.users.owner]);
     await sql(`update items set remind_at = $2 where id = $1`, [walk, minutesAgo(1)]);
@@ -153,7 +155,7 @@ describe("item reminders", () => {
     const id = await item(s, { title: "Dentist", due_at: due, remind_at: minutesAgo(1), props: { _remind: 60 }, assignee_id: home.users.adult });
     app.pushes = [];
     expect((await tick(db())).outcomes.find((o) => o.automationId === id)?.status).toBe("fired");
-    expect(app.pushes.map((p) => p.userId)).toEqual([home.users.adult]);
+    expect(cardPushes().map((p) => p.userId)).toEqual([home.users.adult]);
     expect(await sql(`select remind_at from items where id = $1`, [id])).toEqual([{ remind_at: null }]);
   });
 

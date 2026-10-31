@@ -41,6 +41,7 @@ beforeAll(async () => {
   await db.query(`insert into home_info (household_id, wifi_name) values ($1, 'Home')`, [h]);
   await db.query(`insert into google_tokens (user_id, refresh_token) values ($1, 'sealed')`, [u.adult]);
   await db.query(`insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, 'https://push/x', 'k', 'a')`, [u.adult]);
+  await db.query(`insert into push_deliveries (user_id, run_id, ok, status) values ($1, $2, true, 201)`, [u.adult, ids.run]);
 }, 120_000);
 
 /** True when the statement ran and touched (or returned) at least one row. */
@@ -142,9 +143,11 @@ describe("people", () => {
 });
 
 describe("personal data", () => {
-  it("runs, push subscriptions and Brain logs belong to one person", async () => {
+  it("runs, push subscriptions, deliveries and Brain logs belong to one person", async () => {
     expect(await who(`select 1 from runs where id = $1`, () => [ids.run])).toEqual(["adult"]);
     expect(await who(`select 1 from push_subscriptions`)).toEqual(["adult"]);
+    expect(await who(`select 1 from push_deliveries`)).toEqual(["adult"]);
+    expect(await who(`update push_deliveries set ok = false returning 1`)).toEqual([]);
     expect(await who(`select 1 from automations where id = $1`, () => [ids.automation])).toEqual(["adult"]);
   });
   it("server-only tables are closed to members", async () => {

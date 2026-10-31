@@ -13,6 +13,7 @@ import type { Member } from "@/components/sections/PropertyInput";
 import type { Profile } from "@/lib/db-types";
 import { DailyBrainSettings, type DailyPrefs } from "./DailyBrainSettings";
 import { BrainStatusCard, type BrainStatus } from "./BrainStatusCard";
+import { PushDevicesCard, type PushDevice } from "./PushDevicesCard";
 import { YourDataCard } from "./YourDataCard";
 import { useToast } from "@/components/Toaster";
 import { errorKey } from "@/lib/errors";
@@ -46,6 +47,7 @@ export function SettingsScreen({
   roster,
   userId,
   spaces,
+  devices = [],
 }: {
   profile: ProfileForm;
   household: { name: string; invite_code: string | null }; // null: only owners and adults invite
@@ -59,6 +61,7 @@ export function SettingsScreen({
   roster: HomeMember[];
   userId: string;
   spaces: { id: string; icon: string; title: string }[];
+  devices?: PushDevice[];
 }) {
   const { t } = useI18n();
   const [p, setP] = useState(profile);
@@ -140,7 +143,7 @@ export function SettingsScreen({
           <p className="text-sm text-muted">{push === "granted" ? t.settings.enabled : push === "needs-install" ? t.today.installHint : push === "denied" ? "⛔" : t.today.enablePushHint}</p>
         </div>
         {push === "granted" ? (
-          <Button size="sm" variant="soft" onClick={async () => { const r = await sendTestPush(); if (r.ok) toast.success("🔔"); else toast.error(r.error); }}>
+          <Button size="sm" variant="soft" onClick={async () => { const r = await sendTestPush(); if (r.ok) toast.success("🔔"); else toast.error(r.error ?? t.failures.generic); }}>
             {t.settings.testPush}
           </Button>
         ) : (
@@ -151,6 +154,8 @@ export function SettingsScreen({
           )
         )}
       </Card>
+
+      <PushDevicesCard devices={devices} />
 
       <div className="mt-3">
         <BrainStatusCard status={brain} />

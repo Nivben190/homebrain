@@ -660,20 +660,34 @@ export async function savePushSubscription(sub: unknown, deviceLabel: string): P
   // One device, several people (a family tablet): pushes go to whoever turned them on last.
   await createSupabaseAdmin().from("push_subscriptions").delete().eq("endpoint", parsed.data.endpoint).neq("user_id", user.id);
   const { error } = await supabase.from("push_subscriptions").upsert(
-    { user_id: user.id, endpoint: parsed.data.endpoint, p256dh: parsed.data.keys.p256dh, auth: parsed.data.keys.auth, device_label: deviceLabel.slice(0, 60) },
+    {
+      user_id: user.id,
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.keys.p256dh,
+      auth: parsed.data.keys.auth,
+      device_label: deviceLabel.slice(0, 60),
+      last_seen_at: new Date().toISOString(),
+    },
     { onConflict: "endpoint" },
   );
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 
-export async function sendTestPush(): Promise<Result> {
+/** Me → Send test: every device, or just one (roadmap 1.10). */
+export async function sendTestPush(deviceId?: string): Promise<Result> {
   const { user, profile } = await requireHome();
-  const sent = await sendPush(createSupabaseAdmin(), user.id, {
-    title: `🧠 ${getDict(profile.locale).settings.testPushTitle}`,
-    body: getDict(profile.locale).settings.testPushBody,
-    url: "/",
-  });
-  return sent > 0 ? { ok: true } : { ok: false, error: "No devices registered" };
+  const t = getDict(profile.locale).settings;
+  const sent = await sendPush(createSupabaseAdmin(), user.id, { title: `🧠 ${t.testPushTitle}`, body: t.testPushBody, url: "/" }, { subscriptionId: deviceId });
+  revalidatePath("/me");
+  return sent > 0 ? { ok: true } : { ok: false, error: t.testPushFailed };
+}
+
+export async function removePushDevice(deviceId: string): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { data, error } = await supabase.from("push_subscriptions").delete().eq("id", deviceId).select("id");
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/me");
+  return data?.length ? { ok: true } : { ok: false, error: "permission denied" };
 }
 
 // ---------------------------------------------------------------------------

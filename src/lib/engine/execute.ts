@@ -177,7 +177,7 @@ async function fireAutomationOnce(db: Admin, automation: Automation, now: Date):
       await db.from("items").insert({ section_id: effect.sectionId, title: effect.title, created_by: me.user_id });
     }
   }
-  if (pushAllowed(me, null, now)) await sendPush(db, me.user_id, { title: `${def.icon} ${out.title}`, body: out.body, url: `/runs/${run.id}` });
+  if (pushAllowed(me, null, now)) await sendPush(db, me.user_id, { title: `${def.icon} ${out.title}`, body: out.body, url: `/runs/${run.id}` }, { runId: run.id });
 
   return { automationId: automation.id, status: "fired", runId: run.id, reason: skipped.join("; ") || undefined };
 }
@@ -386,7 +386,7 @@ export async function sendReminders(
     const run = await insertItemRun(db, { user_id: target.user_id, household_id: section.household_id, item_id: itemId, title, body, icon: section.icon, rendered, fired_at: now.toISOString() });
     if (!run) continue;
     // The card is there either way; quiet hours, a muted space or the digest only hold back the buzz.
-    if (pushAllowed(target, section.id, now)) await sendPush(db, target.user_id, { title: `${section.icon} ${title}`, body, url: `/runs/${run.id}` });
+    if (pushAllowed(target, section.id, now)) await sendPush(db, target.user_id, { title: `${section.icon} ${title}`, body, url: `/runs/${run.id}` }, { runId: run.id });
     fired++;
   }
   return fired;

@@ -47,6 +47,77 @@ describe("push delivery", () => {
     expect(JSON.parse(webpush.sendNotification.mock.calls[0][1])).toMatchObject({ title: "Hi", badge: 1 });
     expect(await sql(`select endpoint from push_subscriptions where user_id = $1`, [home.users.owner])).toEqual([{ endpoint: "https://push/live" }]);
   });
+
+  async function phones(...endpoints: string[]) {
+    const home = await homeWith(["owner"]);
+    const [{ id: runId }] = await sql<{ id: string }>(`insert into runs (user_id, household_id, title) values ($1, $2, 'Vet') returning id`, [home.users.owner, home.householdId]);
+    const at = Object.fromEntries(endpoints.map((e) => [e, `https://push/${crypto.randomUUID()}/${e}`]));
+    for (const e of endpoints) await sql(`insert into push_subscriptions (user_id, endpoint, p256dh, auth, device_label) values ($1, $2, 'k', 'a', 'iPhone')`, [home.users.owner, at[e]]);
+    return { user: home.users.owner, runId, at };
+  }
+  const deliveries = (runId: string) => sql(`select device_label, ok, status, attempts from push_deliveries where run_id = $1 order by ok desc`, [runId]);
+
+  it("records what each device said for the card it was about", async () => {
+    const { user, runId } = await phones("a", "b");
+    webpush.sendNotification.mockImplementation(async (sub: { endpoint: string }) => {
+      if (sub.endpoint.endsWith("b")) throw Object.assign(new Error("bad key"), { statusCode: 403 });
+      return { statusCode: 201 };
+    });
+    expect(await sendPush(testClient(app.db), user, { title: "Vet", body: "", url: "/" }, { runId })).toBe(1);
+    expect(await deliveries(runId)).toEqual([
+      { device_label: "iPhone", ok: true, status: 201, attempts: 1 },
+      { device_label: "iPhone", ok: false, status: 403, attempts: 1 },
+    ]);
+  });
+
+  it("a busy push service gets one more try", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const { user, runId } = await phones("busy");
+      webpush.sendNotification
+        .mockRejectedValueOnce(Object.assign(new Error("slow down"), { statusCode: 429, headers: { "retry-after": "2" } }))
+        .mockResolvedValueOnce({ statusCode: 201 });
+      const sending = sendPush(testClient(app.db), user, { title: "Vet", body: "", url: "/" }, { runId });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(await sending).toBe(1);
+      expect(webpush.sendNotification).toHaveBeenCalledTimes(2);
+      expect(await deliveries(runId)).toEqual([{ device_label: "iPhone", ok: true, status: 201, attempts: 2 }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a server error twice is recorded as not delivered; a refusal isn't retried", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const { user, runId } = await phones("down");
+      webpush.sendNotification.mockRejectedValue(Object.assign(new Error("down"), { statusCode: 503 }));
+      const sending = sendPush(testClient(app.db), user, { title: "Vet", body: "", url: "/" }, { runId });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await sending).toBe(0);
+      expect(await deliveries(runId)).toEqual([{ device_label: "iPhone", ok: false, status: 503, attempts: 2 }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("one device only, for Me → Send test", async () => {
+    const { user, at } = await phones("a", "b");
+    const [{ id }] = await sql<{ id: string }>(`select id from push_subscriptions where endpoint = $1`, [at.b]);
+    webpush.sendNotification.mockResolvedValue({ statusCode: 201 });
+    expect(await sendPush(testClient(app.db), user, { title: "Test", body: "", url: "/" }, { subscriptionId: id })).toBe(1);
+    expect(webpush.sendNotification.mock.calls.map((c) => c[0].endpoint)).toEqual([at.b]);
+  });
+
+  it("drops phones not seen for 60 days, and delivery records older than 30", async () => {
+    const { user, runId, at } = await phones("old", "new");
+    await sql(`update push_subscriptions set last_seen_at = now() - interval '61 days' where endpoint = $1`, [at.old]);
+    await sql(`insert into push_deliveries (user_id, ok, created_at) values ($1, true, now() - interval '31 days')`, [user]);
+    webpush.sendNotification.mockResolvedValue({ statusCode: 201 });
+    expect(await sendPush(testClient(app.db), user, { title: "Vet", body: "", url: "/" }, { runId })).toBe(1);
+    expect(await sql(`select endpoint from push_subscriptions where user_id = $1`, [user])).toEqual([{ endpoint: at.new }]);
+    expect(await sql(`select run_id from push_deliveries where user_id = $1`, [user])).toEqual([{ run_id: runId }]);
+  });
 });
 
 describe("email", () => {
