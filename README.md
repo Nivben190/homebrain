@@ -23,7 +23,7 @@ Code map: `src/lib/engine` (pure scheduling/templates + executor), `src/lib/regi
 1. **Supabase**: create a project at supabase.com and run the files in `supabase/migrations` in order (`0003` comes after deploy).
    - Sign-in is email + password. Accounts are created already confirmed, through the service-role key, so no email is ever sent and there are no email templates or SMTP to set up.
    - Sign-up is invite only: an email in `ALLOWED_EMAILS=you@x.com,partner@y.com`, or anyone with a household invite code. With no home yet, the first account is let in.
-2. **Env**: `cp .env.example .env.local` and fill it in. Generate push keys with `npx web-push generate-vapid-keys`.
+2. **Env**: `cp .env.example .env.local` and fill it in. [docs/SECRETS.md](docs/SECRETS.md) lists what each secret unlocks and how to rotate it. Generate push keys with `npx web-push generate-vapid-keys`.
 3. **Run locally**: `npm install`, then `npm run dev`. Push notifications only work in a production build (`npm run build && npm start`) over HTTPS.
 4. **Deploy**: push to GitHub and import the repo in Vercel. Add the same env vars there.
 5. **Heartbeat**: in the Supabase SQL editor, run:

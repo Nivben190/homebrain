@@ -146,6 +146,8 @@ export function readState(state: string): { u: string; s: string } | null {
 
 /** AES-256-GCM with GOOGLE_TOKEN_KEY (32 bytes, base64): a database leak alone can't read mail. */
 const key = () => Buffer.from(process.env.GOOGLE_TOKEN_KEY!, "base64");
+/** While rotating (docs/SECRETS.md): the old key still opens what it sealed, until everything is re-sealed. */
+const previousKey = () => (process.env.GOOGLE_TOKEN_KEY_PREVIOUS ? Buffer.from(process.env.GOOGLE_TOKEN_KEY_PREVIOUS, "base64") : null);
 
 export function sealToken(plain: string) {
   const iv = randomBytes(12);
@@ -154,9 +156,29 @@ export function sealToken(plain: string) {
   return `v1:${Buffer.concat([iv, c.getAuthTag(), enc]).toString("base64")}`;
 }
 
-export function openToken(sealed: string) {
-  const raw = Buffer.from(sealed.slice(3), "base64");
-  const d = createDecipheriv("aes-256-gcm", key(), raw.subarray(0, 12));
+function openWith(k: Buffer, raw: Buffer) {
+  const d = createDecipheriv("aes-256-gcm", k, raw.subarray(0, 12));
   d.setAuthTag(raw.subarray(12, 28));
   return Buffer.concat([d.update(raw.subarray(28)), d.final()]).toString("utf8");
+}
+
+export function openToken(sealed: string) {
+  const raw = Buffer.from(sealed.slice(3), "base64");
+  try {
+    return openWith(key(), raw);
+  } catch (e) {
+    const old = previousKey();
+    if (!old) throw e;
+    return openWith(old, raw);
+  }
+}
+
+/** Sealed with the current key already (the auth tag only checks out with the right key). */
+export function sealedWithCurrentKey(sealed: string) {
+  try {
+    openWith(key(), Buffer.from(sealed.slice(3), "base64"));
+    return true;
+  } catch {
+    return false;
+  }
 }
