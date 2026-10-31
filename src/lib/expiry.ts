@@ -25,3 +25,13 @@ export function expiryStage(expires: string, today: string, state: ExpirySent | 
   if (nearest === undefined || sent.includes(nearest)) return null;
   return nearest;
 }
+
+/** Whole days until an expiry date ("YYYY-MM-DD…"); negative once it has passed. */
+export const daysLeft = (expires: string, today: string) => daysBetween(today, expires.slice(0, 10));
+
+/** The first date property of an expiry space holds the expiry. */
+export function expiryOf(schema: { id: string; type: string }[], props: Record<string, unknown>): string | null {
+  const prop = schema.find((p) => p.type === "date");
+  const value = prop ? props[prop.id] : null;
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null;
+}

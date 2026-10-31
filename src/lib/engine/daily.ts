@@ -207,7 +207,7 @@ async function monthEndSummary(db: Admin, people: Profile[], now: Date) {
 
 /** Documents, the shelter kit, warranties: a heads-up 60, 30 and 7 days before the expiry date, between 09:00 and 21:00 (roadmap 3.7). */
 async function expiryAlerts(db: Admin, people: Profile[], now: Date) {
-  const { data: spaces } = await db.from("sections").select("id,household_id,owner_id,schema,icon").in("template", EXPIRY_TEMPLATES).returns<{ id: string; household_id: string; owner_id: string | null; schema: PropertyDef[]; icon: string }[]>();
+  const { data: spaces } = await db.from("sections").select("id,household_id,owner_id,schema,icon,template").in("template", EXPIRY_TEMPLATES).returns<{ id: string; household_id: string; owner_id: string | null; schema: PropertyDef[]; icon: string; template: string }[]>();
   const sent: string[] = [];
   for (const s of spaces ?? []) {
     const dateProp = s.schema.find((p) => p.type === "date");
@@ -230,7 +230,12 @@ async function expiryAlerts(db: Admin, people: Profile[], now: Date) {
       for (const m of members) {
         if (!pushAllowed(m, s.id, now)) continue;
         const t = getDict(m.locale).daily;
-        await sendPush(db, m.user_id, { title: `${s.icon} ${fill(t.expiryTitle, { title: item.title })}`, body: fill(t.expiryBody, { n: stage, date: day }), url: `/sections/${s.id}` });
+        const warranty = s.template === "receipts";
+        await sendPush(db, m.user_id, {
+          title: `${s.icon} ${fill(warranty ? t.warrantyTitle : t.expiryTitle, { title: item.title })}`,
+          body: fill(warranty ? t.warrantyBody : t.expiryBody, { n: stage, date: day }),
+          url: `/sections/${s.id}`,
+        });
       }
       sent.push(`expiry:${item.id}:${stage}`);
     }

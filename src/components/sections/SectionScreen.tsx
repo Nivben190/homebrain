@@ -24,6 +24,7 @@ import { manualSub, readSub, subPatch, SUB_PROP } from "@/lib/subs/types";
 import { currentOccurrence, defaultDate, readDate } from "@/lib/engine/dates";
 import { handleDate } from "@/app/actions";
 import { assigneesFor, readHabit, todayKey } from "@/lib/engine/habits";
+import { daysLeft, EXPIRY_TEMPLATES, expiryOf } from "@/lib/expiry";
 import { deleteAttachment, readPhotos } from "@/lib/photos";
 import { RemoveBadge, SwipeRow } from "./SwipeRow";
 import { notesShortcutUrl } from "@/lib/engine/render";
@@ -574,7 +575,7 @@ export function SectionScreen({
         <ul className="glass divide-y divide-card-border overflow-hidden rounded-3xl empty:hidden">
           <AnimatePresence initial={false}>
             {open.map((i) => (
-              <ItemRow key={i.id} item={i} section={section} members={members} locale={locale} checklist={isChecklist} editing={editing} onDelete={() => remove(i.id)} onToggle={() => update(i.id, { done: !i.done })} onOpen={() => setOpenItem(i)} />
+              <ItemRow key={i.id} item={i} section={section} members={members} locale={locale} checklist={isChecklist} editing={editing} onDelete={() => remove(i.id)} onToggle={() => update(i.id, { done: !i.done })} onOpen={() => setOpenItem(i)} today={todayKey(timeZone)} />
             ))}
           </AnimatePresence>
         </ul>
@@ -724,6 +725,7 @@ function ItemRow({
   onDelete,
   onToggle,
   onOpen,
+  today,
 }: {
   item: Item;
   section: Section;
@@ -734,6 +736,8 @@ function ItemRow({
   onDelete: () => void;
   onToggle: () => void;
   onOpen: () => void;
+  /** For expiry spaces (documents, shelter kit, warranties): how long is left. */
+  today?: string;
 }) {
   return (
     <motion.li layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
@@ -757,10 +761,22 @@ function ItemRow({
       )}
       <button onClick={onOpen} className="min-w-0 flex-1 py-3.5 text-start">
         <span className={cn("block text-[16px] font-medium leading-snug", item.done && "text-muted line-through")}>{item.title}</span>
+        {today && <ExpiryLeft section={section} item={item} today={today} />}
         <PropertyChips schema={section.schema} props={item.props} members={members} locale={locale} />
       </button>
         </div>
       </SwipeRow>
     </motion.li>
   );
+}
+
+/** "4 months left" / "12 days left" / "Ended" under an item of an expiry space. */
+function ExpiryLeft({ section, item, today }: { section: Section; item: Item; today: string }) {
+  const { t } = useI18n();
+  if (!section.template || !EXPIRY_TEMPLATES.includes(section.template)) return null;
+  const expires = expiryOf(section.schema, item.props);
+  if (!expires) return null;
+  const n = daysLeft(expires, today);
+  const label = n < 0 ? t.expiry.ended : n < 60 ? fill(t.expiry.days, { n: String(n) }) : fill(t.expiry.months, { n: String(Math.floor(n / 30)) });
+  return <span className={cn("mt-0.5 block text-xs font-semibold", n < 0 ? "text-muted" : n <= 30 ? "text-danger" : "text-accent")}>🛡️ {label}</span>;
 }

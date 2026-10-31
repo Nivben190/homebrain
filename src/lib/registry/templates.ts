@@ -429,12 +429,14 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     color: "green",
     view: "list",
     title: { en: "Receipts & warranties", he: "קבלות ואחריות" },
-    desc: { en: "Scan the receipt; warranty end dates show up on Today and in your calendar.", he: "סורקים את הקבלה; סוף האחריות מופיע ב״היום״ וביומן." },
+    desc: { en: "Snap the receipt and set the warranty end: a heads-up 60, 30 and 7 days before it runs out, with the model and who repairs it.", he: "מצלמים את הקבלה וקובעים מתי נגמרת האחריות: תזכורת 60, 30 ו־7 ימים לפני, עם הדגם ומי מתקן." },
     props: [
       { key: "warranty", name: { en: "Warranty until", he: "אחריות עד" }, type: "date" },
       { key: "amount", name: { en: "Amount", he: "סכום" }, type: "price" },
       { key: "store", name: { en: "Store", he: "חנות" }, type: "text" },
       { key: "bought", name: { en: "Bought on", he: "נקנה ב־" }, type: "date" },
+      { key: "model", name: { en: "Model / serial", he: "דגם / מספר סידורי" }, type: "text" },
+      { key: "repair", name: { en: "Repair contact", he: "איש תיקונים / מעבדה" }, type: "text" },
     ],
   },
   {

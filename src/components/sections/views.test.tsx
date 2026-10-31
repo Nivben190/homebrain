@@ -283,6 +283,22 @@ describe("reminder calendar", () => {
   });
 });
 
+describe("expiry spaces", () => {
+  it("a warranty shows how long is left", async () => {
+    const today = todayKey(TZ);
+    const home = await homeWith(["owner"]);
+    signIn(home.users.owner);
+    const schema = [{ id: "w", name: "Warranty until", type: "date" }];
+    const [section] = await sql<Section>(`insert into sections (household_id, title, view, template, schema) values ($1, 'Receipts', 'list', 'receipts', $2) returning *`, [home.householdId, JSON.stringify(schema)]);
+    await sql(`insert into items (section_id, title, position, props) values ($1, 'Fridge', 0, $2), ($1, 'Kettle', 1, $3), ($1, 'Old TV', 2, $4)`, [section.id, { w: addDays(today, 20) }, { w: addDays(today, 200) }, { w: addDays(today, -5) }]);
+    const rows = await sql<Item>(`select * from items where section_id = $1 order by position`, [section.id]);
+    renderUi(<SectionScreen initialSection={section} initialItems={rows.map((r) => ({ ...r, created_at: String(r.created_at) }))} initialCheckins={[]} userId={home.users.owner} members={[]} timeZone={TZ} launch={{ notes: "n", checkin: "c" }} />);
+    expect(screen.getByText(/20 days left/)).toBeInTheDocument();
+    expect(screen.getByText(/6 months left/)).toBeInTheDocument();
+    expect(screen.getByText(/Ended/)).toBeInTheDocument();
+  });
+});
+
 describe("smart fridge", () => {
   const fridge = (level: string, staple = false) => ({ _fridge: { level, staple } });
   const state = async (sectionId: string) => (await props(sectionId)).map((r) => ({ title: r.title, ...(r.props._fridge as object) }));

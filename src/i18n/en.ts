@@ -329,6 +329,11 @@ export const en = {
     cta: "Make a {holiday} list",
     dismiss: "Not this time",
   },
+  expiry: {
+    days: "{n} days left",
+    months: "{n} months left",
+    ended: "Ended",
+  },
   finder: {
     open: "Help me choose",
     openHint: "Say what you want to get better at, and we'll pick the spaces.",
@@ -742,6 +747,8 @@ export const en = {
     moneyBody: "Most went to {category} ({amount}). Tap for the full picture.",
     expiryTitle: "{title} expires soon",
     expiryBody: "In {n} days or less, on {date}. Time to renew.",
+    warrantyTitle: "Warranty on {title} ends soon",
+    warrantyBody: "In {n} days or less, on {date}. Anything to fix or claim, do it now.",
     foodTitle: "🦴 {name}'s food is running low",
     foodBody: "About {n} days left — time to reorder.",
     whosOnIt: "Who's on it",

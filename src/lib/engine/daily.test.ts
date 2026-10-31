@@ -130,6 +130,7 @@ describe("pets, documents, money, weekly", () => {
     const sent = await dailyJobs(db(), at("2026-11-02", "10:00"));
     expect(sent).toContain(`expiry:${water}:30`);
     expect(sent).toContain(`expiry:${fridge}:30`);
+    expect(pushesTo(home.users.owner).map((p) => p.title)).toEqual(expect.arrayContaining([expect.stringContaining("Water expires soon"), expect.stringContaining("Warranty on Fridge ends soon")]));
   });
 
   it("month end: where the money went, on the last evening", async () => {

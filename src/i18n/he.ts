@@ -330,6 +330,11 @@ export const he: Dict = {
     cta: "רשימה ל{holiday}",
     dismiss: "לא הפעם",
   },
+  expiry: {
+    days: "נשארו {n} ימים",
+    months: "נשארו {n} חודשים",
+    ended: "פג",
+  },
   finder: {
     open: "עזרו לי לבחור",
     openHint: "ספרו במה תרצו להשתפר, ואנחנו נבחר את המרחבים.",
@@ -743,6 +748,8 @@ export const he: Dict = {
     moneyBody: "רוב הכסף הלך ל{category} ({amount}). הקישו לתמונה המלאה.",
     expiryTitle: "התוקף של {title} עומד לפוג",
     expiryBody: "בעוד {n} ימים לכל היותר, ב-{date}. הזמן לחדש.",
+    warrantyTitle: "האחריות על {title} נגמרת בקרוב",
+    warrantyBody: "בעוד {n} ימים או פחות, ב־{date}. אם יש מה לתקן או לתבוע, זה הזמן.",
     foodTitle: "🦴 האוכל של {name} עומד להיגמר",
     foodBody: "נשארו בערך {n} ימים — זמן להזמין.",
     whosOnIt: "מי על זה",
