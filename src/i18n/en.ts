@@ -352,6 +352,7 @@ export const en = {
     reorderHint: "Hold a space and drag to reorder",
     templates: "Start from",
     blank: "Blank",
+    shape: "How do you want to keep it?",
     name: "Name",
     icon: "Icon",
     color: "Color",

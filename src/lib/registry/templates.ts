@@ -68,6 +68,11 @@ export interface SectionTemplate {
   props?: TemplateProp[];
   items?: TemplateItem[];
   /**
+   * Ways to keep it, picked on the details step; each names the template it
+   * creates (Get fit: a weekly plan or simple habits).
+   */
+  shapes?: { label: L; template: string }[];
+  /**
    * Merged into another template: no longer offered in New space or Help me
    * choose, but spaces already made from it keep working (views, voices, money).
    */
@@ -96,6 +101,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   },
   {
     key: "dog-vet",
+    retired: true,
     category: "dog",
     icon: "💉",
     color: "sky",
@@ -497,6 +503,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   },
   {
     key: "fitness",
+    retired: true,
     category: "health",
     icon: "🏋️",
     color: "coral",
@@ -693,8 +700,12 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "🏋️",
     color: "coral",
     view: "plan",
-    title: { en: "Training plan", he: "תוכנית אימונים" },
-    desc: { en: "Plan the week's workouts, log what you really lifted or ran, move a missed one, and let your partner cheer (or collect the stake).", he: "מתכננים את האימונים של השבוע, רושמים מה באמת הרמתם או רצתם, מזיזים אימון שהתפספס, והבן/בת זוג מעודדים (או גובים את ההימור)." },
+    title: { en: "Get fit", he: "להיכנס לכושר" },
+    desc: { en: "A weekly training plan with a real log of what you lifted or ran, or just simple workout habits with streaks. You choose.", he: "תוכנית אימונים שבועית עם תיעוד של מה שבאמת הרמתם או רצתם, או פשוט הרגלי אימון עם רצף. אתם בוחרים." },
+    shapes: [
+      { label: { en: "📋 Weekly plan", he: "📋 תוכנית שבועית" }, template: "training" },
+      { label: { en: "✅ Simple habits", he: "✅ הרגלים פשוטים" }, template: "fitness" },
+    ],
   },
   {
     key: "goals",

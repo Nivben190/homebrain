@@ -15,9 +15,9 @@ export interface FinderGoal {
 
 export const FINDER_GOALS: FinderGoal[] = [
   { key: "dog", icon: "🐶", label: { en: "Look after the dog", he: "לטפל בכלב" }, picks: ["dog-care", "dog-health", "dog-training", "dog-supplies"] },
-  { key: "fit", icon: "💪", label: { en: "Get fit", he: "להיכנס לכושר" }, picks: ["training", "fitness"] },
+  { key: "fit", icon: "💪", label: { en: "Get fit", he: "להיכנס לכושר" }, picks: ["training", "meds"] },
   { key: "study", icon: "📚", label: { en: "Study for a test or learn", he: "ללמוד למבחן או משהו חדש" }, picks: ["goals", "commitments"] },
-  { key: "habits", icon: "✅", label: { en: "Build better habits", he: "לבנות הרגלים טובים" }, picks: ["goals", "fitness", "commitments"] },
+  { key: "habits", icon: "✅", label: { en: "Build better habits", he: "לבנות הרגלים טובים" }, picks: ["goals", "commitments", "meds"] },
   { key: "house", icon: "🧹", label: { en: "Keep the house in order", he: "לשמור על הבית מסודר" }, picks: ["cleaning", "groceries", "maintenance", "projects"] },
   { key: "food", icon: "🍽️", label: { en: "Plan meals and eat better", he: "לתכנן ארוחות ולאכול טוב" }, picks: ["meals", "groceries", "fridge", "recipes"] },
   { key: "money", icon: "💰", label: { en: "Get on top of money", he: "לשלוט בכסף" }, picks: ["subscriptions", "spending", "savings", "receipts"] },

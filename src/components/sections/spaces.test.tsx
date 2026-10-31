@@ -87,6 +87,20 @@ describe("new space", () => {
     expect(router.push).toHaveBeenCalledWith("/sections");
   });
 
+  it("Get fit asks how to keep it and makes that kind of space", async () => {
+    const home = await homeWith(["owner"]);
+    const { user, t } = renderUi(<NewSectionButton householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
+    await user.click(screen.getByRole("button", { name: t.sections.new }));
+    await user.click(screen.getByRole("button", { name: /Health/ }));
+    expect(screen.queryByText("Fitness")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Get fit/ }));
+    await user.click(await details(() => screen.getByRole("button", { name: /Simple habits/ })));
+    await user.click(screen.getByRole("button", { name: t.common.create }));
+    await waitFor(async () =>
+      expect(await sql(`select title, view, template from sections where household_id = $1`, [home.householdId])).toEqual([{ title: "Get fit", view: "tracker", template: "fitness" }]),
+    );
+  });
+
   it("refused by the database, it says so in plain words", async () => {
     const home = await homeWith(["owner", "child"]);
     signIn(home.users.child);

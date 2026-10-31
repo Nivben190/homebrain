@@ -353,6 +353,7 @@ export const he: Dict = {
     reorderHint: "החזיקו מרחב וגררו כדי לסדר",
     templates: "להתחיל מ־",
     blank: "ריק",
+    shape: "איך תרצו לנהל את זה?",
     name: "שם",
     icon: "אייקון",
     color: "צבע",

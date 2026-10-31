@@ -81,6 +81,7 @@ export function NewSectionButton({
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState<TemplateCategory>("dog");
   const [tpl, setTpl] = useState<SectionTemplate | null>(null);
+  const [shape, setShape] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState("📄");
   const [color, setColor] = useState("violet");
@@ -145,6 +146,7 @@ export function NewSectionButton({
 
   function pick(next: SectionTemplate) {
     setTpl(next);
+    setShape(next.shapes?.[0]?.template ?? null);
     setTitle(next.title[locale]);
     setIcon(next.icon);
     setColor(next.color);
@@ -165,7 +167,9 @@ export function NewSectionButton({
     if (!tpl) return;
     setBusy(true);
     setError(null);
-    const res = await addSpace(supabaseBrowser(), tpl, {
+    // A template with shapes creates the one picked (Get fit: plan or habits), keeping the name.
+    const chosenTpl = (shape && SECTION_TEMPLATES.find((s) => s.key === shape)) || tpl;
+    const res = await addSpace(supabaseBrowser(), chosenTpl, {
       householdId,
       ownerId: visibility === "private" ? userId : null,
       title: title.trim() || t.sections.new,
@@ -308,6 +312,11 @@ export function NewSectionButton({
                 <Input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t.sections.name} className="h-14 text-lg font-bold" />
               </div>
               {tpl.desc[locale] && <p className="text-sm text-muted">{tpl.desc[locale]}</p>}
+              {tpl.shapes && shape && (
+                <Field label={t.sections.shape}>
+                  <Segmented value={shape} onChange={setShape} options={tpl.shapes.map((s) => ({ value: s.template, label: s.label[locale] }))} />
+                </Field>
+              )}
               {(tpl.items?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {tpl.items!.slice(0, 8).map((it, i) => (
