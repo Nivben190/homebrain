@@ -6,27 +6,7 @@ import type { PropertyDef } from "@/lib/registry/properties";
 import { nextRunAt } from "@/lib/engine/schedule";
 import { nextReminder, todayKey } from "@/lib/engine/habits";
 import { instantiateTemplate, SECTION_TEMPLATES } from "@/lib/registry/templates";
-
-/** Who a new home is for, from the three onboarding questions. */
-export const HOUSEHOLD_KINDS = ["solo", "couple", "family", "roommates"] as const;
-export type HouseholdKind = (typeof HOUSEHOLD_KINDS)[number];
-export interface HomeShape {
-  who: HouseholdKind;
-  dog: boolean;
-  kids: boolean;
-}
-
-/** Shared spaces the home creator starts with (keys in the template library), from what they told us. */
-export function starterSpaces(shape: HomeShape): string[] {
-  return [
-    "groceries",
-    "cleaning",
-    ...(shape.who === "couple" ? ["important-dates"] : []),
-    ...(shape.who === "roommates" ? ["subscriptions"] : []),
-    ...(shape.dog ? ["dog-care"] : []),
-    ...(shape.kids ? ["kids"] : []),
-  ];
-}
+import { starterSpaces, type HomeShape } from "@/lib/home-shape";
 
 const copy = {
   en: {

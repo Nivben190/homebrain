@@ -4,6 +4,11 @@
 
 import { MAX_TICK_AGE_SECONDS } from "@/lib/health";
 
+export const OWNER_TZ = "Asia/Jerusalem";
+const LOGS = "Vercel logs: https://vercel.com/nivben190s-projects/homebrain/logs";
+export const DAY_MS = 86_400_000;
+export const WEEK_MS = 7 * DAY_MS;
+
 /** At most one engine email an hour, however long a problem lasts. */
 export const ALERT_EVERY_MS = 60 * 60 * 1000;
 /** Silent this long and the engine counts as down. */
@@ -18,7 +23,7 @@ export interface EngineState {
 
 export type Mail = { subject: string; body: string };
 
-const israel = (d: Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(d);
+const israel = (d: Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: OWNER_TZ }).format(d);
 const quiet = (state: EngineState | null, now: Date) => !!state?.alerted_at && now.getTime() - Date.parse(state.alerted_at) < ALERT_EVERY_MS;
 
 /**
@@ -33,7 +38,7 @@ export function tickAlert(prev: EngineState | null, failed: { phase: string; err
     ...(gapMs > SILENT_MS ? [`The engine was silent for ${Math.round(gapMs / 60000)} minutes (last run ${israel(new Date(prev!.last_tick_at))}). It's running again now; reminders due in that gap more than 30 minutes ago were skipped.`, ""] : []),
     ...(failed.length ? ["These steps failed in the run at " + israel(now) + ":", ...failed.map((f) => `- ${f.phase}: ${f.error ?? "unknown error"}`), "", "Each step is tried again next minute."] : []),
     "",
-    "Vercel logs: https://vercel.com/nivben190s-projects/homebrain/logs",
+    LOGS,
     ...(appUrl ? [`Health: ${appUrl}/api/health`] : []),
   ];
   const subject = failed.length ? `Home Brain: ${failed.map((f) => f.phase).join(", ")} failed` : "Home Brain: the engine was down and is back";
@@ -52,7 +57,7 @@ export function silenceAlert(state: EngineState | null, now: Date, appUrl = ""):
       `No engine run ${since}. Reminders and automations aren't going out.`,
       "",
       "Check the home-brain-tick cron in Supabase (cron.job_run_details) and the Vercel logs for /api/engine/tick.",
-      "Vercel logs: https://vercel.com/nivben190s-projects/homebrain/logs",
+      LOGS,
       ...(appUrl ? [`Health: ${appUrl}/api/health`] : []),
     ].join("\n"),
   };
@@ -76,9 +81,6 @@ export interface WeekStats {
   activeHomes: number;
   goals: [goal: string, times: number][];
 }
-
-const WEEK_MS = 7 * 86_400_000;
-const DAY_MS = 86_400_000;
 
 export function weekStats({ now, homes, members, ticks, finder }: WeekInput): WeekStats {
   const weekAgo = now.getTime() - WEEK_MS;
@@ -112,5 +114,13 @@ export function weeklyReport(s: WeekStats, appUrl = ""): Mail {
       s.goals.length ? `"Help me choose" goals picked: ${s.goals.map(([g, n]) => `${g} ×${n}`).join(", ")}` : `Nobody used "Help me choose" this week.`,
       ...(appUrl ? ["", appUrl] : []),
     ].join("\n"),
+  };
+}
+
+/** Me → Send feedback. */
+export function feedbackMail(input: { text: string; email: string | null; name: string; locale: string; at: Date }): Mail {
+  return {
+    subject: `Home Brain feedback from ${input.name}`,
+    body: [input.text, "", `— ${input.name}${input.email ? ` <${input.email}>` : ""}, ${israel(input.at)} (Israel time), app in ${input.locale}`].join("\n"),
   };
 }

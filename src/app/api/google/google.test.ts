@@ -75,8 +75,9 @@ describe("connect Gmail", () => {
     expect(conn.email).toBe("niv@gmail.com");
     expect(conn.refresh_token).not.toContain("refresh");
     expect(await sql(`select title from sections where id = $1`, [s])).toEqual([{ title: "Subscriptions · niv" }]);
-    // The first scan runs after the redirect.
+    // The first scan runs after the redirect, and the cron leaves the inbox to it.
     await vi.waitFor(async () => expect(await sql(`select title from items where section_id = $1`, [s])).toEqual([{ title: "Netflix" }]));
+    expect(await sql(`select retry_after from gmail_connections where section_id = $1`, [s])).toEqual([{ retry_after: null }]);
   });
 
   it("refuses someone else's state, a cancelled consent, or a missing read scope", async () => {
@@ -127,9 +128,8 @@ describe("scanning", () => {
     expect(conn.status).toBe("ok");
     expect(new Date(conn.retry_after).getTime()).toBe(now.getTime() + 3600_000);
 
-    // A day later the scan is due, but the inbox is still resting until retry_after.
-    await sql(`update gmail_connections set last_scan_at = now() - interval '2 days', retry_after = now() + interval '30 minutes' where section_id = $1`, [s]);
-    expect(await scanDueGmail(db)).toBeNull();
+    // Still resting half an hour on; the cron picks it up once the hour is over, not a day later.
+    expect(await scanDueGmail(db, new Date(now.getTime() + 30 * 60_000))).toBeNull();
     await sql(`update gmail_connections set retry_after = now() - interval '1 minute' where section_id = $1`, [s]);
     google.busy = false;
     expect(await scanDueGmail(db)).toMatchObject({ ok: true });

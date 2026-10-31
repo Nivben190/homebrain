@@ -7,9 +7,7 @@ import { setupHome } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
 import { Button, Card, EmojiPicker, Field, Input, Segmented, Toggle } from "@/components/ui";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
-import type { HouseholdKind } from "@/lib/starter";
-
-const KINDS: HouseholdKind[] = ["solo", "couple", "family", "roommates"];
+import { DEFAULT_HOME, HOUSEHOLD_KINDS, type HouseholdKind } from "@/lib/home-shape";
 
 export function OnboardingForm({ defaultName, invite }: { defaultName: string; invite?: string }) {
   const { t } = useI18n();
@@ -21,8 +19,9 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
   const [homeName, setHomeName] = useState("");
   const [inviteCode, setInviteCode] = useState(invite ?? "");
   const [starter, setStarter] = useState(true);
-  const [who, setWho] = useState<HouseholdKind>("couple");
-  const [dog, setDog] = useState(false);
+  const [who, setWho] = useState<HouseholdKind>(DEFAULT_HOME.who);
+  const [dog, setDog] = useState(DEFAULT_HOME.dog);
+  const [kids, setKids] = useState(DEFAULT_HOME.kids);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -35,7 +34,7 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
         homeName,
         inviteCode,
         starter,
-        home: { who, dog, kids: who === "family" },
+        home: { who, dog, kids },
         displayName,
         emoji,
         phone,
@@ -100,12 +99,15 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
             <>
               <Field label={t.onboarding.who}>
                 <div className="grid grid-cols-2 gap-2">
-                  {KINDS.map((k) => (
+                  {HOUSEHOLD_KINDS.map((k) => (
                     <button
                       key={k}
                       type="button"
                       aria-pressed={who === k}
-                      onClick={() => setWho(k)}
+                      onClick={() => {
+                        setWho(k);
+                        if (k === "family") setKids(true);
+                      }}
                       className={who === k ? "rounded-2xl bg-accent px-3 py-2.5 text-sm font-bold text-white" : "rounded-2xl bg-sunken px-3 py-2.5 text-sm font-semibold"}
                     >
                       {t.onboarding.kinds[k]}
@@ -116,6 +118,10 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
               <div className="flex items-center justify-between gap-4">
                 <span className="text-[15px] leading-snug">{t.onboarding.dog}</span>
                 <Toggle checked={dog} onChange={setDog} label={t.onboarding.dog} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[15px] leading-snug">{t.onboarding.kids}</span>
+                <Toggle checked={kids} onChange={setKids} label={t.onboarding.kids} />
               </div>
             </>
           )}

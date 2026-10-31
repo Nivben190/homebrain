@@ -27,6 +27,8 @@ export interface GmailConnection {
 
 /** How long an inbox rests after Gmail said "too many requests". */
 export const RATE_LIMIT_REST_MS = 60 * 60 * 1000;
+/** The cron leaves a just-connected inbox to the scan the connect started. */
+export const FIRST_SCAN_MS = 10 * 60 * 1000;
 
 /** A read that failed for its own reasons is skipped; being rate-limited stops the whole scan. */
 const skipUnlessLimited =
@@ -161,12 +163,13 @@ async function notifyChanges(db: Db, profile: Profile, sectionId: string, c: { a
 export async function scanDueGmail(db: Db, now = new Date()) {
   const cutoff = new Date(now.getTime() - 20 * 3600000).toISOString();
   const stale = `last_scan_at.is.null,last_scan_at.lt.${cutoff}`;
-  const { data: due } = await db.from("gmail_connections").select("section_id,retry_after").eq("status", "ok").or(stale).order("last_scan_at", { nullsFirst: true }).limit(20);
-  // Inboxes Gmail rate-limited rest until retry_after.
-  const sectionId = due?.find((c) => !c.retry_after || Date.parse(c.retry_after) <= now.getTime())?.section_id;
+  // A rested inbox (Gmail rate-limited it, or its first scan is running) is due when the rest ends, else once a day.
+  const due = `${stale},retry_after.lte.${now.toISOString()}`;
+  const { data: candidates } = await db.from("gmail_connections").select("section_id,retry_after").eq("status", "ok").or(`${due},retry_after.not.is.null`).order("last_scan_at", { nullsFirst: true }).limit(20);
+  const sectionId = candidates?.find((c) => (c.retry_after ? Date.parse(c.retry_after) <= now.getTime() : true))?.section_id;
   if (!sectionId) return null;
   // Claim it first so overlapping ticks don't scan the same inbox twice.
-  const { data: claimed } = await db.from("gmail_connections").update({ last_scan_at: now.toISOString() }).eq("section_id", sectionId).or(stale).select("section_id");
+  const { data: claimed } = await db.from("gmail_connections").update({ last_scan_at: now.toISOString(), retry_after: null }).eq("section_id", sectionId).or(due).select("section_id");
   if (!claimed?.length) return null;
   return scanGmail(db, sectionId, { notify: true, now });
 }

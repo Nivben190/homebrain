@@ -305,9 +305,10 @@ export const he: Dict = {
     or: "או",
     starter: "להתחיל עם הרשימות שמתאימות לבית, ושגרת בוקר",
     starterJoin: "להוסיף לי שגרת בוקר פרטית",
-    who: "מי גר כאן?",
-    kinds: { solo: "רק אני", couple: "זוג", family: "משפחה עם ילדים", roommates: "שותפים לדירה" },
+    who: "מי גרים כאן?",
+    kinds: { solo: "רק אני", couple: "זוג", family: "משפחה", roommates: "שותפים לדירה" },
     dog: "יש כלב 🐶",
+    kids: "יש ילדים 🧒",
   },
   today: {
     googleGone: "{what} הפסיק לעבוד",
@@ -385,6 +386,7 @@ export const he: Dict = {
     send: "שליחה",
     sent: "תודה! זה בדרך 💌",
     failed: "לא הצלחתי לשלוח כרגע. אפשר לנסות שוב אחר כך.",
+    tooMany: "זה הרבה משוב ליום אחד. תודה! אפשר לשלוח עוד מחר.",
   },
   finder: {
     open: "עזרו לי לבחור",

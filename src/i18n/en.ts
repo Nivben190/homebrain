@@ -305,8 +305,9 @@ export const en = {
     starter: "Start me off with the house lists that fit, and a morning routine",
     starterJoin: "Add a private morning routine for me",
     who: "Who lives here?",
-    kinds: { solo: "Just me", couple: "A couple", family: "Family with kids", roommates: "Roommates" },
+    kinds: { solo: "Just me", couple: "A couple", family: "Family", roommates: "Roommates" },
     dog: "There's a dog 🐶",
+    kids: "There are kids 🧒",
   },
   today: {
     googleGone: "{what} stopped working",
@@ -384,6 +385,7 @@ export const en = {
     send: "Send",
     sent: "Thanks! It's on its way 💌",
     failed: "Couldn't send it right now. Try again later.",
+    tooMany: "That's a lot of feedback for one day. Thank you! Send more tomorrow.",
   },
   finder: {
     open: "Help me choose",

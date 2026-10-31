@@ -99,7 +99,8 @@ export function SubscriptionsView({
     // Connecting started the first scan on the server; show it running until it lands.
     if (result === "connected") {
       setScanning(true);
-      waitForScan(Date.now() - 3 * 60_000).finally(() => setScanning(false));
+      // The connect redirected here seconds after starting it.
+      waitForScan(Date.now() - 60_000).finally(() => setScanning(false));
     }
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -10,13 +10,13 @@ export function FeedbackRow() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const [result, setResult] = useState<"sent" | "failed" | null>(null);
+  const [result, setResult] = useState<"sent" | "failed" | "tooMany" | null>(null);
   const [pending, start] = useTransition();
 
   function send() {
     start(async () => {
       const res = await sendFeedback(text);
-      setResult(res.ok ? "sent" : "failed");
+      setResult(res.ok ? "sent" : res.error === "too_many" ? "tooMany" : "failed");
       if (res.ok) setText("");
     });
   }
@@ -46,7 +46,7 @@ export function FeedbackRow() {
                 maxLength={4000}
                 className="w-full rounded-2xl bg-sunken p-3 text-[15px] outline-none focus:ring-2 focus:ring-accent"
               />
-              {result === "failed" && <p className="text-sm text-danger">{t.feedback.failed}</p>}
+              {(result === "failed" || result === "tooMany") && <p className="text-sm text-danger">{t.feedback[result]}</p>}
               <Button className="w-full" loading={pending} disabled={text.trim().length < 3} onClick={send}>
                 {t.feedback.send}
               </Button>

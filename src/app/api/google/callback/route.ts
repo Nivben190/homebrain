@@ -4,7 +4,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { appOrigin } from "@/lib/url";
 import { getDict } from "@/i18n";
 import { exchangeCode, GmailApiDisabled, gmailAddress, GMAIL_SCOPE, GoogleAuthError, readState, sealToken } from "@/lib/subs/gmail";
-import { scanGmail } from "@/lib/subs/scan";
+import { FIRST_SCAN_MS, scanGmail } from "@/lib/subs/scan";
 import { calendarAccount, CALENDAR_SCOPE, CALENDAR_STATE } from "@/lib/gcal";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const email = await gmailAddress(tokens.access_token!);
     const { error } = await db
       .from("gmail_connections")
-      .upsert({ section_id: sectionId, user_id: user.id, email, refresh_token: sealToken(tokens.refresh_token), status: "ok", scan_error: null, updated_at: new Date().toISOString() }, { onConflict: "section_id" });
+      .upsert({ section_id: sectionId, user_id: user.id, email, refresh_token: sealToken(tokens.refresh_token), status: "ok", scan_error: null, updated_at: new Date().toISOString(), retry_after: new Date(Date.now() + FIRST_SCAN_MS).toISOString() }, { onConflict: "section_id" });
     if (error) throw error;
     // A space still called just "Subscriptions" gets the inbox in its name, so several are easy to tell apart.
     const plain = getDict(profile?.locale ?? "en").views.subscriptions;

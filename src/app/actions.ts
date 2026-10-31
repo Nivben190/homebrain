@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { getLocale, getSession, requireHome } from "@/lib/session";
-import { HOUSEHOLD_KINDS, seedStarterBrain, type HomeShape } from "@/lib/starter";
+import { seedStarterBrain } from "@/lib/starter";
+import { DEFAULT_HOME, HOUSEHOLD_KINDS, type HomeShape } from "@/lib/home-shape";
 import { fireAutomation, handledDays, handleEvent, rescheduleDate } from "@/lib/engine/execute";
 import { currentOccurrence, readDate } from "@/lib/engine/dates";
 import type { RenderedAction } from "@/lib/engine/types";
@@ -35,7 +36,8 @@ import { AMOUNT_PROP } from "@/lib/money";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 import { sendEmail } from "@/lib/email";
 import { signupAlert, type SignupVia } from "@/lib/signup-alert";
-import { feedbackMail, sendFeedbackToOwner } from "@/lib/owner-alerts";
+import { tellOwner } from "@/lib/owner-alerts";
+import { feedbackMail } from "@/lib/owner-report";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
 
@@ -475,7 +477,7 @@ export async function setupHome(input: {
       householdId: rpc.data.id,
       locale,
       timezone: p.timezone,
-      home: input.mode === "create" ? homeShape.parse(input.home ?? { who: "couple", dog: false, kids: false }) : undefined,
+      home: input.mode === "create" ? homeShape.parse(input.home ?? DEFAULT_HOME) : undefined,
     });
   }
   revalidatePath("/", "layout");
@@ -531,7 +533,7 @@ export async function sendFeedback(text: string): Promise<Result> {
   const parsed = z.string().trim().min(3).max(4000).safeParse(text);
   if (!parsed.success) return { ok: false, error: "too short" };
   if (!(await allow(createSupabaseAdmin(), "feedback", user.id))) return { ok: false, error: "too_many" };
-  const sent = await sendFeedbackToOwner(feedbackMail({ text: parsed.data, email: user.email ?? null, name: profile.display_name, locale: profile.locale, at: new Date() }));
+  const sent = await tellOwner(feedbackMail({ text: parsed.data, email: user.email ?? null, name: profile.display_name, locale: profile.locale, at: new Date() }));
   return sent ? { ok: true } : { ok: false, error: "not sent" };
 }
 

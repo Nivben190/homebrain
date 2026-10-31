@@ -147,9 +147,9 @@ describe("people and invites", () => {
 
     const parent = await fresh("parent@test");
     signIn(parent);
-    expect(await A.setupHome({ mode: "create", homeName: "Ours", starter: true, home: { who: "family", dog: true, kids: true }, displayName: "P", emoji: "🙂" })).toEqual({ ok: true });
+    expect(await A.setupHome({ mode: "create", homeName: "Ours", starter: true, home: { who: "roommates", dog: true, kids: true }, displayName: "P", emoji: "🙂" })).toEqual({ ok: true });
     const family = await spacesOf(parent);
-    expect(family.map((s) => s.template ?? s.title)).toEqual(["Morning routine", "groceries", "cleaning", "dog-care", "kids"]);
+    expect(family.map((s) => s.template ?? s.title)).toEqual(["Morning routine", "groceries", "cleaning", "subscriptions", "dog-care", "kids"]);
     // The routine is private; nothing written for a partner, and only the stretch reminder.
     expect(family[0].owner_id).toBe(parent);
     expect(await sql(`select name from automations where owner_id = $1`, [parent])).toEqual([{ name: "Stretch" }]);
