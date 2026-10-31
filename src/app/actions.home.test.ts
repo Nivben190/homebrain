@@ -173,7 +173,7 @@ describe("accounts", () => {
     expect(await sql(`select email from auth.users where email = 'friend@example.com'`)).toHaveLength(1);
     expect(await A.createAccount({ email: "friend@example.com", password: "longenough", inviteCode: invite_code })).toEqual({ ok: false, error: "exists" });
     expect(await A.createAccount({ email: "stranger@example.com", password: "longenough" })).toEqual({ ok: false, error: "not_invited" });
-    expect((await A.createAccount({ email: "x@example.com", password: "short" })).ok).toBe(false);
+    expect(await A.createAccount({ email: "x@example.com", password: "ninechars" })).toEqual({ ok: false, error: "too_short" });
   });
 
   it("deleteAccount needs the typed email, then removes the user and an empty home", async () => {

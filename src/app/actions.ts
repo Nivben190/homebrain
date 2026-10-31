@@ -37,9 +37,12 @@ type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; d
 // Accounts
 // ---------------------------------------------------------------------------
 
+const PASSWORD_MIN = 10;
+
 const accountInput = z.object({
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  // 10+ (roadmap 0.8); Supabase's own minimum is set to match.
+  password: z.string().min(PASSWORD_MIN, "too_short"),
 });
 
 /**

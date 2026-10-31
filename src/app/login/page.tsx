@@ -47,7 +47,7 @@ export default function LoginPage() {
           setMode("signin");
           return setError(t.login.exists);
         }
-        const known: Record<string, string> = { not_invited: t.login.notInvited, too_many: t.login.tooMany };
+        const known: Record<string, string> = { not_invited: t.login.notInvited, too_many: t.login.tooMany, too_short: t.login.tooShort };
         return setError(known[res.error] ?? t.failures[errorKey(res.error)]);
       }
     }
@@ -112,7 +112,7 @@ export default function LoginPage() {
               type={show ? "text" : "password"}
               name="password"
               required
-              minLength={mode === "signup" ? 8 : undefined}
+              minLength={mode === "signup" ? 10 : undefined}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               placeholder={mode === "signup" ? t.login.newPassword : t.login.password}
               value={password}

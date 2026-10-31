@@ -2,6 +2,8 @@ import { InviteLinkButton } from "@/components/InviteLinkButton";
 import Link from "next/link";
 import { Suspense } from "react";
 import { requireHome, getT } from "@/lib/session";
+import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { GoogleReconnect, type ExpiredGoogle } from "@/components/today/GoogleReconnect";
 import { zonedParts } from "@/lib/engine/time";
 import { Card, IconTile, SectionTitle, Skeleton } from "@/components/ui";
 import { RunCard } from "@/components/today/RunCard";
@@ -59,7 +61,8 @@ export default async function TodayPage() {
   const lon = profile.lon ?? DEFAULT_PLACE.lon;
   const forecastP = getForecast(lat, lon, profile.timezone);
   const holyP = getJewishCalendar(lat, lon, profile.timezone, addDays(today, -2), addDays(today, 14));
-  const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ, activityQ] = await Promise.all([
+  const admin = createSupabaseAdmin();
+  const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ, activityQ, gmailQ, gcalQ] = await Promise.all([
     supabase.from("runs").select("*").eq("user_id", user.id).is("acknowledged_at", null).gte("fired_at", dayAgo).order("fired_at", { ascending: false }).returns<Run[]>(),
     supabase.from("runs").select("*").eq("user_id", user.id).gte("fired_at", new Date(now.getTime() - 60 * 86400000).toISOString()).order("fired_at", { ascending: false }).returns<Run[]>(),
     supabase.from("automations").select("*").eq("target_user_id", user.id).eq("enabled", true).returns<Automation[]>(),
@@ -79,7 +82,18 @@ export default async function TodayPage() {
     supabase.from("requests").select("*").in("status", ["open", "doing"]).order("created_at").returns<RequestRow[]>(),
     supabase.from("pets").select("*").order("created_at").returns<Pet[]>(),
     supabase.from("activity").select("id,actor,kind,title,at").gte("at", dayAgo).order("at", { ascending: false }).limit(50).returns<ActivityRow[]>(),
+    // Google connections that ended (roadmap 1.9): server-only tables, this user's rows.
+    admin.from("gmail_connections").select("section_id,sections(title,icon)").eq("user_id", user.id).eq("status", "expired").returns<{ section_id: string; sections: { title: string; icon: string } | null }[]>(),
+    admin.from("calendar_connections").select("status").eq("user_id", user.id).eq("status", "expired").maybeSingle(),
   ]);
+  const expiredGoogle: ExpiredGoogle[] = [
+    ...(gcalQ.data ? [{ key: "gcal", what: "Google Calendar", href: "/api/google/calendar" }] : []),
+    ...(gmailQ.data ?? []).map((g) => ({
+      key: g.section_id,
+      what: t.today.gmailIn.replace("{space}", `${g.sections?.icon ?? "💳"} ${g.sections?.title ?? ""}`.trim()),
+      href: `/api/google/connect?section=${g.section_id}`,
+    })),
+  ];
   const memberList = members.map((m) => ({ id: m.user_id, name: m.display_name, emoji: m.emoji }));
   const otherMembers = memberList.filter((m) => m.id !== user.id);
   const pets = petsQ.data ?? [];
@@ -171,6 +185,7 @@ export default async function TodayPage() {
       {/* Now */}
       <SectionTitle>{t.today.bandNow}</SectionTitle>
       {!awakeToday && local.hour >= 4 && local.hour < 13 && <AwakeButton firstOpen={profile.wake_mode === "first_open"} />}
+      <GoogleReconnect expired={expiredGoogle} />
       <RequestCards incoming={incoming} outgoing={requests.filter((r) => r.from_user === user.id)} members={memberList} />
       {now3.length === 0 ? (
         incoming.length === 0 && <Card className="py-6 text-center text-muted">{t.today.nothing}</Card>

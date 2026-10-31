@@ -14,6 +14,7 @@ vi.mock("next/link", () => import("@/test/app").then((m) => m.nextLinkMock));
 vi.mock("@/lib/push", () => import("@/test/app").then((m) => m.pushMock));
 
 const { DayCard } = await import("@/components/today/DayCard");
+const { GoogleReconnect } = await import("@/components/today/GoogleReconnect");
 const { default: IphonePage } = await import("@/app/(app)/me/iphone/page");
 const { default: JoinPage } = await import("@/app/join/[token]/page");
 const { default: CalendarPage } = await import("@/app/(app)/calendar/page");
@@ -64,6 +65,25 @@ describe("Today's day card", () => {
     expect(await DayCard({ weather: null, advice: null, holy: noHoly, today: today(), locale: "en", place: "Haifa" })).toBeNull();
     renderUi((await DayCard({ weather: { day: today(), max: 22, min: 15, rain: 0, code: 0 }, advice: { hot: false, windows: [], peakFeels: 22 }, holy: noHoly, today: today(), locale: "en", place: "Haifa" }))!);
     expect(screen.getByText("📍 Haifa")).toBeInTheDocument();
+  });
+});
+
+describe("Google reconnect on Today (roadmap 1.9)", () => {
+  it("each ended connection gets its own Reconnect, pointing at its own Google sign-in", async () => {
+    const ui = await GoogleReconnect({
+      expired: [
+        { key: "gcal", what: "Google Calendar", href: "/api/google/calendar" },
+        { key: "s1", what: "Gmail in 💳 Subs", href: "/api/google/connect?section=s1" },
+      ],
+    });
+    const { t } = renderUi(ui!);
+    const links = screen.getAllByRole("link", { name: t.subs.reconnect });
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/api/google/calendar", "/api/google/connect?section=s1"]);
+    expect(screen.getByText(t.today.googleGone.replace("{what}", "Google Calendar"))).toBeInTheDocument();
+  });
+
+  it("all connected: nothing", async () => {
+    expect(await GoogleReconnect({ expired: [] })).toBeNull();
   });
 });
 
