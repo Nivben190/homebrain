@@ -1,6 +1,9 @@
 // Documents with expiry dates (roadmap 3.7): heads-ups 60, 30 and 7 days ahead.
 
 export const EXPIRY_PROP = "_expiry";
+
+/** Spaces whose first date property is an expiry: documents, the shelter kit, warranties. */
+export const EXPIRY_TEMPLATES = ["documents", "shelter-kit", "receipts"];
 export const STAGES = [60, 30, 7] as const;
 export type Stage = (typeof STAGES)[number];
 

@@ -50,7 +50,7 @@ interface TemplateItem {
   /** Outdoor session: reminders mention rain/heat. */
   outdoor?: boolean;
   done?: boolean;
-  /** Values keyed by TemplateProp.key; select values are option indexes. */
+  /** Values keyed by TemplateProp.key; select values are option indexes; a date "+N" is N days from today. */
   props?: Record<string, number | string>;
   /** "Spin the wheel" spaces: this item is a wheel with these options. */
   wheel?: { label: L; tag?: L }[];
@@ -294,6 +294,31 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { title: { en: "Passports", he: "דרכונים" }, props: { type: 0 } },
       { title: { en: "Rental contract", he: "חוזה שכירות" }, props: { type: 2 } },
       { title: { en: "Dog vaccination record", he: "פנקס חיסונים של הכלב" }, props: { type: 4 } },
+    ],
+  },
+  // Israel: the safe room (ממ״ד) or shelter. Expiry heads-ups come from the daily job.
+  {
+    key: "shelter-kit",
+    category: "home",
+    icon: "🛡️",
+    color: "green",
+    view: "checklist",
+    title: { en: "Shelter & emergency kit", he: "ממ״ד וערכת חירום" },
+    desc: { en: "What the safe room needs, with expiry dates on water, batteries and meds. Heads-ups before anything runs out, and a full check every 6 months.", he: "מה שצריך בממ״ד, עם תוקף למים, סוללות ותרופות. תזכורת לפני שמשהו פג, ובדיקה מלאה כל חצי שנה." },
+    props: [{ key: "expires", name: { en: "Expires", he: "בתוקף עד" }, type: "date" }],
+    items: [
+      { title: { en: "Full kit check ✅", he: "בדיקה מלאה של הערכה ✅" }, props: { expires: "+182" } },
+      { title: { en: "Water: 3 L per person per day, for 3 days 💧", he: "מים: 3 ליטר לאדם ליום, ל־3 ימים 💧" } },
+      { title: { en: "Canned and dry food", he: "שימורים ומזון יבש" } },
+      { title: { en: "Flashlight and spare batteries 🔦", he: "פנס וסוללות רזרביות 🔦" } },
+      { title: { en: "Charged power bank and cables 🔋", he: "סוללה ניידת טעונה וכבלים 🔋" } },
+      { title: { en: "Battery radio 📻", he: "רדיו על סוללות 📻" } },
+      { title: { en: "First-aid kit 🩹", he: "ערכת עזרה ראשונה 🩹" } },
+      { title: { en: "Regular meds for a few days 💊", he: "תרופות קבועות לכמה ימים 💊" } },
+      { title: { en: "Copies of IDs and documents", he: "צילומי תעודות ומסמכים" } },
+      { title: { en: "Pet food, water and leash 🐾", he: "אוכל, מים ורצועה לחיות המחמד 🐾" } },
+      { title: { en: "Chairs or mattresses, blankets", he: "כיסאות או מזרנים, שמיכות" } },
+      { title: { en: "Something for the kids (games, snacks)", he: "משהו לילדים (משחקים, חטיפים)" } },
     ],
   },
   {
@@ -837,7 +862,12 @@ export function instantiateTemplate(t: SectionTemplate, locale: Locale, today: s
       const def = idByKey.get(key);
       const tp = t.props?.find((p) => p.key === key);
       if (!def || !tp) continue;
-      props[def.id] = tp.type === "select" && typeof value === "number" ? tp.options?.[value]?.[locale] : value;
+      props[def.id] =
+        tp.type === "select" && typeof value === "number"
+          ? tp.options?.[value]?.[locale]
+          : tp.type === "date" && typeof value === "string" && value.startsWith("+")
+            ? addDays(today, Number(value.slice(1)))
+            : value;
     }
     let habit: Habit | null = null;
     if (it.every && it.time) {

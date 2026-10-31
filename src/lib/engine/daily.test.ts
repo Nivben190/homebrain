@@ -121,6 +121,17 @@ describe("pets, documents, money, weekly", () => {
     expect(await dailyJobs(db(), at("2026-11-25", "10:00"))).toContain(`expiry:${id}:7`);
   });
 
+  it("the shelter kit and warranties get the same expiry heads-ups", async () => {
+    const home = await homeWith(["owner"]);
+    const kit = await space(home.householdId, { template: "shelter-kit", schema: [{ id: "exp", name: "Expires", type: "date" }] });
+    const [{ id: water }] = await sql<{ id: string }>(`insert into items (section_id, title, props) values ($1, 'Water', '{"exp":"2026-12-01"}') returning id`, [kit]);
+    const receipts = await space(home.householdId, { template: "receipts", schema: [{ id: "w", name: "Warranty until", type: "date" }, { id: "b", name: "Bought on", type: "date" }] });
+    const [{ id: fridge }] = await sql<{ id: string }>(`insert into items (section_id, title, props) values ($1, 'Fridge', '{"w":"2026-12-01","b":"2024-12-01"}') returning id`, [receipts]);
+    const sent = await dailyJobs(db(), at("2026-11-02", "10:00"));
+    expect(sent).toContain(`expiry:${water}:30`);
+    expect(sent).toContain(`expiry:${fridge}:30`);
+  });
+
   it("month end: where the money went, on the last evening", async () => {
     const home = await homeWith(["owner"]);
     const spend = await space(home.householdId, { view: "spend" });

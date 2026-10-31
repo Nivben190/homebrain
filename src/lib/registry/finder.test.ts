@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FINDER_GOALS, MAX_RECOMMENDATIONS, recommend } from "./finder";
-import { LIVE_TEMPLATES, SECTION_TEMPLATES } from "./templates";
+import { instantiateTemplate, LIVE_TEMPLATES, SECTION_TEMPLATES } from "./templates";
 
 const keys = (r: ReturnType<typeof recommend>) => r.map((x) => x.template.key);
 
@@ -57,6 +57,13 @@ describe("space finder", () => {
 
   it("the move goal starts with the Moving checklist", () => {
     expect(keys(recommend(["move"]))[0]).toBe("moving");
+  });
+
+  it("the shelter kit's full check is due in half a year", () => {
+    const kit = SECTION_TEMPLATES.find((t) => t.key === "shelter-kit")!;
+    const { schema, items } = instantiateTemplate(kit, "en", "2026-11-01");
+    expect(items[0].props[schema[0].id]).toBe("2027-05-02");
+    expect(keys(recommend(["safe"]))[0]).toBe("shelter-kit");
   });
 
   it("keeps the list short and ignores unknown goals", () => {
