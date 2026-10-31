@@ -666,6 +666,26 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { title: { en: "Dog's rabies vaccine 💉", he: "חיסון כלבת לכלב 💉" } },
     ],
   },
+  // Undated on purpose: tap each to set the real date (and repeat yearly).
+  {
+    key: "car",
+    category: "home",
+    icon: "🚗",
+    color: "sky",
+    view: "dates",
+    title: { en: "Car", he: "רכב" },
+    desc: { en: "Annual test, insurance, licence and service: nags on the day until it's handled. Fines too, with their pay-by date.", he: "טסט שנתי, ביטוחים, רישיון וטיפול: מזכיר ביום עצמו עד שמטפלים. גם דוחות, עם תאריך התשלום." },
+    items: [
+      { title: { en: "Annual test (טסט)", he: "טסט שנתי" } },
+      { title: { en: "Mandatory insurance (חובה)", he: "ביטוח חובה" } },
+      { title: { en: "Comprehensive / third-party insurance", he: "ביטוח מקיף / צד ג׳" } },
+      { title: { en: "Vehicle licence renewal", he: "חידוש רישיון רכב" } },
+      { title: { en: "Driving licence renewal", he: "חידוש רישיון נהיגה" } },
+      { title: { en: "Service (every 12 months or 15,000 km) 🔧", he: "טיפול (כל 12 חודשים או 15,000 ק״מ) 🔧" } },
+      { title: { en: "Tyre pressure check", he: "בדיקת לחץ אוויר בצמיגים" } },
+      { title: { en: "Parking / traffic fine: pay by", he: "דוח חניה / תנועה: לשלם עד" } },
+    ],
+  },
   // Bills and subscriptions in one place (it replaced the Bills & payments and Bills &
 // renewals templates). Filled from Gmail or by hand; private, since it reads one person's inbox.
   {

@@ -51,6 +51,10 @@ describe("space finder", () => {
     expect(text).not.toMatch(/Naomi|נעמי|Niv|ניב/);
   });
 
+  it("the car goal leads to the Car space", () => {
+    expect(keys(recommend(["car"]))[0]).toBe("car");
+  });
+
   it("keeps the list short and ignores unknown goals", () => {
     expect(recommend(FINDER_GOALS.map((g) => g.key))).toHaveLength(MAX_RECOMMENDATIONS);
     expect(recommend(["nope"])).toEqual([]);

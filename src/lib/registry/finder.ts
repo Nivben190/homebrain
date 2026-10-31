@@ -21,6 +21,7 @@ export const FINDER_GOALS: FinderGoal[] = [
   { key: "house", icon: "🧹", label: { en: "Keep the house in order", he: "לשמור על הבית מסודר" }, picks: ["cleaning", "groceries", "maintenance", "projects"] },
   { key: "food", icon: "🍽️", label: { en: "Plan meals and eat better", he: "לתכנן ארוחות ולאכול טוב" }, picks: ["groceries", "fridge", "recipes", "wheels"] },
   { key: "money", icon: "💰", label: { en: "Get on top of money", he: "לשלוט בכסף" }, picks: ["subscriptions", "spending", "savings", "receipts"] },
+  { key: "car", icon: "🚗", label: { en: "Look after the car", he: "לטפל ברכב" }, picks: ["car", "documents"] },
   { key: "dates", icon: "🎂", label: { en: "Never forget a date", he: "לא לשכוח תאריכים" }, picks: ["important-dates", "appointments", "documents"] },
   { key: "health", icon: "💊", label: { en: "Health and meds", he: "בריאות ותרופות" }, picks: ["meds", "appointments", "checkups"] },
   { key: "us", icon: "💑", label: { en: "More time together", he: "יותר זמן ביחד" }, picks: ["date-ideas", "us", "wheels", "watch"] },
