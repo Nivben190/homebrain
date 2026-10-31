@@ -111,7 +111,7 @@ export const en = {
     previousMonth: "Previous month",
     nextMonth: "Next month",
   },
-  nav: { today: "Today", spaces: "Spaces", brain: "Brain", me: "Me" },
+  nav: { today: "Today", spaces: "Spaces", brain: "Brain", home: "Home", me: "Me" },
   greeting: { morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening", night: "Good night" },
   login: {
     title: "Welcome home",
@@ -340,6 +340,19 @@ export const en = {
     add: "Add to my home",
     gone: "This link no longer works. Ask for a new one.",
     noData: "You get the layout and items only. Nothing that was filled in comes with it.",
+  },
+  hub: {
+    title: "Home",
+    calendar: "A week of everything with a date",
+    meals: "Plan dinners, fill the shopping list",
+    money: "This month, budgets, who owes whom",
+    weekly: "A Sunday check-in together",
+    info: "Wi-Fi, contacts, the vet, accounts",
+    pet: "Food, vet, weight",
+    addPet: "Add a pet",
+    addPetHint: "Food running out, the vet and weight",
+    automations: "Automations",
+    automationsHint: "Reminders and routines that run by themselves",
   },
   finder: {
     open: "Help me choose",

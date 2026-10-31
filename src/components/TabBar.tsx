@@ -2,10 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { Brain, LayoutGrid, Sun, UserRound } from "lucide-react";
+import { House, LayoutGrid, Sun, UserRound } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { cn } from "@/lib/cn";
 import { QuickAdd, type QuickMember, type QuickSpace } from "@/components/QuickAdd";
+
+/** Screens that live under the Home tab. */
+const HOME_PATHS = ["/home", "/calendar", "/meals", "/money", "/weekly", "/pets"];
 
 export function TabBar({ spaces, members, timeZone }: { spaces: QuickSpace[]; members: QuickMember[]; timeZone: string }) {
   const { t } = useI18n();
@@ -13,8 +16,8 @@ export function TabBar({ spaces, members, timeZone }: { spaces: QuickSpace[]; me
   const tabs = [
     { href: "/", label: t.nav.today, Icon: Sun, active: path === "/" || path.startsWith("/runs") },
     { href: "/sections", label: t.nav.spaces, Icon: LayoutGrid, active: path.startsWith("/sections") },
-    { href: "/brain", label: t.nav.brain, Icon: Brain, active: path.startsWith("/brain") },
-    { href: "/me", label: t.nav.me, Icon: UserRound, active: path.startsWith("/me") },
+    { href: "/home", label: t.nav.home, Icon: House, active: HOME_PATHS.some((p) => path.startsWith(p)) },
+    { href: "/me", label: t.nav.me, Icon: UserRound, active: path.startsWith("/me") || path.startsWith("/brain") },
   ];
   return (
     <nav className="safe-bottom pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4">

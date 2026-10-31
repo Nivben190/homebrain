@@ -21,6 +21,7 @@ const { default: CalendarPage } = await import("@/app/(app)/calendar/page");
 const { default: MoneyPage } = await import("@/app/(app)/money/page");
 const { default: BrainPage } = await import("@/app/(app)/brain/page");
 const { default: WeeklyPage } = await import("@/app/(app)/weekly/page");
+const { default: HomeHubPage } = await import("@/app/(app)/home/page");
 
 beforeAll(startApp, 120_000);
 beforeEach(() => {
@@ -163,6 +164,18 @@ describe("invite link page", () => {
     await user.click(screen.getByRole("button", { name: t.join.move }));
     expect(await screen.findByText(t.join.expired)).toBeInTheDocument();
     expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("home tab", () => {
+  it("links the home-wide screens and each pet, with a way to add one", async () => {
+    const home = await homeWith(["owner"]);
+    const [pet] = await sql<{ id: string }>(`insert into pets (household_id, name, emoji) values ($1, 'Luna', '🐕') returning id`, [home.householdId]);
+    const { t } = renderUi(await HomeHubPage());
+    for (const href of ["/calendar", "/meals", "/money", "/weekly", "/home-info", `/pets/${pet.id}`, "/pets/new"]) {
+      expect(screen.getAllByRole("link").some((a) => a.getAttribute("href") === href)).toBe(true);
+    }
+    expect(screen.getByText(t.hub.addPet)).toBeInTheDocument();
   });
 });
 

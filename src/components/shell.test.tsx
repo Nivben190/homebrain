@@ -104,9 +104,23 @@ describe("app shell", () => {
       const { t } = renderUi(<TabBar spaces={[]} members={[]} timeZone="Asia/Jerusalem" />);
       expect(screen.getByRole("link", { name: t.nav.spaces })).toHaveAttribute("aria-current", "page");
       expect(screen.getByRole("link", { name: t.nav.today })).not.toHaveAttribute("aria-current");
-      expect(screen.getByRole("link", { name: t.nav.brain })).toHaveAttribute("href", "/brain");
+      expect(screen.getByRole("link", { name: t.nav.home })).toHaveAttribute("href", "/home");
+      expect(screen.queryByRole("link", { name: t.nav.brain })).not.toBeInTheDocument();
     } finally {
       at.mockRestore();
+    }
+  });
+
+  it("calendar, meals and money light up Home; automations light up Me", () => {
+    for (const [path, tab] of [["/money", "home"], ["/pets/x", "home"], ["/brain/abc", "me"]] as const) {
+      const at = vi.spyOn(nextNavigationMock, "usePathname").mockReturnValue(path);
+      try {
+        const { t, unmount } = renderUi(<TabBar spaces={[]} members={[]} timeZone="Asia/Jerusalem" />);
+        expect(screen.getByRole("link", { name: t.nav[tab] })).toHaveAttribute("aria-current", "page");
+        unmount();
+      } finally {
+        at.mockRestore();
+      }
     }
   });
 

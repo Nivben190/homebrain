@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireHome, getT } from "@/lib/session";
 import { PageHeader } from "@/components/ui";
 import { SpacesGrid } from "@/components/sections/SpacesGrid";
@@ -40,12 +39,6 @@ export default async function SectionsPage({ searchParams }: { searchParams: Pro
         }
       />
       {canCreate && (sections?.length ?? 0) <= FEW_SPACES && <FinderBanner />}
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <Link href="/meals" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">🍽️ {t.meals.link}</Link>
-        <Link href="/calendar" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">📅 {t.calendar.title}</Link>
-        <Link href="/money" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">💰 {t.money.title}</Link>
-        <Link href="/weekly" className="glass flex flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 font-semibold">🗓️ {t.weekly.title}</Link>
-      </div>
       <SearchBox spaces={(sections ?? []).map((s) => ({ id: s.id, icon: s.icon, title: s.title }))} />
       <SpacesGrid sections={sections ?? []} counts={Object.fromEntries(counts)} canReorder={["owner", "adult"].includes(profile.role)} />
     </>

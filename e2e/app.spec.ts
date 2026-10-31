@@ -22,6 +22,7 @@ test("every main screen opens without errors", async ({ page }) => {
     [`/sections/${list}`, "Groceries"],
     ["/brain", null],
     ["/brain/new", null],
+    ["/home", null],
     ["/calendar", "Calendar"],
     ["/money", "Money"],
     ["/weekly", null],
