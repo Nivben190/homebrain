@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Migration revokes anon execute and moves those policies to `authenticated`
 - [ ] Role policies use `(select auth.uid())`

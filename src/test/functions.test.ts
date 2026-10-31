@@ -20,13 +20,21 @@ describe("who may call what", () => {
                           'log_event_activity', 'log_item_activity', 'on_checkin_ack_runs', 'on_item_done_ack_runs')`);
     expect(rows.map((r) => r.name)).toEqual([]);
   });
-  it("signed-out visitors call nothing that changes a home", async () => {
+  it("signed-out visitors can't call any function that skips RLS, and see no home's rows", async () => {
     const { rows } = await db.query<{ name: string }>(`
       select p.proname as name from pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.prosecdef and has_function_privilege('anon', p.oid, 'execute')
-        and p.proname <> 'my_household_id' -- read-only, null when signed out
       order by 1`);
     expect(rows.map((r) => r.name)).toEqual([]);
+
+    await seedHome(db, ["owner"]);
+    const seen = await db.transaction(async (tx) => {
+      await tx.exec("set local role anon");
+      const counts = await tx.query<{ n: number }>(`select (select count(*) from sections) + (select count(*) from households) + (select count(*) from items) as n`);
+      await tx.rollback();
+      return Number(counts.rows[0].n);
+    });
+    expect(seen).toBe(0);
   });
 });
 
