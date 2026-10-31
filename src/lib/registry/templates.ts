@@ -67,6 +67,11 @@ export interface SectionTemplate {
   shared?: boolean;
   props?: TemplateProp[];
   items?: TemplateItem[];
+  /**
+   * Merged into another template: no longer offered in New space or Help me
+   * choose, but spaces already made from it keep working (views, voices, money).
+   */
+  retired?: boolean;
 }
 
 const DAILY: Repeat = { kind: "interval", every: 1 };
@@ -737,6 +742,9 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   // ---------------------------------------------------------------- Blank
   { key: "blank", category: "home", icon: "📄", color: "coral", view: "list", title: { en: "", he: "" }, desc: { en: "Start from scratch.", he: "מתחילים מאפס." } },
 ];
+
+/** Templates offered when making a new space (everything not retired). */
+export const LIVE_TEMPLATES: SectionTemplate[] = SECTION_TEMPLATES.filter((t) => !t.retired);
 
 /** Default "who sees it": personal templates are private, everything else shared. */
 export function templateIsShared(t: SectionTemplate): boolean {

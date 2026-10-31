@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { BellRing, Check, ChevronLeft, Plus, Sparkles } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/browser";
-import { instantiateTemplate, SECTION_TEMPLATES, TEMPLATE_CATEGORIES, templateIsShared, type SectionTemplate, type TemplateCategory } from "@/lib/registry/templates";
+import { instantiateTemplate, LIVE_TEMPLATES, SECTION_TEMPLATES, TEMPLATE_CATEGORIES, templateIsShared, type SectionTemplate, type TemplateCategory } from "@/lib/registry/templates";
 import { FINDER_GOALS, recommend } from "@/lib/registry/finder";
 import { nextReminder, todayKey } from "@/lib/engine/habits";
 import { useI18n } from "@/i18n/client";
@@ -88,7 +88,7 @@ export function NewSectionButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const list = useMemo(() => SECTION_TEMPLATES.filter((s) => s.category === category && s.key !== "blank"), [category]);
+  const list = useMemo(() => LIVE_TEMPLATES.filter((s) => s.category === category && s.key !== "blank"), [category]);
   const blank = SECTION_TEMPLATES.find((s) => s.key === "blank")!;
   const results = useMemo(() => recommend(goals, existing), [goals, existing]);
 

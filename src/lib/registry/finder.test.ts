@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { FINDER_GOALS, MAX_RECOMMENDATIONS, recommend } from "./finder";
-import { SECTION_TEMPLATES } from "./templates";
+import { LIVE_TEMPLATES, SECTION_TEMPLATES } from "./templates";
 
 const keys = (r: ReturnType<typeof recommend>) => r.map((x) => x.template.key);
 
 describe("space finder", () => {
-  it("only points at templates that exist", () => {
-    const all = new Set(SECTION_TEMPLATES.map((t) => t.key));
+  it("only points at templates that are still offered", () => {
+    const all = new Set(LIVE_TEMPLATES.map((t) => t.key));
     expect(FINDER_GOALS.flatMap((g) => g.picks).filter((k) => !all.has(k))).toEqual([]);
   });
 
@@ -28,6 +28,14 @@ describe("space finder", () => {
     const r = recommend(["dog"], ["dog-care"]);
     expect(keys(r)[0]).toBe("dog-health");
     expect(r[0].suggested).toBe(true);
+  });
+
+  it("retired templates stay known for old spaces but are never offered", () => {
+    const retired = SECTION_TEMPLATES.filter((t) => t.retired);
+    expect(LIVE_TEMPLATES).toHaveLength(SECTION_TEMPLATES.length - retired.length);
+    for (const t of retired) expect(LIVE_TEMPLATES).not.toContain(t);
+    const everyPick = recommend(FINDER_GOALS.map((g) => g.key), []).map((r) => r.template);
+    expect(everyPick.filter((t) => t.retired)).toEqual([]);
   });
 
   it("keeps the list short and ignores unknown goals", () => {

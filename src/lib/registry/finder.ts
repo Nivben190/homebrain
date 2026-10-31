@@ -1,7 +1,7 @@
 // "Help me choose": a new user says what they want to get better at, and gets
 // a short list of spaces from the template library instead of the whole gallery.
 import type { Locale } from "@/i18n";
-import { SECTION_TEMPLATES, type SectionTemplate } from "./templates";
+import { LIVE_TEMPLATES, type SectionTemplate } from "./templates";
 
 type L = Record<Locale, string>;
 
@@ -67,7 +67,7 @@ export function recommend(goalKeys: string[], existing: Iterable<string> = []): 
     .sort(([, a], [, b]) => b.score - a.score || a.order - b.order)
     .slice(0, MAX_RECOMMENDATIONS)
     .flatMap(([key, e]) => {
-      const template = SECTION_TEMPLATES.find((t) => t.key === key);
+      const template = LIVE_TEMPLATES.find((t) => t.key === key);
       return template ? [{ template, goals: e.goals, suggested: e.suggested }] : [];
     });
 }
