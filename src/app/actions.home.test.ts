@@ -132,6 +132,38 @@ describe("people and invites", () => {
     expect((await A.setupHome({ mode: "join", inviteCode: "WRONG000", starter: false, displayName: "L", emoji: "🙂" })).ok).toBe(false);
   });
 
+  it("a new home gets only the shared spaces that fit it, and nobody gets personal notes", async () => {
+    const spacesOf = async (userId: string) => {
+      const [{ household_id }] = await sql<{ household_id: string }>(`select household_id from profiles where user_id = $1`, [userId]);
+      return (await sql<{ template: string | null; title: string; owner_id: string | null }>(`select template, title, owner_id from sections where household_id = $1 order by position`, [household_id]));
+    };
+    const fresh = async (email: string) => (await sql<{ id: string }>(`insert into auth.users (email) values ($1) returning id`, [email]))[0].id;
+
+    app.cookies.clear();
+    const solo = await fresh("solo@test");
+    signIn(solo);
+    expect(await A.setupHome({ mode: "create", homeName: "Mine", starter: true, home: { who: "solo", dog: false, kids: false }, displayName: "S", emoji: "🙂" })).toEqual({ ok: true });
+    expect((await spacesOf(solo)).map((s) => s.template ?? s.title)).toEqual(["Morning routine", "groceries", "cleaning"]);
+
+    const parent = await fresh("parent@test");
+    signIn(parent);
+    expect(await A.setupHome({ mode: "create", homeName: "Ours", starter: true, home: { who: "family", dog: true, kids: true }, displayName: "P", emoji: "🙂" })).toEqual({ ok: true });
+    const family = await spacesOf(parent);
+    expect(family.map((s) => s.template ?? s.title)).toEqual(["Morning routine", "groceries", "cleaning", "dog-care", "kids"]);
+    // The routine is private; nothing written for a partner, and only the stretch reminder.
+    expect(family[0].owner_id).toBe(parent);
+    expect(await sql(`select name from automations where owner_id = $1`, [parent])).toEqual([{ name: "Stretch" }]);
+
+    const [{ invite_code }] = await sql<{ invite_code: string }>(`select h.invite_code from households h join profiles p on p.household_id = h.id where p.user_id = $1`, [parent]);
+    const joiner = await fresh("kid-parent@test");
+    signIn(joiner);
+    expect(await A.setupHome({ mode: "join", inviteCode: invite_code, starter: true, displayName: "J", emoji: "🙂" })).toEqual({ ok: true });
+    // Joining adds only the joiner's own routine, not a second set of house lists.
+    expect((await spacesOf(joiner)).filter((s) => s.template === "groceries")).toHaveLength(1);
+    expect(await sql(`select count(*)::int as n from sections where owner_id = $1`, [joiner])).toEqual([{ n: 1 }]);
+    expect(await sql(`select count(*)::int as n from items i join sections s on s.id = i.section_id where s.household_id = (select household_id from profiles where user_id = $1) and i.title ilike '%love%'`, [joiner])).toEqual([{ n: 0 }]);
+  });
+
   it("a Hebrew phone sets up in Hebrew: the profile and the starter spaces", async () => {
     const [{ id }] = await sql<{ id: string }>(`insert into auth.users (email) values ('ivrit@test') returning id`);
     signIn(id);

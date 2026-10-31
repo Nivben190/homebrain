@@ -7,6 +7,9 @@ import { setupHome } from "@/app/actions";
 import { useI18n } from "@/i18n/client";
 import { Button, Card, EmojiPicker, Field, Input, Segmented, Toggle } from "@/components/ui";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
+import type { HouseholdKind } from "@/lib/starter";
+
+const KINDS: HouseholdKind[] = ["solo", "couple", "family", "roommates"];
 
 export function OnboardingForm({ defaultName, invite }: { defaultName: string; invite?: string }) {
   const { t } = useI18n();
@@ -18,6 +21,8 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
   const [homeName, setHomeName] = useState("");
   const [inviteCode, setInviteCode] = useState(invite ?? "");
   const [starter, setStarter] = useState(true);
+  const [who, setWho] = useState<HouseholdKind>("couple");
+  const [dog, setDog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -30,13 +35,15 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
         homeName,
         inviteCode,
         starter,
+        home: { who, dog, kids: who === "family" },
         displayName,
         emoji,
         phone,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (!res.ok) return setError(res.error);
-      router.replace("/");
+      // A new home goes on to pick its first spaces; a joiner's home already has them.
+      router.replace(mode === "create" ? "/sections?find=1" : "/");
       router.refresh();
     });
   }
@@ -89,8 +96,31 @@ export function OnboardingForm({ defaultName, invite }: { defaultName: string; i
               <Input required value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="text-center font-mono text-xl tracking-[0.3em]" maxLength={8} />
             </Field>
           )}
+          {mode === "create" && (
+            <>
+              <Field label={t.onboarding.who}>
+                <div className="grid grid-cols-2 gap-2">
+                  {KINDS.map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={who === k}
+                      onClick={() => setWho(k)}
+                      className={who === k ? "rounded-2xl bg-accent px-3 py-2.5 text-sm font-bold text-white" : "rounded-2xl bg-sunken px-3 py-2.5 text-sm font-semibold"}
+                    >
+                      {t.onboarding.kinds[k]}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[15px] leading-snug">{t.onboarding.dog}</span>
+                <Toggle checked={dog} onChange={setDog} label={t.onboarding.dog} />
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[15px] leading-snug">{t.onboarding.starter}</span>
+            <span className="text-[15px] leading-snug">{mode === "create" ? t.onboarding.starter : t.onboarding.starterJoin}</span>
             <Toggle checked={starter} onChange={setStarter} />
           </div>
         </Card>

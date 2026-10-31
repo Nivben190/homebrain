@@ -26,14 +26,17 @@ beforeEach(() => {
 });
 
 describe("first steps", () => {
-  it("onboarding creates a home with starter spaces and goes to Today", async () => {
+  it("onboarding asks who lives here, creates a home with the spaces that fit, and opens Help me choose", async () => {
     const [{ id }] = await sql<{ id: string }>(`insert into auth.users (email) values ('new-person@test') returning id`);
     signIn(id);
     const { user, t } = renderUi(<OnboardingForm defaultName="" />);
     await user.type(screen.getByLabelText(t.onboarding.name), "Maya");
     await user.type(screen.getByLabelText(t.onboarding.homeName), "The Nest");
+    await user.click(screen.getByRole("button", { name: t.onboarding.kinds.solo }));
+    await user.click(screen.getByRole("switch", { name: t.onboarding.dog }));
     await user.click(screen.getByRole("button", { name: new RegExp(t.onboarding.start) }));
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/sections?find=1"));
+    expect((await sql<{ template: string }>(`select template from sections s join profiles p on p.household_id = s.household_id where p.user_id = $1 and template is not null order by s.position`, [id])).map((s) => s.template)).toEqual(["groceries", "cleaning", "dog-care"]);
     const [p] = await sql<{ display_name: string; role: string; name: string }>(`select p.display_name, p.role, h.name from profiles p join households h on h.id = p.household_id where p.user_id = $1`, [id]);
     expect(p).toEqual({ display_name: "Maya", role: "owner", name: "The Nest" });
   });

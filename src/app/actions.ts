@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { getLocale, getSession, requireHome } from "@/lib/session";
-import { seedStarterBrain } from "@/lib/starter";
+import { HOUSEHOLD_KINDS, seedStarterBrain, type HomeShape } from "@/lib/starter";
 import { fireAutomation, handledDays, handleEvent, rescheduleDate } from "@/lib/engine/execute";
 import { currentOccurrence, readDate } from "@/lib/engine/dates";
 import type { RenderedAction } from "@/lib/engine/types";
@@ -434,11 +434,15 @@ const profileInput = z.object({
   timezone: z.string().default("Asia/Jerusalem"),
 });
 
+const homeShape = z.object({ who: z.enum(HOUSEHOLD_KINDS), dog: z.boolean(), kids: z.boolean() });
+
 export async function setupHome(input: {
   mode: "create" | "join";
   homeName?: string;
   inviteCode?: string;
   starter: boolean;
+  /** The onboarding answers, for a new home. */
+  home?: HomeShape;
   displayName: string;
   emoji: string;
   phone?: string;
@@ -470,7 +474,7 @@ export async function setupHome(input: {
       householdId: rpc.data.id,
       locale,
       timezone: p.timezone,
-      shared: input.mode === "create",
+      home: input.mode === "create" ? homeShape.parse(input.home ?? { who: "couple", dog: false, kids: false }) : undefined,
     });
   }
   revalidatePath("/", "layout");

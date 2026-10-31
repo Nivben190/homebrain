@@ -302,7 +302,11 @@ export const en = {
     start: "Start my home",
     join: "Join home",
     or: "or",
-    starter: "Add the starter brain (morning love, stretch, workout, house lists)",
+    starter: "Start me off with the house lists that fit, and a morning routine",
+    starterJoin: "Add a private morning routine for me",
+    who: "Who lives here?",
+    kinds: { solo: "Just me", couple: "A couple", family: "Family with kids", roommates: "Roommates" },
+    dog: "There's a dog 🐶",
   },
   today: {
     googleGone: "{what} stopped working",
