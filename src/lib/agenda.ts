@@ -1,5 +1,5 @@
 // Family calendar (roadmap 3.4): everything dated in one week, by day.
-import { addDays, assigneesFor, dueDaysBetween, type Habit } from "@/lib/engine/habits";
+import { addDays, assigneesFor, dueDaysBetween, todayKey, type Habit } from "@/lib/engine/habits";
 
 export type AgendaKind = "item" | "session" | "automation" | "holiday" | "google";
 
@@ -52,4 +52,9 @@ export function buildAgenda(from: string, days: number, s: AgendaSources): Map<s
 
   for (const list of out.values()) list.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "") || a.title.localeCompare(b.title));
   return out;
+}
+
+/** The earliest of these that falls on `day` in the home's timezone ("tomorrow's first thing" on Today). */
+export function firstOn<T extends { at: string }>(day: string, timeZone: string, entries: T[]): T | undefined {
+  return entries.filter((x) => todayKey(timeZone, new Date(x.at)) === day).sort((a, b) => a.at.localeCompare(b.at))[0];
 }

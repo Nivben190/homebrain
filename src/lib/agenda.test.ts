@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgenda, type AgendaSources } from "./agenda";
+import { buildAgenda, firstOn, type AgendaSources } from "./agenda";
 
 const empty: AgendaSources = { items: [], sessions: [], automations: [], holidays: [], google: [], members: ["a", "b"] };
 
@@ -53,5 +53,19 @@ describe("buildAgenda", () => {
     });
     expect(week.get("2026-11-03")!.map((e) => e.title)).toEqual(["Rosh Chodesh", "Standup", "Dentist"]);
     expect([...week.values()].flat().some((e) => e.title === "Too late")).toBe(false);
+  });
+});
+
+describe("firstOn (tomorrow's first thing on Today)", () => {
+  it("the earliest that falls on that local day", () => {
+    const entries = [
+      { at: "2026-11-02T10:00:00Z", title: "late" },
+      { at: "2026-11-02T06:00:00Z", title: "early" },
+      // 23:30 UTC on the 1st is already the 2nd in Israel.
+      { at: "2026-11-01T23:30:00Z", title: "just after midnight" },
+      { at: "2026-11-03T05:00:00Z", title: "day after" },
+    ];
+    expect(firstOn("2026-11-02", "Asia/Jerusalem", entries)?.title).toBe("just after midnight");
+    expect(firstOn("2026-11-04", "Asia/Jerusalem", entries)).toBeUndefined();
   });
 });

@@ -5,7 +5,9 @@ import { requireHome, getT } from "@/lib/session";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { GoogleReconnect, type ExpiredGoogle } from "@/components/today/GoogleReconnect";
 import { zonedParts } from "@/lib/engine/time";
-import { Card, IconTile, SectionTitle, Skeleton } from "@/components/ui";
+import { Card, SectionTitle, Skeleton } from "@/components/ui";
+import { fill } from "@/i18n";
+import { firstOn } from "@/lib/agenda";
 import { RunCard } from "@/components/today/RunCard";
 import { AwakeButton } from "@/components/today/AwakeButton";
 import { PushPrompt } from "@/components/today/PushPrompt";
@@ -180,6 +182,14 @@ export default async function TodayPage() {
   const incoming = requests.filter((r) => r.to_user === user.id);
   const dateShort = new Intl.DateTimeFormat(profile.locale, { day: "numeric", month: "short" });
 
+  // When nothing needs you now: the first thing tomorrow, from dated items and automations.
+  const tomorrow = addDays(today, 1);
+  const hhmm = new Intl.DateTimeFormat("en-GB", { timeZone: profile.timezone, hour: "2-digit", minute: "2-digit" });
+  const tomorrowFirst = firstOn(tomorrow, profile.timezone, [
+    ...(dueQ.data ?? []).map((i) => ({ at: i.due_at!, title: `${sectionById.get(i.section_id)?.icon ?? ""} ${i.title}`.trim() })),
+    ...automations.filter((a) => a.next_run_at).map((a) => ({ at: a.next_run_at!, title: `${a.icon} ${a.name}` })),
+  ]);
+
   return (
     <>
       <RealtimeRefresh tables={["runs", "items", "requests"]} />
@@ -206,7 +216,14 @@ export default async function TodayPage() {
       <GoogleReconnect expired={expiredGoogle} />
       <RequestCards incoming={incoming} outgoing={requests.filter((r) => r.from_user === user.id)} members={memberList} />
       {now3.length === 0 ? (
-        incoming.length === 0 && <Card className="py-6 text-center text-muted">{t.today.nothing}</Card>
+        incoming.length === 0 && (
+          <Card className="py-5 text-center">
+            <p className="font-bold">{t.today.allDone}</p>
+            <p className="mt-1 text-sm text-muted">
+              {tomorrowFirst ? fill(t.today.tomorrowFirst, { time: hhmm.format(new Date(tomorrowFirst.at)), title: tomorrowFirst.title }) : t.today.nothing}
+            </p>
+          </Card>
+        )
       ) : (
         <div className="space-y-3">
           {now3.map((r) => (
@@ -261,23 +278,28 @@ export default async function TodayPage() {
           <InviteLinkButton variant="primary" />
         </div>
       )}
-      <Suspense fallback={<Skeleton className="mb-3 h-36" />}>
-        <Day />
-      </Suspense>
+      {/* One swipeable strip: the day (weather, Shabbat) and streaks. */}
+      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4">
+        <div className={streaks.length > 0 ? "w-[88%] shrink-0 snap-start" : "w-full shrink-0"}>
+          <Suspense fallback={<Skeleton className="mb-3 h-36" />}>
+            <Day />
+          </Suspense>
+        </div>
+        {streaks.length > 0 && (
+          <div className="glass mb-3 w-[70%] shrink-0 snap-start space-y-2 rounded-3xl p-4">
+            <p className="text-[13px] font-bold uppercase tracking-wider text-muted">🔥 {t.today.streaks}</p>
+            {streaks.map(({ a, n }) => (
+              <p key={a.id} className="flex items-center gap-2 text-sm">
+                <span>{a.icon}</span>
+                <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                <span className="font-bold">🔥 {n}</span>
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
 
       <QuickActions others={otherMembers} pets={pets.map((pet) => ({ id: pet.id, name: pet.name, emoji: pet.emoji, daysLeft: foodDaysLeft(pet, today) }))} />
-
-      {streaks.length > 0 && (
-        <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
-          {streaks.map(({ a, n }) => (
-            <div key={a.id} className="glass flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2">
-              <span className="text-lg">{a.icon}</span>
-              <span className="text-sm font-bold">🔥 {n}</span>
-              <span className="text-xs text-muted">{a.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {memories.length > 0 && (
         <>
@@ -285,16 +307,6 @@ export default async function TodayPage() {
           <OnThisDay memories={memories} />
         </>
       )}
-
-      <SectionTitle action={<Link href="/sections" className="text-sm font-semibold text-accent">{t.nav.spaces} →</Link>}>{t.today.spaces}</SectionTitle>
-      <div className="grid grid-cols-2 gap-3">
-        {sections.slice(0, 4).map((s) => (
-          <Link key={s.id} href={`/sections/${s.id}`} className="glass flex items-center gap-3 rounded-3xl p-3 transition active:scale-[0.98]">
-            <IconTile icon={s.icon} color={s.color} />
-            <span className="truncate font-semibold">{s.title}</span>
-          </Link>
-        ))}
-      </div>
     </>
   );
 }
