@@ -18,6 +18,7 @@ import { allowedSections, sectionRefs } from "./scope";
 import { planEvent } from "./events";
 import { reminderAudience } from "./audience";
 import { readLead } from "./due";
+import { pickLine, themeOf } from "./voice";
 import { commitProps, readCommit, status, type CommitSpec } from "@/lib/commit";
 import { giftLine, wantsGift } from "@/lib/gifts";
 import { calendarAccess, upsertEvent } from "@/lib/gcal";
@@ -305,11 +306,14 @@ export async function fireItemReminder(db: Admin, itemId: string, dueAt: Date, n
     const t = getDict(target.locale);
     const warning = habit.outdoor ? outdoorWarning(weatherAt(hours, today, habit.time), { rain: t.daily.rainAt, hot: t.daily.hotAt }) : null;
     const title = isNudge ? t.tracker.nudgeTitle : fill(t.tracker.remindTitle, { item: item.title });
+    // Worded for the space: a dog space talks about the dog, a workout space cheers.
+    const voice = t.voice[themeOf(section, item.title)];
+    const seed = `${itemId}:${today}`;
     const base = isNudge
-      ? fill(t.tracker.nudgeBody, { item: item.title })
+      ? fill(pickLine(voice.nudge, seed), { item: item.title })
       : stats.streak > 0
-        ? fill(t.tracker.remindBody, { streak: stats.streak })
-        : t.tracker.remindBodyNew;
+        ? fill(pickLine(voice.streak, seed), { streak: stats.streak })
+        : pickLine(voice.start, seed);
     const body = warning && !isNudge ? `${warning} · ${base}` : base;
     const rendered: RenderedAction[] = [
       { kind: "done", label: t.tracker.doneButton },
@@ -354,7 +358,7 @@ async function fireDueReminder(db: Admin, item: { id: string; title: string; due
     const when = new Intl.DateTimeFormat(target.locale, { weekday: "long", day: "numeric", month: "long", timeZone: target.timezone }).format(new Date(item.due_at));
     return {
       title: fill(t.dueTitle, { item: item.title }),
-      body: fill(t.dueSoonBody, { when }),
+      body: `${fill(t.dueSoonBody, { when })} · ${pickLine(getDict(target.locale).voice[themeOf(section, item.title)].due, `${item.id}:${item.due_at}`)}`,
       rendered: [{ kind: "link", icon: section.icon, label: section.title, href: `/sections/${section.id}` }],
     };
   });

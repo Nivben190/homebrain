@@ -1,5 +1,74 @@
 export const en = {
   app: { name: "Home Brain", tagline: "Your home, thinking ahead." },
+  // Reminder wording per kind of space (src/lib/engine/voice.ts). {item}, {streak}.
+  voice: {
+    general: {
+      start: ["Today's a good day to start 🌱", "One small step today ✨", "Let's get this one done 💫"],
+      streak: ["🔥 {streak} in a row — keep it going!", "{streak} days strong 💪 don't stop now", "🔥 {streak} straight. Make it {streak}+1"],
+      nudge: ["{item} is still waiting today.", "There's still time for {item} today ⏳", "Quick one before bed? {item} 🌙"],
+      due: ["Don't let it slip 📌", "Worth sorting today ✅"],
+    },
+    dog: {
+      start: ["🐾 Someone's tail is already wagging", "🐶 Your best friend is waiting for you", "🦴 Walks, treats, love — it's time"],
+      streak: ["🐾 {streak} days of a happy pup — keep it up!", "🐶 {streak} in a row. Best human award 🏆", "🦴 {streak} days running — good human!"],
+      nudge: ["🐶 Puppy eyes alert: {item} isn't done yet", "🐾 Don't leave them hanging — {item} is still waiting", "🦴 Someone's still waiting by the door for {item}"],
+      due: ["🐾 They're counting on you", "🐶 For the goodest dog"],
+    },
+    workout: {
+      start: ["💪 Your future self will thank you", "🔥 No excuses today — let's move", "🏋️ Strong starts here. Go!"],
+      streak: ["🔥 {streak} days strong — don't break the chain!", "💪 {streak} in a row. Champions show up", "🏆 {streak} days straight — you're unstoppable"],
+      nudge: ["⏳ The day isn't over — still time for {item}", "💪 Even 10 minutes counts. {item}?", "🔥 Don't let today be the zero — {item}"],
+      due: ["💪 You've got this", "🔥 Go crush it"],
+    },
+    love: {
+      start: ["💌 A little love goes a long way", "❤️ Make them smile today", "🌹 Small gestures, big love"],
+      streak: ["❤️ {streak} days of love in a row", "💕 {streak} straight — you two are glowing", "💌 {streak} days running. That's how love grows"],
+      nudge: ["💌 Before the day ends: {item}", "❤️ They'd love it — {item} is still waiting", "🌙 One sweet thing before bed: {item}"],
+      due: ["❤️ Make it special", "💕 They'll love it"],
+    },
+    health: {
+      start: ["💊 Taking care of you matters", "🩺 Your body will thank you", "💚 Health first, everything else after"],
+      streak: ["💚 {streak} days of looking after yourself", "💊 {streak} in a row — keep it steady", "🩺 {streak} days straight. Consistency is everything"],
+      nudge: ["💊 Did you forget? {item} is still open", "💚 Quick check: {item} isn't marked yet", "🩺 Don't skip {item} today"],
+      due: ["💚 Look after yourself", "🩺 Don't put it off"],
+    },
+    home: {
+      start: ["🏠 A tidy home, a calm mind", "🧹 Ten minutes now, a nicer home all week", "✨ Make home a little better today"],
+      streak: ["✨ {streak} in a row — the house is glowing", "🏠 {streak} days running. Home sweet home", "🧹 {streak} straight — chores don't stand a chance"],
+      nudge: ["🧹 Still on the list: {item}", "🏠 Quick win before bed? {item}", "✨ Future you will love a done {item}"],
+      due: ["🏠 Keep the home running", "🔧 One less thing to worry about"],
+    },
+    plants: {
+      start: ["🌱 Your plants are thirsty", "🪴 A little water, a lot of green", "🌿 Time to show the green ones some love"],
+      streak: ["🌿 {streak} days of happy plants", "🌱 {streak} in a row — look at them grow", "🪴 {streak} straight. Green thumb unlocked"],
+      nudge: ["🥀 Don't let them droop — {item}", "🌱 Still thirsty: {item}", "🪴 Quick splash before bed? {item}"],
+      due: ["🌿 Keep them happy", "🌱 They'll grow for it"],
+    },
+    morning: {
+      start: ["☀️ Rise and shine — let's start strong", "🌅 Good mornings make good days", "☕ New day, fresh start"],
+      streak: ["☀️ {streak} great mornings in a row", "🌅 {streak} days of strong starts", "☕ {streak} straight — morning person unlocked"],
+      nudge: ["☀️ The morning slipped by — still time for {item}", "🌅 Not too late for {item}", "☕ Catch up on {item} before the day ends"],
+      due: ["☀️ Start the day right", "🌅 Get it done early"],
+    },
+    mind: {
+      start: ["🧘 A few quiet minutes, just for you", "🙏 Pause, breathe, begin", "🕯️ Give your mind a moment"],
+      streak: ["🧘 {streak} days of calm in a row", "🙏 {streak} straight — your mind thanks you", "🕯️ {streak} days running. Peace is a habit"],
+      nudge: ["🌙 A quiet moment before sleep: {item}", "🧘 Still time to breathe — {item}", "🙏 End the day gently with {item}"],
+      due: ["🧘 Take a breath first", "🙏 Make space for it"],
+    },
+    learn: {
+      start: ["📚 A little every day adds up", "🧠 Feed your brain today", "✍️ Ten minutes of getting better"],
+      streak: ["🧠 {streak} days of learning in a row", "📚 {streak} straight — you're getting smarter", "🎓 {streak} days running. Keep going"],
+      nudge: ["📖 A few pages before bed? {item}", "🧠 Still time for {item} today", "✍️ Don't break the learning streak — {item}"],
+      due: ["📚 Get ahead of it", "🧠 Future you will thank you"],
+    },
+    money: {
+      start: ["💰 Stay on top of the money", "🧾 Two minutes now saves a headache later", "💳 Keep the books clean"],
+      streak: ["💰 {streak} days on track", "🧾 {streak} in a row — money under control", "💳 {streak} straight. Smart move"],
+      nudge: ["🧾 Still open: {item}", "💰 Quick one before bed: {item}", "💳 Don't let {item} pile up"],
+      due: ["💳 Avoid the late fee", "🧾 Pay it and forget it"],
+    },
+  },
   failures: {
     offline: "No connection. Check your signal and try again.",
     denied: "You don't have access to that anymore. Try reloading.",
@@ -574,10 +643,7 @@ export const en = {
     undo: "Undo",
     cheers: ["Amazing! 🎉", "Nailed it! 💪", "Streak +1 🔥", "So proud of you ⭐", "Keep it up! 🚀"],
     remindTitle: "Time for {item}",
-    remindBody: "🔥 {streak} streak — keep it going!",
-    remindBodyNew: "Let's start a streak today! 🌱",
     nudgeTitle: "🔥 Don't lose your streak!",
-    nudgeBody: "{item} isn't done yet today.",
     doneButton: "Done ✓",
     snooze: "Snooze 15 min",
     practiceToday: "Practice today",

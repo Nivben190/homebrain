@@ -141,6 +141,9 @@ describe("item reminders", () => {
     const first = await tick(db());
     expect(first.outcomes.find((o) => o.automationId === walk)?.status).toBe("fired");
     expect(cardPushes().map((p) => p.userId)).toEqual([home.users.owner]);
+    // Worded for a dog space (roadmap: space voices).
+    const { en } = await import("@/i18n/en");
+    expect([...en.voice.dog.start, ...en.voice.dog.streak]).toContain(cardPushes()[0].payload.body);
     // Checked in: the next reminder that comes due today stays silent.
     await sql(`insert into checkins (item_id, day, user_id) values ($1, $2, $3)`, [walk, todayIn(), home.users.owner]);
     await sql(`update items set remind_at = $2 where id = $1`, [walk, minutesAgo(1)]);
