@@ -1,5 +1,8 @@
 // Plans: a goal over a few weeks ("3 workouts a week for 8 weeks"), the
-// sessions planned on set weekdays, and what was really done. The spec lives in
+// sessions planned on set weekdays, and what was really done. A plan can also
+// lead up to a date (a test): it ends the day before, each week has its own
+// topics, a topic not covered by Saturday carries into the next week, and the
+// last week can be kept for going over everything. The spec lives in
 // props._plan; a session done is that day's check-in, with what was done (sets,
 // reps, weight, minutes, how it felt) in checkins.data. Weeks run Sunday to
 // Saturday, Israeli style. Pure functions over local "YYYY-MM-DD" days.
@@ -39,6 +42,14 @@ export const sessionSchema = z.object({
 });
 export type PlanSession = z.infer<typeof sessionSchema>;
 
+export const topicSchema = z.object({
+  id: z.string().min(1).max(40),
+  name: z.string().trim().min(1).max(80),
+  /** Sunday of the week it's planned for. */
+  week: dayKey,
+});
+export type PlanTopic = z.infer<typeof topicSchema>;
+
 export const planSchema = z.object({
   why: z.string().trim().max(200).optional(),
   /** Sunday of the first week. */
@@ -59,6 +70,12 @@ export const planSchema = z.object({
   reviewed: z.record(dayKey, z.number()).default({}),
   result: z.enum(["kept", "broken"]).optional(),
   lesson: z.string().trim().max(300).optional(),
+  /** The day it leads up to (a test): the plan ends the day before. */
+  deadline: dayKey.optional(),
+  /** What to cover, week by week (chapters, subjects, practice tests). */
+  topics: z.array(topicSchema).max(150).default([]),
+  /** The last week is for going over every topic again. */
+  reviewLast: z.boolean().default(false),
 });
 export type PlanSpec = z.infer<typeof planSchema>;
 
@@ -80,6 +97,10 @@ export const logSchema = z.object({
   minutes: z.number().int().min(1).max(600).optional(),
   /** 1 (awful) … 5 (great). */
   feel: z.number().int().min(1).max(5).optional(),
+  /** Topics covered in this session. */
+  topics: z.array(z.string().max(40)).max(150).default([]),
+  /** Topics gone over again in the review week. */
+  revised: z.array(z.string().max(40)).max(150).default([]),
 });
 export type PlanLog = z.infer<typeof logSchema>;
 
@@ -112,7 +133,15 @@ export const planProps = (props: Record<string, unknown>, spec: PlanSpec) => ({ 
 
 /** The Sunday of the week `day` is in. */
 export const weekOf = (day: string) => addDays(day, -weekdayOf(day));
-export const lastDay = (spec: PlanSpec) => addDays(spec.start, spec.weeks * 7 - 1);
+/** The plan's last day: the end of its last week, or the day before its date. */
+export const lastDay = (spec: PlanSpec) => {
+  const end = addDays(spec.start, spec.weeks * 7 - 1);
+  return spec.deadline && diffDays(spec.deadline, end) >= 0 ? addDays(spec.deadline, -1) : end;
+};
+/** Weeks from `start` up to the day before `deadline`. */
+export const weeksUntil = (start: string, deadline: string) => Math.min(52, Math.max(1, Math.floor(diffDays(start, addDays(deadline, -1)) / 7) + 1));
+/** Days left until the plan's date, or null without one. */
+export const daysLeft = (spec: PlanSpec, today: string) => (spec.deadline ? diffDays(today, spec.deadline) : null);
 /** 1-based week of the plan, or 0 before it / weeks+1 after it. */
 export function weekNumber(spec: PlanSpec, day: string) {
   const d = diffDays(spec.start, day);
@@ -131,10 +160,10 @@ export function sessionOn(spec: PlanSpec, day: string): PlanSession | null {
   return spec.sessions.find((s) => s.days.includes(weekdayOf(day))) ?? null;
 }
 
-/** Sessions needed to keep this week: fewer in a first week that started midway. */
+/** Sessions needed to keep this week: fewer in a first week that started midway, or a last one cut short by the date. */
 export function weekTarget(spec: PlanSpec, week: string) {
   if (diffDays(spec.from, addDays(week, 6)) < 0) return 0;
-  if (diffDays(spec.from, week) >= 0) return spec.perWeek;
+  if (diffDays(spec.from, week) >= 0 && diffDays(addDays(week, 6), lastDay(spec)) >= 0) return spec.perWeek;
   let planned = 0;
   for (let i = 0; i < 7; i++) if (sessionOn(spec, addDays(week, i))) planned++;
   return Math.min(spec.perWeek, planned);
@@ -150,7 +179,20 @@ export interface WeekView {
   days: { day: string; session: PlanSession | null; state: DayState; checkin: PlanCheckin | null }[];
   /** kept / missed once decided (reached, or the week is over); null while it can still go either way. */
   result: "kept" | "missed" | null;
+  /** This week's own topics, and earlier ones not covered before it began. */
+  topics: { own: PlanTopic[]; carried: PlanTopic[]; covered: Set<string>; ownDone: number };
+  /** The last week, kept for going over everything. */
+  review: boolean;
 }
+
+/** Topic ids covered in sessions up to `until` (inclusive), or all. */
+export function coveredTopics(checkins: PlanCheckin[], until?: string, key: "topics" | "revised" = "topics") {
+  const out = new Set<string>();
+  for (const c of checkins) if (c.status === "done" && (!until || c.day <= until)) for (const id of readLog(c.data)?.[key] ?? []) out.add(id);
+  return out;
+}
+
+export const isReviewWeek = (spec: PlanSpec, week: string) => spec.reviewLast && spec.weeks > 1 && week === weekOf(lastDay(spec));
 
 export function weekView(spec: PlanSpec, checkins: PlanCheckin[], week: string, today: string): WeekView {
   const byDay = new Map(checkins.map((c) => [c.day, c]));
@@ -169,9 +211,18 @@ export function weekView(spec: PlanSpec, checkins: PlanCheckin[], week: string, 
   });
   const done = days.filter((d) => d.state === "done" || d.state === "extra").length;
   const target = weekTarget(spec, week);
-  const over = diffDays(addDays(week, 6), today) > 0;
-  const result = target === 0 ? null : done >= target ? "kept" : over ? "missed" : null;
-  return { week, number: weekNumber(spec, week), target, done, days, result };
+  // The week ends Saturday, or earlier when the plan does.
+  const end = diffDays(lastDay(spec), addDays(week, 6)) > 0 ? lastDay(spec) : addDays(week, 6);
+  const over = diffDays(end, today) > 0;
+  const covered = coveredTopics(checkins, end);
+  const before = coveredTopics(checkins, addDays(week, -1));
+  const own = spec.topics.filter((t) => t.week === week);
+  const carried = spec.topics.filter((t) => t.week < week && !before.has(t.id));
+  const ownDone = own.filter((t) => covered.has(t.id)).length;
+  // A week with topics is kept when its sessions are done and its own topics covered.
+  const reached = done >= target && ownDone === own.length;
+  const result = target === 0 && !own.length ? null : reached ? "kept" : over ? "missed" : null;
+  return { week, number: weekNumber(spec, week), target, done, days, result, topics: { own, carried, covered, ownDone }, review: isReviewWeek(spec, week) };
 }
 
 export interface PlanProgress {
@@ -183,6 +234,8 @@ export interface PlanProgress {
   /** Weeks kept in a row, up to the last decided one. */
   streak: number;
   sessions: number;
+  /** Topics covered (and gone over again) of all planned. */
+  topics: { covered: number; revised: number; total: number };
   over: boolean;
   /** Where it's heading once over (or already settled). */
   result: "kept" | "broken" | null;
@@ -190,7 +243,7 @@ export interface PlanProgress {
 
 export function planProgress(spec: PlanSpec, checkins: PlanCheckin[], today: string): PlanProgress {
   const weeks = weekStarts(spec).map((w) => weekView(spec, checkins, w, today));
-  const counted = weeks.filter((w) => w.target > 0);
+  const counted = weeks.filter((w) => w.target > 0 || w.topics.own.length > 0);
   const kept = counted.filter((w) => w.result === "kept").length;
   const missed = counted.filter((w) => w.result === "missed").length;
   let streak = 0;
@@ -203,7 +256,10 @@ export function planProgress(spec: PlanSpec, checkins: PlanCheckin[], today: str
   const thisWeek = weeks.find((w) => w.week === weekOf(today));
   const current = thisWeek ?? (over ? weeks[weeks.length - 1] : weeks[0]);
   const result = spec.result ?? (over && counted.length ? (kept / counted.length >= KEPT_SHARE ? "kept" : "broken") : null);
-  return { current, weeks, kept, missed, streak, sessions: checkins.filter((c) => c.status === "done" && inPlan(spec, c.day)).length, over, result };
+  const covered = coveredTopics(checkins);
+  const revised = coveredTopics(checkins, undefined, "revised");
+  const topics = { covered: spec.topics.filter((t) => covered.has(t.id)).length, revised: spec.topics.filter((t) => revised.has(t.id)).length, total: spec.topics.length };
+  return { current, weeks, kept, missed, streak, sessions: checkins.filter((c) => c.status === "done" && inPlan(spec, c.day)).length, topics, over, result };
 }
 
 /** Days a planned session can move to: later this week (from today), not already planned or done. */
@@ -254,11 +310,7 @@ export function nextPlanReminder(spec: PlanSpec, checkins: PlanCheckin[], after:
   const keptWeeks = new Map<string, boolean>();
   const weekKept = (day: string) => {
     const w = weekOf(day);
-    if (!keptWeeks.has(w)) {
-      const target = weekTarget(spec, w);
-      const done = checkins.filter((c) => c.status === "done" && weekOf(c.day) === w).length;
-      keptWeeks.set(w, target > 0 && done >= target);
-    }
+    if (!keptWeeks.has(w)) keptWeeks.set(w, weekView(spec, checkins, w, today).result === "kept");
     return keptWeeks.get(w)!;
   };
   for (let day = diffDays(spec.from, today) > 0 ? today : spec.from; diffDays(day, end) >= 0; day = addDays(day, 1)) {
@@ -267,7 +319,7 @@ export function nextPlanReminder(spec: PlanSpec, checkins: PlanCheckin[], after:
       slots.push(["main", spec.time]);
       if (spec.nudge && spec.time < NUDGE_TIME) slots.push(["nudge", NUDGE_TIME]);
     }
-    if (weekdayOf(day) === 6 && inPlan(spec, day) && spec.reviewed[weekOf(day)] === undefined) slots.push(["review", REVIEW_TIME]);
+    if ((weekdayOf(day) === 6 || day === lastDay(spec)) && inPlan(spec, day) && spec.reviewed[weekOf(day)] === undefined) slots.push(["review", REVIEW_TIME]);
     slots.sort((a, b) => a[1].localeCompare(b[1]));
     for (const [kind, time] of slots) {
       const [h, m] = time.split(":").map(Number);
@@ -339,6 +391,8 @@ export interface PlanPreset {
   why?: L;
   perWeek?: number;
   time: string;
+  /** Leads up to a date, with topics week by week and a review week. */
+  exam?: boolean;
   sessions: { name: L; days: number[]; steps: PresetStep[] }[];
 }
 
@@ -410,6 +464,14 @@ export const PLAN_PRESETS: PlanPreset[] = [
     ],
   },
   {
+    key: "exam",
+    icon: "📝",
+    title: { en: "Study for a test", he: "ללמוד למבחן" },
+    time: "18:00",
+    exam: true,
+    sessions: [{ name: { en: "Study", he: "לימוד" }, days: [0, 1, 2, 3, 4], steps: [{ name: { en: "Focused time", he: "זמן מרוכז" }, amount: 60, unit: min }] }],
+  },
+  {
     key: "study",
     icon: "📚",
     title: { en: "Study 4× a week", he: "ללמוד 4 פעמים בשבוע" },
@@ -459,10 +521,48 @@ export function planFromPreset(preset: PlanPreset, locale: Locale, today: string
     steps: s.steps.map((st) => ({ id: newId(), name: st.name[locale], sets: st.sets, reps: st.reps, amount: st.amount, unit: st.unit?.[locale] })),
   }));
   const planned = new Set(sessions.flatMap((s) => s.days)).size;
+  const start = weekOf(today);
+  // A test a month out, to be changed to the real date.
+  const deadline = preset.exam ? addDays(today, 30) : undefined;
   return {
     title: preset.key === "custom" ? "" : preset.title[locale],
-    spec: { start: weekOf(today), from: today, weeks, perWeek: preset.perWeek ?? Math.max(1, planned), time: preset.time, nudge: true, sessions, moves: [], reviewed: {} },
+    spec: {
+      start,
+      from: today,
+      weeks: deadline ? weeksUntil(start, deadline) : weeks,
+      perWeek: preset.perWeek ?? Math.max(1, planned),
+      time: preset.time,
+      nudge: true,
+      sessions,
+      moves: [],
+      reviewed: {},
+      deadline,
+      topics: [],
+      reviewLast: !!preset.exam,
+    },
   };
+}
+
+/** Weeks topics can be planned in: all of them, but the last when it's kept for review. */
+export function studyWeeks(spec: PlanSpec) {
+  const weeks = weekStarts(spec);
+  return spec.reviewLast && weeks.length > 1 ? weeks.slice(0, -1) : weeks;
+}
+
+/** New topics spread evenly over the study weeks, in order. */
+export function spreadTopics(spec: PlanSpec, names: string[]): PlanTopic[] {
+  const weeks = studyWeeks(spec);
+  const clean = names.map((n) => n.trim()).filter(Boolean).slice(0, 150);
+  return clean.map((name, i) => ({ id: newId(), name: name.slice(0, 80), week: weeks[Math.floor((i * weeks.length) / clean.length)] }));
+}
+
+/** A spec made consistent after editing: weeks follow the date, and topics stay inside the plan. */
+export function normalizePlan(spec: PlanSpec): PlanSpec {
+  const weeks = spec.deadline ? weeksUntil(spec.start, spec.deadline) : spec.weeks;
+  const next = { ...spec, weeks };
+  const all = weekStarts(next);
+  const last = all[all.length - 1];
+  return { ...next, topics: spec.topics.map((t) => (all.includes(t.week) ? t : { ...t, week: t.week < spec.start ? spec.start : last })) };
 }
 
 export const newPlanId = newId;

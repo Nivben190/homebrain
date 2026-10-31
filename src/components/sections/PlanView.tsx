@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { Button, Input } from "@/components/ui";
 import { useToast } from "@/components/Toaster";
 import { addDays, todayKey, weekdayOf } from "@/lib/engine/habits";
-import { formatTarget, LOG_DAYS_BACK, moveTargets, planProgress, readLog, readPlan, stepHistory, weekOf, type DayState, type PlanCheckin, type PlanLog, type PlanSpec } from "@/lib/plan";
+import { daysLeft, formatTarget, LOG_DAYS_BACK, weekNumber, moveTargets, planProgress, readLog, readPlan, stepHistory, weekOf, type DayState, type PlanCheckin, type PlanLog, type PlanSpec } from "@/lib/plan";
 import { logPlanSession, movePlanSession, reactToSession, removePlanSession, savePlan } from "@/app/plan-actions";
 import { PlanSheet } from "./PlanSheet";
 import { SessionSheet } from "./SessionSheet";
@@ -161,6 +161,11 @@ export function PlanView({
               </button>
             </header>
 
+            {daysLeft(spec, today) !== null && daysLeft(spec, today)! >= 0 && (
+              <p className="me-2 inline-block rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">
+                {daysLeft(spec, today) === 0 ? p.testToday : daysLeft(spec, today) === 1 ? p.testTomorrow : fill(p.daysLeft, { n: daysLeft(spec, today)! })}
+              </p>
+            )}
             {spec.stake && <p className="inline-block rounded-full bg-warn/15 px-3 py-1 text-xs font-bold text-warn">🎲 {fill(p.stakeChip, { stake: spec.stake })}</p>}
 
             {/* This week */}
@@ -245,6 +250,39 @@ export function PlanView({
                 </div>
               )}
             </div>
+
+            {/* Topics: this week's, earlier ones still open, or everything in the review week */}
+            {spec.topics.length > 0 && (
+              <div>
+                <div className="mb-1 flex items-baseline justify-between text-sm">
+                  <span className="font-bold">{week.review ? p.reviewWeekTitle : p.topics}</span>
+                  <span className="text-xs text-muted">
+                    {week.review ? fill(p.topicsRevised, { done: prog.topics.revised, total: prog.topics.total }) : fill(p.topicsCovered, { done: prog.topics.covered, total: prog.topics.total })}
+                  </span>
+                </div>
+                {(() => {
+                  const list = week.review
+                    ? spec.topics.map((x) => ({ topic: x, from: null as number | null }))
+                    : [...week.topics.carried.map((x) => ({ topic: x, from: weekNumber(spec, x.week) as number | null })), ...week.topics.own.map((x) => ({ topic: x, from: null as number | null }))];
+                  const revised = new Set(rows.flatMap((c) => (c.status === "done" ? (readLog(c.data)?.revised ?? []) : [])));
+                  if (!list.length) return <p className="text-xs text-muted">{p.noTopics}</p>;
+                  return (
+                    <ul className="space-y-1">
+                      {list.map(({ topic, from }) => {
+                        const done = week.review ? revised.has(topic.id) : week.topics.covered.has(topic.id);
+                        return (
+                          <li key={topic.id} className="flex items-center gap-2 text-sm">
+                            <span className={cn("grid size-5 shrink-0 place-items-center rounded-md text-xs", done ? "bg-success text-white" : "border-2 border-muted/50")}>{done && "✓"}</span>
+                            <span className={cn("min-w-0 flex-1 truncate", done && "text-muted line-through")}>{topic.name}</span>
+                            {from && <span className="shrink-0 text-xs text-warn">{fill(p.fromWeek, { n: from })}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  );
+                })()}
+              </div>
+            )}
 
             {!prog.over && (
               <Button className="w-full" variant={todays?.state === "today" ? "primary" : "soft"} onClick={() => setLogging({ item, day: today, sessionId: todays?.session?.id })}>

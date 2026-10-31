@@ -6,7 +6,7 @@ import { fill } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { Button, Field, Input, Segmented, Select, Sheet, Textarea } from "@/components/ui";
 import { addDays } from "@/lib/engine/habits";
-import { formatTarget, lastLog, LOG_DAYS_BACK, readLog, sessionOn, type PlanCheckin, type PlanLog, type PlanSpec } from "@/lib/plan";
+import { formatTarget, lastLog, LOG_DAYS_BACK, readLog, sessionOn, weekNumber, weekOf, weekView, type PlanCheckin, type PlanLog, type PlanSpec } from "@/lib/plan";
 
 type StepValue = { done: boolean; sets: string; reps: string; amount: string };
 const str = (n: number | undefined) => (n === undefined ? "" : String(n));
@@ -43,6 +43,7 @@ export function SessionSheet({
   const [minutes, setMinutes] = useState("");
   const [feel, setFeel] = useState<number | undefined>();
   const [note, setNote] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Fill from what's already logged that day, else last time's numbers, else the plan.
@@ -66,6 +67,7 @@ export function SessionSheet({
     setMinutes(str(own?.minutes));
     setFeel(own?.feel);
     setNote(existing?.note ?? "");
+    setTopics((weekView(spec, checkins, weekOf(nextDay), today).review ? own?.revised : own?.topics) ?? []);
   }
 
   useEffect(() => {
@@ -75,6 +77,13 @@ export function SessionSheet({
   const session = spec?.sessions.find((s) => s.id === sessionId);
   const previous = session ? lastLog(checkins, session.id, day) : null;
   const days = Array.from({ length: LOG_DAYS_BACK + 1 }, (_, i) => addDays(today, -i));
+  // This week's topics (and earlier ones still open); in the review week, all of them to go over.
+  const week = spec ? weekView(spec, checkins.filter((c) => c.day !== day), weekOf(day), today) : null;
+  const review = !!week?.review;
+  const topicList = !spec || !week ? [] : review ? spec.topics.map((x) => ({ topic: x, from: null })) : [
+    ...week.topics.carried.map((x) => ({ topic: x, from: weekNumber(spec, x.week) })),
+    ...week.topics.own.map((x) => ({ topic: x, from: null })),
+  ];
 
   async function save() {
     if (!session) return;
@@ -87,6 +96,8 @@ export function SessionSheet({
       }),
       minutes: num(minutes),
       feel,
+      topics: review ? (readLog(checkins.find((c) => c.day === day)?.data)?.topics ?? []) : topics,
+      revised: review ? topics : [],
     };
     const ok = await onSave({ day, log, note: note.trim() || null });
     setSaving(false);
@@ -158,6 +169,35 @@ export function SessionSheet({
                 );
               })}
             </ul>
+          )}
+
+          {topicList.length > 0 && (
+            <Field label={review ? p.revisedQ : p.covered}>
+              <ul className="space-y-1">
+                {topicList.map(({ topic, from }) => {
+                  const on = topics.includes(topic.id);
+                  // Covered in an earlier session: shown ticked, nothing to do.
+                  const before = !review && week!.topics.covered.has(topic.id);
+                  return (
+                    <li key={topic.id}>
+                      <button
+                        type="button"
+                        aria-pressed={on || before}
+                        disabled={before}
+                        onClick={() => setTopics((all) => (on ? all.filter((x) => x !== topic.id) : [...all, topic.id]))}
+                        className="flex w-full items-center gap-3 rounded-xl bg-sunken px-3 py-2 text-start disabled:opacity-60"
+                      >
+                        <span className={cn("grid size-6 shrink-0 place-items-center rounded-md border-2", on || before ? "border-success bg-success text-white" : "border-muted")}>
+                          {(on || before) && <Check className="size-3.5" />}
+                        </span>
+                        <span className="min-w-0 flex-1 text-sm font-semibold">{topic.name}</span>
+                        {from && <span className="shrink-0 text-xs text-warn">{fill(p.fromWeek, { n: from })}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Field>
           )}
 
           <Field label={p.minutes}>

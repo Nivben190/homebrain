@@ -400,19 +400,23 @@ async function firePlan(db: Admin, item: PlanItem, section: Section, spec: PlanS
     else await db.from("items").update({ remind_at: null }).eq("id", item.id);
     if (view.target === 0 || late) return { automationId: item.id, status: "skipped", reason: late ? "too late" : "week not counted" };
 
-    const kept = view.done >= view.target;
+    const kept = view.result === "kept" || (view.done >= view.target && view.topics.ownDone === view.topics.own.length);
     const progress = planProgress(next, checkins, addDays(due.day, 1));
+    const left = view.topics.own.length - view.topics.ownDone;
     const fired = await sendReminders(db, section, item.id, eligible, now, (target) => {
       const t = getDict(target.locale).plan;
       const mine = target.user_id === owner;
       const vars = { n: view.number, item: item.title, name: ownerName, done: view.done, target: view.target };
       const stake = !kept && spec.stake ? ` ${fill(mine ? t.stakeOwed : t.partnerStake, { stake: spec.stake })}` : "";
+      // Topics: how many of the week's were covered, and how many carry into next week.
+      const topics = view.topics.own.length ? fill(t.reviewTopics, { done: view.topics.ownDone, total: view.topics.own.length }) + (left && !final ? fill(t.moved, { n: left }) : "") : "";
       if (final) {
         const title = fill(t.endTitle, { item: item.title, kept: progress.kept, total: progress.kept + progress.missed });
-        return { title, body: `${next.result === "kept" ? t.endKept : t.endBroken}${stake}`, rendered: [link()] };
+        const luck = spec.deadline && diffDays(due.day, spec.deadline) === 1 ? t.goodLuck : "";
+        return { title, body: `${next.result === "kept" ? t.endKept : t.endBroken}${stake}${luck}`, rendered: [link()] };
       }
       const title = fill(mine ? (kept ? t.weekKeptTitle : t.weekMissedTitle) : kept ? t.partnerKeptTitle : t.partnerMissedTitle, vars);
-      const body = `${fill(mine ? (kept ? t.weekKeptBody : t.weekMissedBody) : t.partnerBody, vars)}${stake}`;
+      const body = `${fill(mine ? (kept ? t.weekKeptBody : t.weekMissedBody) : t.partnerBody, { ...vars, topics })}${stake}`;
       return { title, body, rendered: [link()] };
     });
     return { automationId: item.id, status: fired ? "fired" : "skipped", reason: kept ? "week kept" : "week missed" };
@@ -428,9 +432,12 @@ async function firePlan(db: Admin, item: PlanItem, section: Section, spec: PlanS
     const voice = dict.voice[themeOf(section, item.title)];
     const seed = `${item.id}:${due.day}`;
     const line = due.kind === "nudge" ? fill(pickLine(voice.nudge, seed), { item: label }) : pickLine(voice.start, seed);
+    // A study plan says what's next: carried-over topics first.
+    const open = [...view.topics.carried, ...view.topics.own].filter((x) => !view.topics.covered.has(x.id)).slice(0, 2);
+    const next = open.length ? ` · ${fill(dict.plan.remindTopics, { topics: open.map((x) => x.name).join(", ") })}` : "";
     return {
       title: fill(due.kind === "nudge" ? dict.plan.nudgeTitle : dict.plan.remindTitle, { session: label }),
-      body: `${line} · ${fill(dict.plan.weekLeft, { week: view.number, done: view.done, target: view.target })}`,
+      body: `${line} · ${fill(dict.plan.weekLeft, { week: view.number, done: view.done, target: view.target })}${next}`,
       rendered: [{ kind: "done", label: dict.tracker.doneButton }, link()],
     };
   });
@@ -463,9 +470,11 @@ async function sendPlanCheers(db: Admin, now: Date): Promise<FireOutcome[]> {
       const t = getDict(target.locale).plan;
       const minutes = log?.minutes ? ` · ${fill(t.minutesShort, { n: log.minutes })}` : "";
       const feel = log?.feel ? ` ${t.feelings[log.feel - 1]}` : "";
+      const topicNames = spec.topics.filter((x) => log?.topics.includes(x.id)).map((x) => x.name);
+      const covered = topicNames.length ? fill(t.coveredLine, { topics: topicNames.slice(0, 3).join(", ") }) : "";
       await sendPush(db, target.user_id, {
         title: `${section.icon} ${fill(t.cheerTitle, { name, session: label })}`,
-        body: `${fill(t.cheerBody, { week: view.number, done: view.done, target: view.target })}${minutes}${feel}`,
+        body: `${fill(t.cheerBody, { week: view.number, done: view.done, target: view.target })}${minutes}${covered}${feel}`,
         url: `/sections/${section.id}`,
       });
       sent++;

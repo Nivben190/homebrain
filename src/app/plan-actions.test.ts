@@ -32,6 +32,8 @@ const everyDay = (today: string, over: Partial<PlanSpec> = {}): PlanSpec => ({
   sessions: [{ id: "s1", name: "Workout", days: [0, 1, 2, 3, 4, 5, 6], steps: [{ id: "bench", name: "Bench", sets: 3, reps: 8, amount: 40, unit: "kg" }] }],
   moves: [],
   reviewed: {},
+    topics: [],
+    reviewLast: false,
   ...over,
 });
 const names = async (ids: string[]) => Object.fromEntries((await sql<{ user_id: string; display_name: string }>(`select user_id, display_name from profiles where user_id = any($1)`, [ids])).map((r) => [r.user_id, r.display_name]));
@@ -153,5 +155,32 @@ describe("plans", () => {
     );
     await A.markRun(run.id, true);
     expect(await sql(`select 1 from checkins where item_id = $1`, [id])).toEqual([]);
+  });
+
+  it("a test plan: weeks follow the date, the week's topics are in Saturday's message, and leftovers move on", async () => {
+    const home = await homeWith(["owner", "adult"]);
+    await sql(`update profiles set locale = 'en', timezone = $2, quiet_from = null, quiet_to = null, quiet_shabbat = false where household_id = $1`, [home.householdId, TZ]);
+    const sectionId = await planSpace(home.householdId);
+    const today = todayKey(TZ);
+    signIn(home.users.owner);
+    // A date in the past is refused; one ahead sets the weeks.
+    expect(await P.savePlan({ id: null, sectionId, title: "Exam", spec: everyDay(today, { deadline: today }), ownerId: null })).toMatchObject({ ok: false });
+    const deadline = addDays(weekOf(today), 23);
+    const saved = await P.savePlan({ id: null, sectionId, title: "Exam", spec: everyDay(today, { weeks: 9, deadline }), ownerId: null });
+    expect(saved.ok && (saved.data.props._plan as PlanSpec).weeks).toBe(4);
+
+    // Last week: two topics, one covered, sessions done.
+    const lastSunday = addDays(weekOf(today), -7);
+    const spec = everyDay(lastSunday, { weeks: 3, perWeek: 1, topics: [{ id: "a", name: "Ch 1", week: lastSunday }, { id: "b", name: "Ch 2", week: lastSunday }] });
+    const [{ id }] = await sql<{ id: string }>(`insert into items (section_id, title, props, assignee_id) values ($1, 'Exam', $2, $3) returning id`, [sectionId, { _plan: spec }, home.users.owner]);
+    await sql(`insert into checkins (item_id, day, status, user_id, data) values ($1, $2, 'done', $3, $4)`, [id, lastSunday, home.users.owner, { session: "s1", steps: [], topics: ["a", "zzz"] }]);
+    const sat = addDays(lastSunday, 6);
+    const reviewAt = zonedTimeToUtc(+sat.slice(0, 4), +sat.slice(5, 7), +sat.slice(8, 10), 21, 0, TZ);
+    app.pushes = [];
+    await fireItemReminder(db(), id, reviewAt, new Date(reviewAt.getTime() + 1000));
+    expect(app.pushes.find((p) => p.userId === home.users.owner)?.payload).toMatchObject({
+      title: "🏋️ 😬 Week 1 missed: Exam",
+      body: "1 of 1 · topics 1 of 2 · 1 moved to next week. Next week is a new week.",
+    });
   });
 });

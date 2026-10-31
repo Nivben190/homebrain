@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { useI18n } from "@/i18n/client";
-import { Button, Chip, Field, Input, Select, Sheet, Toggle } from "@/components/ui";
-import { newPlanId, PLAN_PRESETS, planFromPreset, setSessionDays, type PlanSpec, type PlanStep } from "@/lib/plan";
+import { Button, Chip, Field, Input, Select, Sheet, Textarea, Toggle } from "@/components/ui";
+import { fill } from "@/i18n";
+import { addDays, diffDays } from "@/lib/engine/habits";
+import { isReviewWeek, newPlanId, normalizePlan, PLAN_PRESETS, planFromPreset, setSessionDays, spreadTopics, weekStarts, type PlanSpec, type PlanStep } from "@/lib/plan";
 import type { Member } from "./PropertyInput";
 
 const WEEKS = [2, 4, 6, 8, 12, 16];
@@ -39,12 +41,17 @@ export function PlanSheet({
   const [spec, setSpec] = useState<PlanSpec | null>(null);
   const [ownerId, setOwnerId] = useState<string | null>(userId);
   const [saving, setSaving] = useState(false);
+  const [paste, setPaste] = useState("");
+  // Leads up to a date with topics week by week (an exam); any plan can turn it on.
+  const [exam, setExam] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setTitle(initial?.title ?? "");
     setSpec(initial?.spec ?? null);
     setOwnerId(initial?.ownerId ?? userId);
+    setExam(!!initial?.spec.deadline || !!initial?.spec.topics.length);
+    setPaste("");
   }, [open, initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const p = t.plan;
@@ -57,12 +64,13 @@ export function PlanSheet({
     );
 
   const planned = spec ? new Set(spec.sessions.flatMap((s) => s.days)).size : 0;
-  const valid = !!spec && !!title.trim() && spec.sessions.every((s) => s.name.trim() && s.steps.every((st) => st.name.trim())) && planned > 0;
+  const valid =
+    !!spec && !!title.trim() && spec.sessions.every((s) => s.name.trim() && s.steps.every((st) => st.name.trim())) && spec.topics.every((x) => x.name.trim()) && planned > 0;
 
   async function save() {
     if (!spec || !valid) return;
     setSaving(true);
-    const ok = await onSave({ id: initial?.id ?? null, title: title.trim(), spec: { ...spec, perWeek: Math.min(spec.perWeek, 14) }, ownerId });
+    const ok = await onSave({ id: initial?.id ?? null, title: title.trim(), spec: normalizePlan({ ...spec, perWeek: Math.min(spec.perWeek, 14) }), ownerId });
     setSaving(false);
     if (ok) onClose();
   }
@@ -92,6 +100,7 @@ export function PlanSheet({
                   const made = planFromPreset(preset, locale, today);
                   setTitle(made.title);
                   setSpec(made.spec);
+                  setExam(!!preset.exam);
                 }}
                 className="glass flex flex-col items-start gap-1 rounded-2xl p-3 text-start transition active:scale-95"
               >
@@ -109,7 +118,33 @@ export function PlanSheet({
           <Field label={p.why}>
             <Input value={spec.why ?? ""} onChange={(e) => patch({ why: e.target.value || undefined })} placeholder={p.whyPlaceholder} maxLength={200} />
           </Field>
-          {!initial && (
+          {exam ? (
+            <>
+              <Field label={p.deadline} hint={p.deadlineHint}>
+                <Input
+                  type="date"
+                  min={addDays(today, 1)}
+                  value={spec.deadline ?? ""}
+                  onChange={(e) => {
+                    const d = e.target.value;
+                    if (d && diffDays(today, d) >= 1) setSpec(normalizePlan({ ...spec, deadline: d }));
+                  }}
+                  className="h-12"
+                />
+              </Field>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">{p.reviewLast}</span>
+                <Toggle checked={spec.reviewLast} onChange={(v) => patch({ reviewLast: v })} label={p.reviewLast} />
+              </div>
+            </>
+          ) : (
+            !initial && (
+              <button type="button" onClick={() => (setExam(true), setSpec(normalizePlan({ ...spec, deadline: addDays(today, 30), reviewLast: true })))} className="text-sm font-semibold text-accent">
+                📅 {p.deadline}
+              </button>
+            )
+          )}
+          {!initial && !exam && (
             <Field label={p.weeks}>
               <Select value={spec.weeks} onChange={(e) => patch({ weeks: Number(e.target.value) })} className="h-12">
                 {WEEKS.map((n) => (
@@ -183,6 +218,73 @@ export function PlanSheet({
               </button>
             )}
           </div>
+
+          {exam && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-muted">{p.topics}</p>
+                <p className="text-xs text-muted">{p.topicsHint}</p>
+              </div>
+              {weekStarts(normalizePlan(spec)).map((week, i) => {
+                const topics = spec.topics.filter((x) => x.week === week);
+                const review = isReviewWeek(normalizePlan(spec), week);
+                return (
+                  <div key={week} className="glass space-y-2 rounded-2xl p-3">
+                    <p className="text-sm font-bold">
+                      {fill(p.weekLabel, { n: i + 1 })} <span className="text-xs font-semibold text-muted">· {week.slice(8, 10)}/{week.slice(5, 7)}</span>
+                      {review && <span className="ms-2 text-xs text-accent">{p.reviewWeekTitle}</span>}
+                    </p>
+                    {topics.map((topic) => (
+                      <div key={topic.id} className="flex items-center gap-2">
+                        <Input
+                          aria-label={p.topics}
+                          value={topic.name}
+                          maxLength={80}
+                          onChange={(e) => patch({ topics: spec.topics.map((x) => (x.id === topic.id ? { ...x, name: e.target.value } : x)) })}
+                          className="h-10"
+                        />
+                        <Select
+                          aria-label={p.weekLabel.replace("{n}", "")}
+                          value={topic.week}
+                          onChange={(e) => patch({ topics: spec.topics.map((x) => (x.id === topic.id ? { ...x, week: e.target.value } : x)) })}
+                          className="h-10 w-20"
+                        >
+                          {weekStarts(normalizePlan(spec)).map((w, j) => (
+                            <option key={w} value={w}>
+                              {j + 1}
+                            </option>
+                          ))}
+                        </Select>
+                        <button type="button" aria-label={t.common.delete} onClick={() => patch({ topics: spec.topics.filter((x) => x.id !== topic.id) })} className="p-1 text-muted">
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => patch({ topics: [...spec.topics, { id: newPlanId(), name: "", week }] })}
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-accent"
+                    >
+                      <Plus className="size-4" /> {p.addTopic}
+                    </button>
+                  </div>
+                );
+              })}
+              <Textarea aria-label={p.pasteTopics} placeholder={p.pasteTopics} value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} />
+              <Button
+                size="sm"
+                variant="soft"
+                disabled={!paste.trim()}
+                onClick={() => {
+                  const next = normalizePlan(spec);
+                  setSpec({ ...next, topics: [...next.topics, ...spreadTopics(next, paste.split(/\r?\n/))] });
+                  setPaste("");
+                }}
+              >
+                {p.spread}
+              </Button>
+            </div>
+          )}
 
           <Field label={p.perWeek}>
             <Select value={spec.perWeek} onChange={(e) => patch({ perWeek: Number(e.target.value) })} className="h-12">

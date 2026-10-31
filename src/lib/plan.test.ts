@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays, weekdayOf } from "./engine/habits";
 import { zonedTimeToUtc } from "./engine/time";
-import { lastLog, moveSession, moveTargets, nextPlanReminder, planFromPreset, PLAN_PRESETS, planProgress, sessionOn, setSessionDays, stepHistory, weekOf, weekTarget, weekView, type PlanCheckin, type PlanSpec } from "./plan";
+import { daysLeft, isReviewWeek, lastDay, lastLog, moveSession, normalizePlan, spreadTopics, studyWeeks, weeksUntil, moveTargets, nextPlanReminder, planFromPreset, PLAN_PRESETS, planProgress, sessionOn, setSessionDays, stepHistory, weekOf, weekTarget, weekView, type PlanCheckin, type PlanSpec } from "./plan";
 
 const TZ = "Asia/Jerusalem";
 const SUN = "2026-11-01";
@@ -23,6 +23,8 @@ function gym(over: Partial<PlanSpec> = {}): PlanSpec {
     ],
     moves: [],
     reviewed: {},
+    topics: [],
+    reviewLast: false,
     stake: "Dishes for a week",
     ...over,
   };
@@ -125,5 +127,58 @@ describe("plan progress", () => {
     expect([spec.start, spec.from, spec.perWeek, spec.weeks]).toEqual([SUN, "2026-11-04", 3, 8]);
     expect(spec.sessions[0].steps[0]).toMatchObject({ name: "לחיצת חזה", unit: "ק״ג" });
     expect(addDays(spec.start, 7 * spec.weeks - 1)).toBe("2026-12-26");
+  });
+});
+
+describe("plans leading up to a test", () => {
+  // Test on Wednesday Nov 25: three weeks, ending Tuesday Nov 24; the last one is for review.
+  const exam = (over: Partial<PlanSpec> = {}) =>
+    normalizePlan(gym({ deadline: "2026-11-25", reviewLast: true, sessions: [{ id: "study", name: "Study", days: [0, 1, 2, 3, 4], steps: [] }], perWeek: 2, ...over }));
+  const covered = (day: string, topics: string[]) => done(day, { session: "study", steps: [], topics });
+
+  it("the weeks follow the date; the plan ends the day before; the last week is for review", () => {
+    const spec = exam();
+    expect([spec.weeks, lastDay(spec), weeksUntil(SUN, "2026-11-25")]).toEqual([4, "2026-11-24", 4]);
+    expect(daysLeft(spec, "2026-11-20")).toBe(5);
+    expect(isReviewWeek(spec, "2026-11-22")).toBe(true);
+    expect(studyWeeks(spec)).toEqual([SUN, "2026-11-08", "2026-11-15"]);
+    // The short last week asks only for what's still planned in it (Sun–Tue).
+    expect(weekTarget(spec, "2026-11-22")).toBe(2);
+    expect(sessionOn(spec, "2026-11-25")).toBeNull();
+    // Its look back comes on the last day, not Saturday.
+    expect(nextPlanReminder({ ...spec, reviewed: { [SUN]: 2, "2026-11-08": 2, "2026-11-15": 2 } }, [done("2026-11-22"), done("2026-11-23")], at("2026-11-23", "22:00"), TZ)).toMatchObject({ kind: "review", day: "2026-11-24" });
+  });
+
+  it("pasted topics spread over the study weeks, in order", () => {
+    const topics = spreadTopics(exam(), ["Ch 1", "Ch 2", "Ch 3", "Ch 4", "Ch 5", " ", "Ch 6"]);
+    expect(topics.map((x) => [x.name, x.week])).toEqual([
+      ["Ch 1", SUN],
+      ["Ch 2", SUN],
+      ["Ch 3", "2026-11-08"],
+      ["Ch 4", "2026-11-08"],
+      ["Ch 5", "2026-11-15"],
+      ["Ch 6", "2026-11-15"],
+    ]);
+  });
+
+  it("a week is kept only with its topics covered; what's left carries into the next week", () => {
+    const spec = exam({ topics: [{ id: "a", name: "Ch 1", week: SUN }, { id: "b", name: "Ch 2", week: SUN }, { id: "c", name: "Ch 3", week: "2026-11-08" }] });
+    const rows = [covered(SUN, ["a"]), covered("2026-11-02", [])];
+    const w1 = weekView(spec, rows, SUN, "2026-11-10");
+    expect([w1.done, w1.target, w1.topics.ownDone, w1.result]).toEqual([2, 2, 1, "missed"]);
+    const w2 = weekView(spec, rows, "2026-11-08", "2026-11-10");
+    expect(w2.topics.carried.map((x) => x.id)).toEqual(["b"]);
+    expect(w2.topics.own.map((x) => x.id)).toEqual(["c"]);
+    // Covering both this week keeps it; the carried one doesn't count against it.
+    const more = [...rows, covered("2026-11-08", ["c"]), covered("2026-11-09", ["b"])];
+    expect(weekView(spec, more, "2026-11-08", "2026-11-10").result).toBe("kept");
+    expect(planProgress(spec, more, "2026-11-10").topics).toEqual({ covered: 3, revised: 0, total: 3 });
+    // Session reminders don't stop while a topic is still open, even with the sessions done.
+    expect(nextPlanReminder(spec, rows.slice(0, 1).concat(covered("2026-11-02", [])), at("2026-11-03", "08:00"), TZ)).toMatchObject({ kind: "main", day: "2026-11-03" });
+  });
+
+  it("topics outside a shorter plan move into it", () => {
+    const spec = normalizePlan({ ...exam(), deadline: "2026-11-10", topics: [{ id: "x", name: "Late", week: "2026-11-22" }] });
+    expect([spec.weeks, spec.topics[0].week]).toEqual([2, "2026-11-08"]);
   });
 });

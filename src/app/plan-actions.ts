@@ -5,7 +5,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { reschedulePlan } from "@/lib/engine/execute";
 import { isQuiet } from "@/lib/engine/daily";
 import { addDays, diffDays, todayKey } from "@/lib/engine/habits";
-import { LOG_DAYS_BACK, logSchema, moveSession, moveTargets, planProps, planSchema, readLog, readPlan, sessionOn, type PlanCheckin } from "@/lib/plan";
+import { LOG_DAYS_BACK, logSchema, moveSession, moveTargets, normalizePlan, planProps, planSchema, readLog, readPlan, sessionOn, type PlanCheckin } from "@/lib/plan";
 import { sendPush } from "@/lib/push";
 import { fill, getDict } from "@/i18n";
 import type { CheckinRow, Item, Profile } from "@/lib/db-types";
@@ -21,7 +21,9 @@ export async function savePlan(input: { id: string | null; sectionId: string; ti
   const parsed = planSchema.safeParse(input.spec);
   const title = input.title.trim().slice(0, 120);
   if (!parsed.success || !title) return { ok: false, error: "invalid" };
-  const spec = parsed.data;
+  // A test date must still be ahead when the plan is made; weeks and topics follow it.
+  if (!input.id && parsed.data.deadline && diffDays(todayKey(profile.timezone), parsed.data.deadline) < 1) return { ok: false, error: "invalid" };
+  const spec = normalizePlan(parsed.data);
   let id = input.id;
   if (id) {
     const { data: old } = await supabase.from("items").select("props").eq("id", id).maybeSingle();
@@ -62,6 +64,12 @@ export async function logPlanSession(input: { itemId: string; day: string; statu
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.day) || back < 0 || back > LOG_DAYS_BACK) return { ok: false, error: "invalid" };
   const log = input.log === undefined ? null : logSchema.safeParse(input.log);
   if (log && !log.success) return { ok: false, error: "invalid" };
+  // Only this plan's topics count.
+  if (log?.data) {
+    const ids = new Set(plan.spec.topics.map((x) => x.id));
+    log.data.topics = log.data.topics.filter((id) => ids.has(id));
+    log.data.revised = log.data.revised.filter((id) => ids.has(id));
+  }
   const { data: row, error } = await supabase
     .from("checkins")
     .upsert({ item_id: input.itemId, day: input.day, status: input.status, data: log?.data ?? null, note: input.note?.trim().slice(0, 500) || null }, { onConflict: "item_id,day" })
