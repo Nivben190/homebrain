@@ -1,7 +1,11 @@
 "use client";
 import { errorKey } from "@/lib/errors";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Copy, Plus, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { fill } from "@/i18n";
+import { rowsFromShape, shapeOf } from "@/lib/space-copy";
+import type { Item } from "@/lib/db-types";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/cn";
 import { NotesSyncHelp } from "@/components/settings/NotesSyncHelp";
@@ -27,7 +31,9 @@ export function SectionSettingsSheet({
   onDeleted: () => void;
 }) {
   const { t } = useI18n();
+  const router = useRouter();
   const [s, setS] = useState(section);
+  const [copying, setCopying] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +58,30 @@ export function SectionSettingsSheet({
     if (error || !data?.length) return setError(t.failures[errorKey(error ?? "permission denied")]);
     onSaved({ ...section, ...patch });
     onClose();
+  }
+
+  /** A new space with this one's structure (private stays private), then opens it. */
+  async function makeLikeThis() {
+    setCopying(true);
+    setError(null);
+    const sb = supabaseBrowser();
+    const { data: items } = await sb.from("items").select("title,props,position").eq("section_id", section.id);
+    const rows = rowsFromShape(shapeOf(section, (items ?? []) as Pick<Item, "title" | "props" | "position">[]), {
+      householdId: section.household_id,
+      ownerId: section.owner_id ? userId : null,
+      title: fill(t.sections.copyTitle, { title: section.title }),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+    const { data, error } = await sb.from("sections").insert(rows.section).select("id").single();
+    if (error || !data) {
+      setCopying(false);
+      return setError(t.failures[errorKey(error ?? "permission denied")]);
+    }
+    const list = rows.items(data.id);
+    if (list.length) await sb.from("items").insert(list);
+    setCopying(false);
+    onClose();
+    router.push(`/sections/${data.id}`);
   }
 
   async function remove() {
@@ -141,6 +171,14 @@ export function SectionSettingsSheet({
             <NotesSyncHelp />
           </>
         )}
+
+        <button type="button" onClick={makeLikeThis} disabled={copying} className="flex w-full items-center gap-3 rounded-2xl bg-sunken p-3 text-start disabled:opacity-60">
+          <Copy className="size-5 shrink-0 text-accent" />
+          <span className="min-w-0">
+            <span className="block font-bold">{t.sections.likeThis}</span>
+            <span className="block text-xs text-muted">{t.sections.likeThisHint}</span>
+          </span>
+        </button>
 
         <Field label={t.sections.properties}>
           <div className="space-y-2">

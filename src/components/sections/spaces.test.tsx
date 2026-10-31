@@ -174,6 +174,23 @@ describe("space settings", () => {
     expect(await sql(`select title from sections where id = $1`, [section.id])).toEqual([{ title: "Shopping" }]);
   });
 
+  it("make a space like this: same structure, none of the filled-in data, and it opens", async () => {
+    const home = await homeWith(["owner"]);
+    const schema = [{ id: "p1", name: "Price", type: "price" }];
+    const [section] = await sql<Section>(`insert into sections (household_id, title, view, schema, icon) values ($1, 'Pesach 2026', 'checklist', $2, '🕯️') returning *`, [home.householdId, JSON.stringify(schema)]);
+    const habit = { time: "09:00", nudge: false, outdoor: false, repeat: { kind: "interval", every: 2, start: "2026-01-01" } };
+    await sql(`insert into items (section_id, title, position, done, props) values ($1, 'Guests', 0, true, $2), ($1, 'Water plants', 1, false, $3)`, [section.id, { p1: 120, _photos: [{ path: "x.jpg" }] }, { _habit: habit }]);
+    signIn(home.users.owner);
+    const { user, t } = renderUi(<SectionSettingsSheet open section={section} userId={home.users.owner} onClose={() => {}} onSaved={() => {}} onDeleted={() => {}} />);
+    await user.click(screen.getByRole("button", { name: new RegExp(t.sections.likeThis) }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/sections\//)));
+    const [copy] = await sql<Section>(`select * from sections where household_id = $1 and id <> $2`, [home.householdId, section.id]);
+    expect(copy).toMatchObject({ title: "Pesach 2026 (new)", view: "checklist", icon: "🕯️", schema, owner_id: null });
+    const items = await sql<{ title: string; done: boolean; props: Record<string, unknown>; remind_at: unknown }>(`select title, done, props, remind_at from items where section_id = $1 order by position`, [copy.id]);
+    expect(items.map((i) => [i.title, i.done, i.props])).toEqual([["Guests", false, {}], ["Water plants", false, { _habit: habit }]]);
+    expect(items[1].remind_at).not.toBeNull();
+  });
+
   it("a child's rename or delete is not pretended: it says no and nothing changes", async () => {
     const { user, t, section, saved, deleted } = await sheet("child");
     const title = screen.getByDisplayValue("Lists");
