@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { app, homeWith, sql, startApp } from "@/test/app";
+import { app, homeWith, signIn, sql, startApp } from "@/test/app";
 import { testClient } from "@/test/postgrest";
 
 vi.mock("@/lib/supabase/server", () => import("@/test/app").then((m) => m.supabaseServerMock));
@@ -20,6 +20,9 @@ const callback = await import("./callback/route");
 const scan = await import("./scan/route");
 const calendar = await import("./calendar/route");
 const cron = await import("../cron/gmail/route");
+const mailPdf = await import("./mail-pdf/route");
+const { readMail } = await import("@/lib/subs/mail");
+const { createSupabaseServer } = await import("@/lib/supabase/server");
 const A = await import("@/app/actions");
 
 beforeAll(startApp, 120_000);
@@ -36,12 +39,16 @@ beforeEach(() => {
     if (url.endsWith("/users/me/profile")) return { emailAddress: "niv@gmail.com" };
     if (url.includes("/users/me/messages?")) return { messages: [{ id: "m1" }] };
     if (url.includes("/users/me/messages/m1") && google.busy) return new Response("Quota exceeded for quota metric 'Queries' and limit 'Queries per minute per user'", { status: 429 });
+    if (url.includes("/users/me/messages/m1/attachments/")) return { data: Buffer.from("%PDF-1.4 receipt").toString("base64url") };
     if (url.includes("/users/me/messages/m1")) {
       const body = Buffer.from("Your monthly plan: Standard\nTotal: 54.90 ₪").toString("base64url");
+      const headers = [{ name: "From", value: "Netflix <info@account.netflix.com>" }, { name: "Subject", value: "Your payment was received" }];
+      // Gmail gives the attachment a new id on every fetch.
+      const pdf = { mimeType: "application/pdf", filename: "receipt.pdf", body: { attachmentId: `att-${Math.random()}`, size: 100 } };
       return {
         id: "m1",
         internalDate: String(Date.parse("2026-10-10T08:00:00Z")),
-        payload: { mimeType: "text/plain", headers: [{ name: "From", value: "Netflix <info@account.netflix.com>" }, { name: "Subject", value: "Your payment was received" }], body: { data: body } },
+        payload: { mimeType: "multipart/mixed", headers, parts: [{ mimeType: "text/plain", body: { data: body } }, pdf] },
       };
     }
     if (url.includes("/calendars/primary/events")) return { id: "evt-1" };
@@ -134,6 +141,29 @@ describe("scanning", () => {
     google.busy = false;
     expect(await scanDueGmail(db)).toMatchObject({ ok: true });
     expect(await sql(`select retry_after from gmail_connections where section_id = $1`, [s])).toEqual([{ retry_after: null }]);
+  });
+
+  it("an email a bill came from opens in the app, with its PDF; nothing else in the inbox does", async () => {
+    const home = await homeWith(["owner"]);
+    const s = await subsSpace(home.householdId);
+    await sql(`insert into gmail_connections (section_id, user_id, email, refresh_token) values ($1, $2, 'niv@gmail.com', $3)`, [s, home.users.owner, sealToken("refresh")]);
+    expect(await scanGmail(testClient(app.db), s)).toMatchObject({ ok: true });
+    signIn(home.users.owner);
+    const mine = await createSupabaseServer();
+    expect(await readMail(mine, s, "m1")).toMatchObject({ ok: true, from: "Netflix <info@account.netflix.com>", subject: "Your payment was received", text: expect.stringContaining("54.90"), pdfs: ["receipt.pdf"] });
+    expect(await readMail(mine, s, "someone-elses-mail")).toEqual({ ok: false, error: "not_found" });
+    const pdf = await mailPdf.GET(new Request(`https://brain.test/api/google/mail-pdf?section=${s}&message=m1&n=0`));
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(Buffer.from(await pdf.arrayBuffer()).toString()).toBe("%PDF-1.4 receipt");
+    expect((await mailPdf.GET(new Request(`https://brain.test/api/google/mail-pdf?section=${s}&message=m1&n=1`))).status).toBe(404);
+
+    // Another home can't read it, even with the link.
+    const other = await homeWith(["owner"]);
+    signIn(other.users.owner);
+    expect(await readMail(await createSupabaseServer(), s, "m1")).toEqual({ ok: false, error: "not_found" });
+    expect((await mailPdf.GET(new Request(`https://brain.test/api/google/mail-pdf?section=${s}&message=m1&n=0`))).status).toBe(404);
+    signIn(null);
+    expect((await mailPdf.GET(new Request(`https://brain.test/api/google/mail-pdf?section=${s}&message=m1&n=0`))).status).toBe(401);
   });
 
   it("an expired Google grant marks the inbox expired", async () => {

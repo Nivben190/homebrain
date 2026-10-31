@@ -104,13 +104,14 @@ interface Part {
 export interface PdfRef {
   attachmentId: string;
   size: number;
+  filename: string;
 }
 
 /** Bills and receipts are small; anything bigger is a brochure or a scan. */
 const MAX_PDF = 2_000_000;
 
 function pdfParts(p: Part): PdfRef[] {
-  const own = p.body?.attachmentId && (p.mimeType === "application/pdf" || /\.pdf$/i.test(p.filename ?? "")) && (p.body.size ?? 0) <= MAX_PDF ? [{ attachmentId: p.body.attachmentId, size: p.body.size ?? 0 }] : [];
+  const own = p.body?.attachmentId && (p.mimeType === "application/pdf" || /\.pdf$/i.test(p.filename ?? "")) && (p.body.size ?? 0) <= MAX_PDF ? [{ attachmentId: p.body.attachmentId, size: p.body.size ?? 0, filename: p.filename || "attachment.pdf" }] : [];
   return [...own, ...(p.parts ?? []).flatMap(pdfParts)];
 }
 

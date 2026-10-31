@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ExternalLink, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import { useI18n } from "@/i18n/client";
 import { Button, Field, Input, Segmented, Select, Sheet, Toggle } from "@/components/ui";
 import { todayKey } from "@/lib/engine/habits";
@@ -18,7 +19,6 @@ export function SubscriptionSheet({
   section,
   checkins,
   timeZone,
-  gmailEmail,
   onClose,
   onChange,
   onDelete,
@@ -27,7 +27,6 @@ export function SubscriptionSheet({
   section: Section;
   checkins: CheckinRow[];
   timeZone: string;
-  gmailEmail: string | null;
   onClose: () => void;
   onChange: (id: string, patch: Partial<Item>) => void;
   onDelete: (id: string) => void;
@@ -166,19 +165,14 @@ export function SubscriptionSheet({
             <ul className="divide-y divide-card-border overflow-hidden rounded-2xl bg-sunken">
               {sub.charges.map((c) => (
                 <li key={c.id}>
-                  <a
-                    href={`https://mail.google.com/mail/u/${encodeURIComponent(gmailEmail ?? "0")}/#all/${c.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2.5"
-                  >
+                  <Link href={`/sections/${section.id}/mail/${encodeURIComponent(c.id)}`} className="flex items-center gap-3 px-3 py-2.5">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{c.subject}</span>
                       <span className="block text-xs text-muted">{new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${c.day}T12:00:00Z`))}</span>
                     </span>
                     {c.amount !== null && <span className="shrink-0 text-sm font-bold tabular-nums">{money(locale, c.amount, c.currency ?? sub.currency)}</span>}
-                    <ExternalLink className="size-3.5 shrink-0 text-faint" />
-                  </a>
+                    <ChevronRight className="size-4 shrink-0 text-faint rtl:rotate-180" />
+                  </Link>
                 </li>
               ))}
             </ul>

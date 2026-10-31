@@ -1061,6 +1061,13 @@ export const en = {
     hide: "Not a subscription",
     unhide: "Show again",
     emails: "From your email",
+    mail: {
+      noSubject: "(no subject)",
+      empty: "This email has no text. Its contents may be in the attachment.",
+      not_found: "This email isn't available here any more.",
+      expired: "Gmail needs reconnecting before this email can be shown. Reconnect it in the space.",
+      failed: "Couldn't load this email from Gmail. Try again in a minute.",
+    },
     accountOnly: "Account found · billed elsewhere — tap to add the price",
     fromCard: "Monthly charge on your card",
     fromGmail: "Found in Gmail",

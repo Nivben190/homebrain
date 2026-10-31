@@ -659,7 +659,6 @@ export function SectionScreen({
           section={section}
           checkins={openItem ? checkins.filter((c) => c.item_id === openItem.id) : []}
           timeZone={timeZone}
-          gmailEmail={gmail?.email ?? null}
           onClose={() => setOpenItem(null)}
           onChange={update}
           onDelete={removeSub}
