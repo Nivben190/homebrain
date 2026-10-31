@@ -31,6 +31,8 @@ import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib
 import { INGREDIENTS_PROP, parseIngredients, readIngredients, shoppingFor } from "@/lib/meals";
 import { AMOUNT_PROP } from "@/lib/money";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
+import { sendEmail } from "@/lib/email";
+import { signupAlert, type SignupVia } from "@/lib/signup-alert";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
 
@@ -78,7 +80,22 @@ export async function createAccount(input: { email: string; password: string; in
     const exists = /already|registered|exists/i.test(error.message);
     return { ok: false, error: exists ? "exists" : error.message };
   }
+  const via: SignupVia = isInviteToken(input.inviteCode?.trim() ?? "") && invited ? "link" : invited ? "code" : (count ?? 0) > 0 ? "allowed" : "first";
+  await tellOwnerAboutSignup(admin, email, via);
   return { ok: true };
+}
+
+/** An email to the app's owner (SIGNUP_ALERT_EMAIL) about a new account. Never holds up or fails the sign-up. */
+async function tellOwnerAboutSignup(admin: ReturnType<typeof createSupabaseAdmin>, email: string, via: SignupVia) {
+  const to = process.env.SIGNUP_ALERT_EMAIL;
+  if (!to) return;
+  try {
+    const { count } = await admin.from("profiles").select("user_id", { count: "exact", head: true });
+    const { subject, body } = signupAlert({ email, via, accounts: count ?? null, at: new Date(), appUrl: process.env.NEXT_PUBLIC_APP_URL });
+    await sendEmail(to, subject, body);
+  } catch (e) {
+    console.error("[signup] alert failed", e);
+  }
 }
 
 /**

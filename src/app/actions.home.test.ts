@@ -176,6 +176,37 @@ describe("accounts", () => {
     expect(await A.createAccount({ email: "x@example.com", password: "ninechars" })).toEqual({ ok: false, error: "too_short" });
   });
 
+  it("a new account emails the app's owner, and only when it really was created", async () => {
+    const home = await homeWith(["owner"]);
+    const [{ invite_code }] = await sql<{ invite_code: string }>(`select invite_code from households where id = $1`, [home.householdId]);
+    // A fresh sign-up allowance for this test's address.
+    await sql(`delete from rate_limits where bucket like 'signUp:%'`);
+    const sent: { to: string[]; subject: string; text: string }[] = [];
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).startsWith("https://api.resend.com/")) {
+        sent.push(JSON.parse(String(init!.body)));
+        return new Response("{}", { status: 200 });
+      }
+      return realFetch(url, init);
+    });
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("SIGNUP_ALERT_EMAIL", "owner@example.com");
+    try {
+      expect(await A.createAccount({ email: "Newbie@Example.com", password: "longenough", inviteCode: invite_code })).toEqual({ ok: true });
+      expect(await A.createAccount({ email: "newbie@example.com", password: "longenough", inviteCode: invite_code })).toEqual({ ok: false, error: "exists" });
+      expect(await A.createAccount({ email: "nobody@example.com", password: "longenough" })).toEqual({ ok: false, error: "not_invited" });
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toEqual(["owner@example.com"]);
+    expect(sent[0].subject).toBe("New sign-up: newbie@example.com");
+    expect(sent[0].text).toContain("How they got in: a home's invite code");
+    expect(sent[0].text).toMatch(/Accounts now: \d+/);
+  });
+
   it("deleteAccount needs the typed email, then removes the user and an empty home", async () => {
     const home = await homeWith(["owner"]);
     const [{ email }] = await sql<{ email: string }>(`select email from auth.users where id = $1`, [home.users.owner]);

@@ -20,6 +20,8 @@ import { DEFAULT_PLACE, getForecast, outdoorWarning, walkAdvice, weatherAt } fro
 import { getJewishCalendar, holyStatus } from "@/lib/jewish";
 import { foodDaysLeft } from "@/lib/engine/food";
 import { TodayPractice } from "@/components/today/TodayPractice";
+import { FinderBanner } from "@/components/sections/FinderBanner";
+import { FEW_SPACES } from "@/lib/registry/finder";
 import { OnThisDay, type Memory } from "@/components/today/OnThisDay";
 import type { Photo } from "@/lib/photos";
 
@@ -180,6 +182,7 @@ export default async function TodayPage() {
       </header>
 
       <PushPrompt />
+      {sections.length <= FEW_SPACES && ["owner", "adult", "teen"].includes(profile.role) && <FinderBanner />}
       <AppBadge count={pending.length} />
 
       {/* Now */}

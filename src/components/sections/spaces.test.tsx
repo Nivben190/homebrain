@@ -4,6 +4,7 @@ import { screen, waitFor } from "@testing-library/react";
 import { homeWith, router, signIn, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
 import type { Section } from "@/lib/db-types";
+import { fill } from "@/i18n";
 
 vi.mock("@/lib/supabase/server", () => import("@/test/app").then((m) => m.supabaseServerMock));
 vi.mock("@/lib/supabase/browser", () => import("@/test/app").then((m) => m.supabaseBrowserMock));
@@ -61,6 +62,29 @@ describe("new space", () => {
     expect(screen.queryByText(t.sections.visibility)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: t.common.create }));
     await waitFor(async () => expect((await spaces(home.householdId)).map((s) => s.owner_id)).toEqual([home.users.teen]));
+  });
+
+  it("help me choose: goals in, the ticked spaces added together, what the home has left out", async () => {
+    const home = await homeWith(["owner"]);
+    const { user, t } = renderUi(<NewSectionButton householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" existing={["dog-care"]} startFinder />);
+    await user.click(await screen.findByRole("button", { name: /Look after the dog/ }));
+    await user.click(screen.getByRole("button", { name: /Plan meals and eat better/ }));
+    await user.click(screen.getByRole("button", { name: t.finder.show }));
+    // Dog care is already there; Dog health and Meal plan are the best start.
+    const boxes = await details(() => {
+      const all = screen.getAllByRole("checkbox");
+      expect(all.length).toBeGreaterThan(2);
+      return all;
+    });
+    expect(boxes.filter((b) => b.getAttribute("aria-checked") === "true").map((b) => b.textContent)).toEqual([
+      expect.stringContaining("Dog health"),
+      expect.stringContaining("Meal plan"),
+    ]);
+    expect(screen.queryByText("Dog care")).not.toBeInTheDocument();
+    await user.click(boxes.find((b) => b.textContent?.includes("Groceries"))!);
+    await user.click(screen.getByRole("button", { name: fill(t.finder.add, { n: "3" }) }));
+    await waitFor(async () => expect((await spaces(home.householdId)).map((s) => s.title).sort()).toEqual(["Dog health", "Groceries", "Meal plan"]));
+    expect(router.push).toHaveBeenCalledWith("/sections");
   });
 
   it("refused by the database, it says so in plain words", async () => {
