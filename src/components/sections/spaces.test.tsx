@@ -40,6 +40,18 @@ describe("new space", () => {
     expect(n).toBeGreaterThanOrEqual(0);
   });
 
+  it("popular spaces first, the whole library behind See all", async () => {
+    const home = await homeWith(["owner"]);
+    const { user, t } = renderUi(<NewSectionButton householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
+    await user.click(screen.getByRole("button", { name: t.sections.new }));
+    expect(screen.getByText(t.sections.popular)).toBeInTheDocument();
+    expect(screen.getByText("Groceries")).toBeInTheDocument();
+    expect(screen.queryByText("Car")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: t.sections.seeAll }));
+    await user.click(screen.getByRole("button", { name: /Home/ }));
+    expect(await screen.findByText("Car")).toBeInTheDocument();
+  });
+
   it("a blank private one with a custom name", async () => {
     const home = await homeWith(["owner"]);
     const { user, t } = renderUi(<NewSectionButton householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
@@ -92,6 +104,7 @@ describe("new space", () => {
     const home = await homeWith(["owner"]);
     const { user, t } = renderUi(<NewSectionButton householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
     await user.click(screen.getByRole("button", { name: t.sections.new }));
+    await user.click(screen.getByRole("button", { name: t.sections.seeAll }));
     await user.click(screen.getByRole("button", { name: /Health/ }));
     expect(screen.queryByText("Fitness")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Get fit/ }));

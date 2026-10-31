@@ -944,6 +944,11 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 /** Templates offered when making a new space (everything not retired). */
 export const LIVE_TEMPLATES: SectionTemplate[] = SECTION_TEMPLATES.filter((t) => !t.retired);
 
+/** What New space shows first, before "See all": the starting points most homes want. */
+export const POPULAR_TEMPLATES: SectionTemplate[] = ["groceries", "cleaning", "subscriptions", "important-dates", "training", "dog-care"].map(
+  (key) => LIVE_TEMPLATES.find((t) => t.key === key)!,
+);
+
 /** Default "who sees it": personal templates are private, everything else shared. */
 export function templateIsShared(t: SectionTemplate): boolean {
   return t.shared ?? true;

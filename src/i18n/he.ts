@@ -365,6 +365,8 @@ export const he: Dict = {
     templates: "להתחיל מ־",
     blank: "ריק",
     shape: "איך תרצו לנהל את זה?",
+    popular: "פופולריים",
+    seeAll: "לכל המרחבים",
     name: "שם",
     icon: "אייקון",
     color: "צבע",

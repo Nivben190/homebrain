@@ -364,6 +364,8 @@ export const en = {
     templates: "Start from",
     blank: "Blank",
     shape: "How do you want to keep it?",
+    popular: "Popular",
+    seeAll: "See all spaces",
     name: "Name",
     icon: "Icon",
     color: "Color",

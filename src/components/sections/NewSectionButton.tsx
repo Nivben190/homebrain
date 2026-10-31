@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { BellRing, Check, ChevronLeft, Plus, Sparkles } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/browser";
-import { instantiateTemplate, LIVE_TEMPLATES, SECTION_TEMPLATES, TEMPLATE_CATEGORIES, templateIsShared, type SectionTemplate, type TemplateCategory } from "@/lib/registry/templates";
+import { instantiateTemplate, LIVE_TEMPLATES, POPULAR_TEMPLATES, SECTION_TEMPLATES, TEMPLATE_CATEGORIES, templateIsShared, type SectionTemplate, type TemplateCategory } from "@/lib/registry/templates";
 import { FINDER_GOALS, recommend } from "@/lib/registry/finder";
 import { nextReminder, todayKey } from "@/lib/engine/habits";
 import { useI18n } from "@/i18n/client";
@@ -80,6 +80,8 @@ export function NewSectionButton({
   const [goals, setGoals] = useState<string[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState<TemplateCategory>("dog");
+  // Popular first; the whole library by category behind "See all".
+  const [all, setAll] = useState(false);
   const [tpl, setTpl] = useState<SectionTemplate | null>(null);
   const [shape, setShape] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -89,7 +91,7 @@ export function NewSectionButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const list = useMemo(() => LIVE_TEMPLATES.filter((s) => s.category === category && s.key !== "blank"), [category]);
+  const list = useMemo(() => (all ? LIVE_TEMPLATES.filter((s) => s.category === category && s.key !== "blank") : POPULAR_TEMPLATES), [all, category]);
   const blank = SECTION_TEMPLATES.find((s) => s.key === "blank")!;
   const results = useMemo(() => recommend(goals, existing), [goals, existing]);
 
@@ -159,6 +161,7 @@ export function NewSectionButton({
     setTimeout(() => {
       setTpl(null);
       setFinder(null);
+      setAll(false);
     }, 300);
   }
 
@@ -277,13 +280,17 @@ export function NewSectionButton({
                   <span className="block text-sm leading-snug text-muted">{t.finder.openHint}</span>
                 </span>
               </button>
-              <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5">
-                {TEMPLATE_CATEGORIES.map((c) => (
-                  <Chip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)} className="shrink-0">
-                    {c.icon} {c.label[locale]}
-                  </Chip>
-                ))}
-              </div>
+              {all ? (
+                <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5">
+                  {TEMPLATE_CATEGORIES.map((c) => (
+                    <Chip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)} className="shrink-0">
+                      {c.icon} {c.label[locale]}
+                    </Chip>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-1 text-[13px] font-bold uppercase tracking-wider text-muted">{t.sections.popular}</p>
+              )}
               <div className="space-y-2">
                 {list.map((s) => (
                   <button key={s.key} onClick={() => pick(s)} className="flex w-full items-center gap-3 rounded-2xl bg-sunken p-3 text-start transition active:scale-[0.98]">
@@ -298,6 +305,11 @@ export function NewSectionButton({
                   </button>
                 ))}
               </div>
+              {!all && (
+                <Button variant="soft" className="w-full" onClick={() => setAll(true)}>
+                  {t.sections.seeAll}
+                </Button>
+              )}
               <Button variant="ghost" className="w-full" onClick={() => pick(blank)}>
                 <Plus className="size-4" /> {t.sections.blank}
               </Button>
