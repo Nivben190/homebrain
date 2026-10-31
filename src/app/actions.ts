@@ -27,6 +27,7 @@ import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
 import { readPlan } from "@/lib/plan";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
+import { rowsFromShape, shapeOf, type SpaceShape } from "@/lib/space-copy";
 import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib/guest-links";
 import { INGREDIENTS_PROP, parseIngredients, readIngredients, shoppingFor } from "@/lib/meals";
 import { AMOUNT_PROP } from "@/lib/money";
@@ -305,6 +306,41 @@ export async function createGuestLink(input: { sectionId: string | null; include
   if (error) return { ok: false, error: error.message };
   revalidatePath("/home-info");
   return { ok: true, data: { token: data.token } };
+}
+
+/** A template link for one space: a snapshot of its structure, which anyone signed in can add to their own home. */
+export async function shareSpaceTemplate(sectionId: string): Promise<Result<{ token: string }>> {
+  const { supabase, user, household } = await requireHome();
+  const { data: section } = await supabase.from("sections").select("title,icon,color,view,template,schema").eq("id", sectionId).eq("household_id", household.id).maybeSingle();
+  if (!section) return { ok: false, error: "not allowed" };
+  const { data: items } = await supabase.from("items").select("title,props,position").eq("section_id", sectionId);
+  const shape = shapeOf(section, items ?? []);
+  const { data, error } = await supabase.from("space_templates").insert({ household_id: household.id, section_id: sectionId, shape, created_by: user.id }).select("token").single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: { token: data.token } };
+}
+
+/** Ends every template link to this space; links already opened stop working. */
+export async function unshareSpaceTemplate(sectionId: string): Promise<Result> {
+  const { supabase } = await requireHome();
+  const { data, error } = await supabase.from("space_templates").delete().eq("section_id", sectionId).select("token");
+  if (error) return { ok: false, error: error.message };
+  return data?.length ? { ok: true } : { ok: false, error: "permission denied" };
+}
+
+/** Adds a copy of a shared template to the visitor's home (their role decides whether they may). */
+export async function addSharedSpace(token: string): Promise<Result<{ id: string }>> {
+  const { supabase, user, profile, household } = await requireHome();
+  if (!/^[0-9a-f]{24}$/.test(token)) return { ok: false, error: "not found" };
+  const { data: link } = await createSupabaseAdmin().from("space_templates").select("shape").eq("token", token).maybeSingle<{ shape: SpaceShape }>();
+  if (!link) return { ok: false, error: "not found" };
+  const rows = rowsFromShape(link.shape, { householdId: household.id, ownerId: profile.role === "teen" ? user.id : null, title: link.shape.title, timeZone: profile.timezone });
+  const { data, error } = await supabase.from("sections").insert(rows.section).select("id").single();
+  if (error || !data) return { ok: false, error: error?.message ?? "permission denied" };
+  const list = rows.items(data.id);
+  if (list.length) await supabase.from("items").insert(list);
+  revalidatePath("/sections");
+  return { ok: true, data: { id: data.id } };
 }
 
 export async function revokeGuestLink(token: string): Promise<Result> {

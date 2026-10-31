@@ -1,7 +1,8 @@
 "use client";
 import { errorKey } from "@/lib/errors";
 import { useEffect, useState } from "react";
-import { Copy, Plus, Trash2, X } from "lucide-react";
+import { Copy, Link2, Plus, Share2, Trash2, X } from "lucide-react";
+import { shareSpaceTemplate, unshareSpaceTemplate } from "@/app/actions";
 import { useRouter } from "next/navigation";
 import { fill } from "@/i18n";
 import { rowsFromShape, shapeOf } from "@/lib/space-copy";
@@ -34,6 +35,8 @@ export function SectionSettingsSheet({
   const router = useRouter();
   const [s, setS] = useState(section);
   const [copying, setCopying] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +85,24 @@ export function SectionSettingsSheet({
     setCopying(false);
     onClose();
     router.push(`/sections/${data.id}`);
+  }
+
+  async function share() {
+    setSharing(true);
+    setError(null);
+    const res = await shareSpaceTemplate(section.id);
+    setSharing(false);
+    if (!res.ok) return setError(t.failures[errorKey(res.error)]);
+    const link = `${location.origin}/t/${res.data.token}`;
+    setShareLink(link);
+    if (navigator.share) navigator.share({ title: fill(t.sections.shareText, { title: section.title }), url: link }).catch(() => {});
+  }
+
+  async function stopSharing() {
+    setError(null);
+    const res = await unshareSpaceTemplate(section.id);
+    if (!res.ok) return setError(t.failures[errorKey(res.error)]);
+    setShareLink(null);
   }
 
   async function remove() {
@@ -179,6 +200,39 @@ export function SectionSettingsSheet({
             <span className="block text-xs text-muted">{t.sections.likeThisHint}</span>
           </span>
         </button>
+
+        <div className="rounded-2xl bg-sunken p-3">
+          <button type="button" onClick={share} disabled={sharing} className="flex w-full items-center gap-3 text-start disabled:opacity-60">
+            <Share2 className="size-5 shrink-0 text-accent" />
+            <span className="min-w-0">
+              <span className="block font-bold">{t.sections.share}</span>
+              <span className="block text-xs text-muted">{t.sections.shareHint}</span>
+            </span>
+          </button>
+          {shareLink && (
+            <div className="mt-3 space-y-2">
+              <button type="button" onClick={() => navigator.clipboard?.writeText(shareLink).catch(() => {})} className="flex w-full items-center gap-2 rounded-xl bg-card px-3 py-2 text-start">
+                <Link2 className="size-4 shrink-0 text-accent" />
+                <span className="min-w-0 flex-1 truncate font-mono text-xs" dir="ltr">
+                  {shareLink}
+                </span>
+              </button>
+              <div className="flex gap-2">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`${fill(t.sections.shareText, { title: section.title })} ${shareLink}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 rounded-xl bg-[#25d366] px-3 py-2 text-center text-sm font-bold text-white"
+                >
+                  WhatsApp
+                </a>
+                <button type="button" onClick={stopSharing} className="flex-1 rounded-xl bg-card px-3 py-2 text-sm font-bold text-danger">
+                  {t.sections.shareStop}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <Field label={t.sections.properties}>
           <div className="space-y-2">
