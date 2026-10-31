@@ -11,16 +11,15 @@ const withSerwist = withSerwistInit({
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-// Report-Only for now: browsers log what it would block without blocking it.
-// Once the console stays quiet on both phones, rename the header to enforce it.
-// Inline scripts are allowed because Next injects its bootstrap inline (a nonce
+// Enforced. Inline scripts are allowed because Next injects its bootstrap inline (a nonce
 // from middleware would let this tighten later).
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${supabase}`,
-  `connect-src 'self' ${supabase} ${supabase.replace(/^https:/, "wss:")}`,
+  // Open-Meteo's geocoder: "Your city" in Daily brain settings looks the name up from the browser.
+  `connect-src 'self' ${supabase} ${supabase.replace(/^https:/, "wss:")} https://geocoding-api.open-meteo.com`,
   "font-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
@@ -36,7 +35,7 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // The app's own pages may use the camera and location ("Use my location"); nothing embedded may.
   { key: "Permissions-Policy", value: "camera=(self), geolocation=(self), microphone=(), payment=(), usb=()" },
-  { key: "Content-Security-Policy-Report-Only", value: csp },
+  { key: "Content-Security-Policy", value: csp },
 ];
 
 // Which deploy this is. Pages bake it in; /api/version reports the live one, so an

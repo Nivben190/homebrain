@@ -4,7 +4,7 @@
 
 **Blocked by:** 01–04 (so the check covers the new pages).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Header is `Content-Security-Policy`
 - [ ] Login, Today, a space, Me and the finder load in production with no CSP errors
