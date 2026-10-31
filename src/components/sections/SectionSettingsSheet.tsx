@@ -3,11 +3,9 @@ import { errorKey } from "@/lib/errors";
 import { useEffect, useState } from "react";
 import { Copy, Link2, Plus, Share2, Trash2, X, Zap } from "lucide-react";
 import Link from "next/link";
-import { shareSpaceTemplate, unshareSpaceTemplate } from "@/app/actions";
+import { copySpace, shareSpaceTemplate, unshareSpaceTemplate } from "@/app/actions";
 import { useRouter } from "next/navigation";
 import { fill } from "@/i18n";
-import { rowsFromShape, shapeOf } from "@/lib/space-copy";
-import type { Item } from "@/lib/db-types";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn } from "@/lib/cn";
 import { NotesSyncHelp } from "@/components/settings/NotesSyncHelp";
@@ -68,24 +66,11 @@ export function SectionSettingsSheet({
   async function makeLikeThis() {
     setCopying(true);
     setError(null);
-    const sb = supabaseBrowser();
-    const { data: items } = await sb.from("items").select("title,props,position").eq("section_id", section.id);
-    const rows = rowsFromShape(shapeOf(section, (items ?? []) as Pick<Item, "title" | "props" | "position">[]), {
-      householdId: section.household_id,
-      ownerId: section.owner_id ? userId : null,
-      title: fill(t.sections.copyTitle, { title: section.title }),
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    });
-    const { data, error } = await sb.from("sections").insert(rows.section).select("id").single();
-    if (error || !data) {
-      setCopying(false);
-      return setError(t.failures[errorKey(error ?? "permission denied")]);
-    }
-    const list = rows.items(data.id);
-    if (list.length) await sb.from("items").insert(list);
+    const res = await copySpace(section.id, fill(t.sections.copyTitle, { title: section.title }));
     setCopying(false);
+    if (!res.ok) return setError(t.failures[errorKey(res.error)]);
     onClose();
-    router.push(`/sections/${data.id}`);
+    router.push(`/sections/${res.data.id}`);
   }
 
   async function share() {

@@ -803,6 +803,8 @@ export const he: Dict = {
     moneyBody: "רוב הכסף הלך ל{category} ({amount}). הקישו לתמונה המלאה.",
     expiryTitle: "התוקף של {title} עומד לפוג",
     expiryBody: "בעוד {n} ימים לכל היותר, ב-{date}. הזמן לחדש.",
+    kitTitle: "הגיע הזמן לבדוק: {title}",
+    kitBody: "בעוד {n} ימים או פחות, ב־{date}. לרענן או להחליף, ואז לקבוע את התאריך הבא.",
     warrantyTitle: "האחריות על {title} נגמרת בקרוב",
     warrantyBody: "בעוד {n} ימים או פחות, ב־{date}. אם יש מה לתקן או לתבוע, זה הזמן.",
     foodTitle: "🦴 האוכל של {name} עומד להיגמר",

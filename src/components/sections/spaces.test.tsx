@@ -9,6 +9,8 @@ import { fill } from "@/i18n";
 vi.mock("@/lib/supabase/server", () => import("@/test/app").then((m) => m.supabaseServerMock));
 vi.mock("@/lib/supabase/browser", () => import("@/test/app").then((m) => m.supabaseBrowserMock));
 vi.mock("next/navigation", () => import("@/test/app").then((m) => m.nextNavigationMock));
+vi.mock("next/cache", () => import("@/test/app").then((m) => m.nextCacheMock));
+vi.mock("next/headers", () => import("@/test/app").then((m) => m.nextHeadersMock));
 vi.mock("next/link", () => import("@/test/app").then((m) => m.nextLinkMock));
 
 const { NewSectionButton } = await import("./NewSectionButton");

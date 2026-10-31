@@ -2,7 +2,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { getT, requireHome } from "@/lib/session";
 import { fill } from "@/i18n";
 import { IconTile } from "@/components/ui";
-import type { SpaceShape } from "@/lib/space-copy";
+import { readSharedTemplate } from "@/lib/space-copy";
 import { AddSharedSpace } from "./AddSharedSpace";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +12,8 @@ export default async function SharedSpacePage({ params }: { params: Promise<{ to
   const { token } = await params;
   await requireHome();
   const t = await getT();
-  const { data } = /^[0-9a-f]{24}$/.test(token) ? await createSupabaseAdmin().from("space_templates").select("shape").eq("token", token).maybeSingle<{ shape: SpaceShape }>() : { data: null };
-  if (!data) return <p className="glass mt-10 rounded-3xl p-5 text-center">⌛ {t.shared.gone}</p>;
-  const shape = data.shape;
+  const shape = await readSharedTemplate(createSupabaseAdmin(), token);
+  if (!shape) return <p className="glass mt-10 rounded-3xl p-5 text-center">⌛ {t.shared.gone}</p>;
   return (
     <div className="safe-top space-y-4 pt-4">
       <p className="text-sm font-semibold text-muted">{t.shared.title}</p>

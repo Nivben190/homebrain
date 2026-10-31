@@ -16,7 +16,8 @@ async function sharedHome(role = "owner") {
   const home = await homeWith(["owner", role].filter((r, i, a) => a.indexOf(r) === i));
   const schema = [{ id: "p", name: "Price", type: "price" }];
   const [{ id }] = await sql<{ id: string }>(`insert into sections (household_id, title, view, icon, schema) values ($1, 'Pesach list', 'checklist', '🕯️', $2) returning id`, [home.householdId, JSON.stringify(schema)]);
-  await sql(`insert into items (section_id, title, position, done, props) values ($1, 'Wine', 0, true, '{"p": 90, "_photos": [{"path": "secret.jpg"}]}'), ($1, 'Chairs', 1, false, '{}')`, [id]);
+  const habit = { time: "09:00", nudge: false, outdoor: false, repeat: { kind: "interval", every: 2, start: "2026-01-01" }, assign: { kind: "person", userId: home.users.owner } };
+  await sql(`insert into items (section_id, title, position, done, props) values ($1, 'Wine', 0, true, '{"p": 90, "_photos": [{"path": "secret.jpg"}]}'), ($1, 'Chairs', 1, false, $2)`, [id, { _habit: habit }]);
   return { home, sectionId: id };
 }
 
@@ -36,7 +37,8 @@ describe("space template links", () => {
     ]);
     expect(await sql(`select title, done, props from items where section_id = $1 order by position`, [added.data.id])).toEqual([
       { title: "Wine", done: false, props: {} },
-      { title: "Chairs", done: false, props: {} },
+      // The schedule travels; who did it (a member of the other home) doesn't.
+      { title: "Chairs", done: false, props: { _habit: { time: "09:00", nudge: false, outdoor: false, repeat: { kind: "interval", every: 2, start: "2026-01-01" } } } },
     ]);
   });
 

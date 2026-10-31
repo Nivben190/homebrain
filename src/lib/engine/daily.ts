@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Pet, Profile } from "@/lib/db-types";
 import type { PropertyDef } from "@/lib/registry/properties";
-import { EXPIRY_PROP, EXPIRY_TEMPLATES, expiryStage, type ExpirySent } from "@/lib/expiry";
+import { EXPIRY_COPY, EXPIRY_PROP, EXPIRY_TEMPLATES, expiryStage, type ExpirySent } from "@/lib/expiry";
 import { pushAllowed } from "@/lib/calm";
 import { loadMonth } from "@/lib/money-data";
 import { sendEmail } from "@/lib/email";
@@ -230,10 +230,10 @@ async function expiryAlerts(db: Admin, people: Profile[], now: Date) {
       for (const m of members) {
         if (!pushAllowed(m, s.id, now)) continue;
         const t = getDict(m.locale).daily;
-        const warranty = s.template === "receipts";
+        const copy = EXPIRY_COPY[s.template as keyof typeof EXPIRY_COPY] ?? EXPIRY_COPY.documents;
         await sendPush(db, m.user_id, {
-          title: `${s.icon} ${fill(warranty ? t.warrantyTitle : t.expiryTitle, { title: item.title })}`,
-          body: fill(warranty ? t.warrantyBody : t.expiryBody, { n: stage, date: day }),
+          title: `${s.icon} ${fill(t[copy.title], { title: item.title })}`,
+          body: fill(t[copy.body], { n: stage, date: day }),
           url: `/sections/${s.id}`,
         });
       }

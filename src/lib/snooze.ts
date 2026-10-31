@@ -2,7 +2,8 @@
 import { addDays, todayKey } from "@/lib/engine/habits";
 import { zonedParts, zonedTimeToUtc } from "@/lib/engine/time";
 
-export type SnoozeChoice = "hour" | "tonight" | "tomorrow";
+export const SNOOZE_CHOICES = ["hour", "tonight", "tomorrow"] as const;
+export type SnoozeChoice = (typeof SNOOZE_CHOICES)[number];
 
 const TONIGHT = { hour: 20, minute: 0 };
 const TOMORROW = { hour: 8, minute: 0 };

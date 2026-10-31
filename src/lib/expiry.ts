@@ -2,8 +2,13 @@
 
 export const EXPIRY_PROP = "_expiry";
 
-/** Spaces whose first date property is an expiry: documents, the shelter kit, warranties. */
-export const EXPIRY_TEMPLATES = ["documents", "shelter-kit", "receipts"];
+/** Spaces whose first date property is an expiry, and the push wording each uses (keys of the `daily` dictionary). */
+export const EXPIRY_COPY = {
+  documents: { title: "expiryTitle", body: "expiryBody" },
+  "shelter-kit": { title: "kitTitle", body: "kitBody" },
+  receipts: { title: "warrantyTitle", body: "warrantyBody" },
+} as const;
+export const EXPIRY_TEMPLATES = Object.keys(EXPIRY_COPY);
 export const STAGES = [60, 30, 7] as const;
 export type Stage = (typeof STAGES)[number];
 

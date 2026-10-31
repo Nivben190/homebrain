@@ -27,8 +27,8 @@ import { zonedTimeToUtc } from "@/lib/engine/time";
 import { newCommit } from "@/lib/commit";
 import { readPlan } from "@/lib/plan";
 import { RECIPES, type RecipeId } from "@/lib/registry/recipes";
-import { rowsFromShape, shapeOf, type SpaceShape } from "@/lib/space-copy";
-import { snoozeUntil, type SnoozeChoice } from "@/lib/snooze";
+import { createFromShape, readSharedTemplate, shapeOf } from "@/lib/space-copy";
+import { SNOOZE_CHOICES, snoozeUntil, type SnoozeChoice } from "@/lib/snooze";
 import { guestLinkOpen, guestMayTick, isGuestToken, type GuestLink } from "@/lib/guest-links";
 import { INGREDIENTS_PROP, parseIngredients, readIngredients, shoppingFor } from "@/lib/meals";
 import { AMOUNT_PROP } from "@/lib/money";
@@ -332,16 +332,29 @@ export async function unshareSpaceTemplate(sectionId: string): Promise<Result> {
 /** Adds a copy of a shared template to the visitor's home (their role decides whether they may). */
 export async function addSharedSpace(token: string): Promise<Result<{ id: string }>> {
   const { supabase, user, profile, household } = await requireHome();
-  if (!/^[0-9a-f]{24}$/.test(token)) return { ok: false, error: "not found" };
-  const { data: link } = await createSupabaseAdmin().from("space_templates").select("shape").eq("token", token).maybeSingle<{ shape: SpaceShape }>();
-  if (!link) return { ok: false, error: "not found" };
-  const rows = rowsFromShape(link.shape, { householdId: household.id, ownerId: profile.role === "teen" ? user.id : null, title: link.shape.title, timeZone: profile.timezone });
-  const { data, error } = await supabase.from("sections").insert(rows.section).select("id").single();
-  if (error || !data) return { ok: false, error: error?.message ?? "permission denied" };
-  const list = rows.items(data.id);
-  if (list.length) await supabase.from("items").insert(list);
+  const shape = await readSharedTemplate(createSupabaseAdmin(), token);
+  if (!shape) return { ok: false, error: "not found" };
+  const res = await createFromShape(supabase, shape, { householdId: household.id, ownerId: profile.role === "teen" ? user.id : null, title: shape.title, timeZone: profile.timezone });
+  if ("error" in res) return { ok: false, error: res.error };
   revalidatePath("/sections");
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: res };
+}
+
+/** "Make a space like this": a new space with this one's structure; private stays private, and a teen's is theirs. */
+export async function copySpace(sectionId: string, title: string): Promise<Result<{ id: string }>> {
+  const { supabase, user, profile, household } = await requireHome();
+  const { data: section } = await supabase.from("sections").select("title,icon,color,view,template,schema,owner_id").eq("id", sectionId).eq("household_id", household.id).maybeSingle();
+  if (!section) return { ok: false, error: "not allowed" };
+  const { data: items } = await supabase.from("items").select("title,props,position").eq("section_id", sectionId);
+  const res = await createFromShape(supabase, shapeOf(section, items ?? []), {
+    householdId: household.id,
+    ownerId: section.owner_id || profile.role === "teen" ? user.id : null,
+    title: title.trim().slice(0, 80) || section.title,
+    timeZone: profile.timezone,
+  });
+  if ("error" in res) return { ok: false, error: res.error };
+  revalidatePath("/sections");
+  return { ok: true, data: res };
 }
 
 export async function revokeGuestLink(token: string): Promise<Result> {
@@ -688,7 +701,7 @@ export async function handleDate(itemId: string, handled: boolean) {
 /** Hides a reminder until the chosen time; the engine tick brings it back as a push. */
 export async function snoozeRun(id: string, choice: SnoozeChoice): Promise<Result> {
   const { supabase, profile } = await requireHome();
-  if (!["hour", "tonight", "tomorrow"].includes(choice)) return { ok: false, error: "invalid" };
+  if (!SNOOZE_CHOICES.includes(choice)) return { ok: false, error: "invalid" };
   const now = new Date();
   const { data, error } = await supabase
     .from("runs")

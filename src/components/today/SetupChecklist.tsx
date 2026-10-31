@@ -77,14 +77,16 @@ export function SetupChecklist({ done: serverDone, fewSpaces }: { done: Partial<
               </span>
               <span className={cn("flex-1 text-sm font-semibold", done[step] && "text-muted line-through")}>{t.setup.steps[step]}</span>
             </div>
-            {step === next && (
+            {step === "push" && !done.push && (installed || step === next) && (
+              <div className="ms-9 mt-2">
+                <Button size="sm" loading={busy} onClick={turnOnPush}>
+                  {t.settings.enable}
+                </Button>
+              </div>
+            )}
+            {step === next && step !== "push" && (
               <div className="ms-9 mt-2">
                 {step === "install" && <p className="text-sm text-muted">{t.today.installHint}</p>}
-                {step === "push" && (
-                  <Button size="sm" loading={busy} onClick={turnOnPush}>
-                    {t.settings.enable}
-                  </Button>
-                )}
                 {step === "partner" && <InviteLinkButton />}
                 {step === "routine" && (
                   <Link href={fewSpaces ? "/sections?find=1" : "/sections"} className="text-sm font-bold text-accent">
