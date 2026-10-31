@@ -16,11 +16,12 @@ import { newPropertyId, type PropertyDef, type PropertyType } from "./properties
 
 type L = Record<Locale, string>;
 
-export type TemplateCategory = "dog" | "home" | "memories" | "money" | "us" | "health" | "work" | "plan";
+export type TemplateCategory = "dog" | "home" | "family" | "memories" | "money" | "us" | "health" | "work" | "plan";
 
 export const TEMPLATE_CATEGORIES: { key: TemplateCategory; icon: string; label: L }[] = [
   { key: "dog", icon: "🐶", label: { en: "Dog", he: "כלב" } },
   { key: "home", icon: "🏠", label: { en: "Home", he: "בית" } },
+  { key: "family", icon: "🧒", label: { en: "Kids", he: "ילדים" } },
   { key: "memories", icon: "✨", label: { en: "Memories", he: "זיכרונות" } },
   { key: "money", icon: "💰", label: { en: "Money", he: "כסף" } },
   { key: "us", icon: "💑", label: { en: "Us", he: "זוגיות" } },
@@ -606,7 +607,84 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     ],
   },
 
+  // Israeli self-employed calendar; items start undated so each sets its own cycle.
+  {
+    key: "business-admin",
+    category: "work",
+    icon: "🧾",
+    color: "green",
+    view: "dates",
+    shared: false,
+    title: { en: "Business admin", he: "ניהול העסק" },
+    desc: { en: "VAT, income-tax advances, Bituach Leumi and the yearly report, each nagging on its day until it's filed. Plus invoices still unpaid.", he: "מע״מ, מקדמות מס הכנסה, ביטוח לאומי והדוח השנתי, כל אחד מזכיר ביום שלו עד שמגישים. וגם חשבוניות שעוד לא שולמו." },
+    items: [
+      { title: { en: "VAT report (every 1–2 months, by the 15th)", he: "דיווח מע״מ (כל חודש או חודשיים, עד ה־15)" } },
+      { title: { en: "Income-tax advance (מקדמות)", he: "מקדמות מס הכנסה" } },
+      { title: { en: "Bituach Leumi payment", he: "תשלום ביטוח לאומי" } },
+      { title: { en: "Yearly report to the accountant", he: "דוח שנתי לרואה החשבון" } },
+      { title: { en: "Send this month's invoices", he: "לשלוח את החשבוניות של החודש" } },
+      { title: { en: "Chase unpaid invoices", he: "לגבות חשבוניות שלא שולמו" } },
+    ],
+  },
+
+  // ---------------------------------------------------------------- Kids
+  {
+    key: "kids",
+    category: "family",
+    icon: "🧒",
+    color: "amber",
+    view: "tracker",
+    title: { en: "Kids' week", he: "השבוע של הילדים" },
+    desc: { en: "Pick-ups from activities, homework, bags and lunchboxes. Set who does each day.", he: "איסוף מחוגים, שיעורי בית, תיקים וקופסאות אוכל. קובעים מי עושה בכל יום." },
+    items: [
+      { title: { en: "Pick up from the activity (חוג) 🚸", he: "איסוף מהחוג 🚸" }, every: { kind: "weekly", days: [0, 2] }, time: "16:30", nudge: true },
+      { title: { en: "Homework check ✏️", he: "בדיקת שיעורי בית ✏️" }, every: { kind: "weekly", days: [0, 1, 2, 3, 4] }, time: "17:30", nudge: false },
+      { title: { en: "Pack the school bag 🎒", he: "להכין תיק לבית הספר 🎒" }, every: { kind: "weekly", days: [0, 1, 2, 3, 4] }, time: "20:00", nudge: false },
+      { title: { en: "Lunchbox 🥪", he: "קופסת אוכל 🥪" }, every: { kind: "weekly", days: [0, 1, 2, 3, 4] }, time: "07:00", nudge: false },
+    ],
+  },
+  {
+    key: "kids-admin",
+    category: "family",
+    icon: "🏫",
+    color: "sky",
+    view: "dates",
+    title: { en: "School & health", he: "בית ספר ובריאות" },
+    desc: { en: "Tipat Halav vaccines, school forms and payments, parent meetings, trips. Each reminds on its day.", he: "חיסונים בטיפת חלב, טפסים ותשלומים לבית הספר, אסיפות הורים וטיולים. כל אחד מזכיר ביום שלו." },
+    items: [
+      { title: { en: "Tipat Halav vaccine appointment 💉", he: "תור לחיסון בטיפת חלב 💉" } },
+      { title: { en: "School payments (תשלומי הורים)", he: "תשלומי הורים" } },
+      { title: { en: "Sign school forms", he: "לחתום על טפסים לבית הספר" } },
+      { title: { en: "Parent-teacher meeting", he: "אסיפת הורים" } },
+      { title: { en: "School trip: payment and gear", he: "טיול שנתי: תשלום וציוד" } },
+      { title: { en: "Dentist for the kids 🦷", he: "רופא שיניים לילדים 🦷" } },
+    ],
+  },
+
   // ---------------------------------------------------------------- Plans
+  {
+    key: "reserve-duty",
+    category: "plan",
+    icon: "🪖",
+    color: "green",
+    view: "checklist",
+    title: { en: "Reserve duty (מילואים)", he: "מילואים" },
+    desc: { en: "Before, during and after a call-up: what home needs while one of you is away, and the forms that pay you back.", he: "לפני, במהלך ואחרי צו: מה הבית צריך כשאחד מכם לא כאן, והטפסים שמחזירים כסף." },
+    props: [
+      { key: "who", name: { en: "Who", he: "מי" }, type: "person" },
+      { key: "due", name: { en: "By", he: "עד מתי" }, type: "date" },
+    ],
+    items: [
+      { title: { en: "Dates of the call-up (צו 8 / scheduled)", he: "תאריכי הצו (צו 8 / מתוכנן)" } },
+      { title: { en: "Tell work and the manager", he: "לעדכן את העבודה ואת המנהל/ת" } },
+      { title: { en: "Who takes the dog, the car, the bills while away", he: "מי לוקח את הכלב, הרכב והחשבונות בזמן ההיעדרות" } },
+      { title: { en: "Help lined up for the partner at home (family, friends)", he: "עזרה לבן/בת הזוג בבית (משפחה, חברים)" } },
+      { title: { en: "Pack: charger, meds, warm clothes", he: "לארוז: מטען, תרופות, בגדים חמים" } },
+      { title: { en: "Bituach Leumi compensation form (תגמולים)", he: "טופס תגמולים לביטוח לאומי" } },
+      { title: { en: "Reservist grants and benefits to claim", he: "מענקים והטבות למשרתי מילואים" } },
+      { title: { en: "Self-employed: compensation for the business", he: "עצמאים: פיצוי לעסק" } },
+    ],
+  },
   {
     key: "packing",
     category: "plan",

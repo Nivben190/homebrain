@@ -66,6 +66,12 @@ describe("space finder", () => {
     expect(keys(recommend(["safe"]))[0]).toBe("shelter-kit");
   });
 
+  it("kids, business admin and reserve duty each have a way in", () => {
+    expect(keys(recommend(["kids"])).slice(0, 2)).toEqual(["kids", "kids-admin"]);
+    expect(keys(recommend(["work"]))).toContain("business-admin");
+    expect(keys(recommend(["reserve"]))[0]).toBe("reserve-duty");
+  });
+
   it("keeps the list short and ignores unknown goals", () => {
     expect(recommend(FINDER_GOALS.map((g) => g.key))).toHaveLength(MAX_RECOMMENDATIONS);
     expect(recommend(["nope"])).toEqual([]);
