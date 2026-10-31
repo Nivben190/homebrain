@@ -71,7 +71,7 @@ export async function sendPush(db: SupabaseClient, userId: string, payload: Push
   const results = await Promise.all(
     (subs ?? []).map(async (s) => {
       const send = () =>
-        webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 60 * 60, urgency: "high" });
+        webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 60 * 60, urgency: "high", timeout: 8000 });
       let attempts = 1;
       try {
         try {

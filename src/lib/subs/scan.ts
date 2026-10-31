@@ -5,7 +5,7 @@ import { sendPush } from "@/lib/push";
 import { todayKey } from "@/lib/engine/habits";
 import type { Item, Profile } from "@/lib/db-types";
 import { BILLERS, SERVICES } from "./catalog";
-import { getAttachment, getMessage, GoogleAuthError, listMessageIds, openToken, refreshAccess, type PdfRef } from "./gmail";
+import { getAttachment, getMessage, GmailRateLimited, GoogleAuthError, listMessageIds, openToken, refreshAccess, type PdfRef } from "./gmail";
 import { chargesFrom, needsAttachments, rollForward, summarize, type DetectedSub, type MailMessage } from "./parse";
 import { pdfText } from "./pdf";
 import { readSub, subPatch, type SubProps } from "./types";
@@ -21,9 +21,22 @@ export interface GmailConnection {
   email: string | null;
   status: "ok" | "expired";
   last_scan_at: string | null;
+  /** After Gmail rate-limited a scan: the cron leaves this inbox alone until then. */
+  retry_after: string | null;
 }
 
-export type ScanResult = { ok: true; found: number; added: number } | { ok: false; error: "not_connected" | "expired" | "failed" };
+/** How long an inbox rests after Gmail said "too many requests". */
+export const RATE_LIMIT_REST_MS = 60 * 60 * 1000;
+
+/** A read that failed for its own reasons is skipped; being rate-limited stops the whole scan. */
+const skipUnlessLimited =
+  <T,>(fallback: T) =>
+  (e: unknown): T => {
+    if (e instanceof GmailRateLimited) throw e;
+    return fallback;
+  };
+
+export type ScanResult = { ok: true; found: number; added: number } | { ok: false; error: "not_connected" | "expired" | "failed" | "busy" };
 
 const SKIP_DOMAINS = new Set(["google.com"]);
 const KNOWN_FROM = ["apple.com", "paypal.com", ...SERVICES.flatMap((s) => s.domains).filter((d) => !SKIP_DOMAINS.has(d))];
@@ -59,11 +72,11 @@ export async function scanGmail(db: Db, sectionId: string, opts: { notify?: bool
     const hits: string[] = [];
     for (const [q, max] of QUERIES) hits.push(...(await listMessageIds(access, q, max)));
     const ids = [...new Set(hits)].slice(0, 800);
-    const messages = (await pool(ids, 4, (id) => getMessage(access, id).catch(() => null))).filter(Boolean) as (MailMessage & { pdfs: PdfRef[] })[];
+    const messages = (await pool(ids, 4, (id) => getMessage(access, id).catch(skipUnlessLimited(null)))).filter(Boolean) as (MailMessage & { pdfs: PdfRef[] })[];
     // Bills and receipts that carry the amount (and sometimes the biller) only in the PDF: newest first.
     const withPdf = messages.filter((m) => m.pdfs.length && needsAttachments(m)).sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, MAX_PDFS);
     await pool(withPdf, 4, async (m) => {
-      const texts = await Promise.all(m.pdfs.map((p) => getAttachment(access, m.id, p.attachmentId).then(pdfText).catch(() => "")));
+      const texts = await Promise.all(m.pdfs.map((p) => getAttachment(access, m.id, p.attachmentId).then(pdfText).catch(skipUnlessLimited(""))));
       m.attachments = texts.join("\n").slice(0, 20000);
     });
     const today = todayKey(profile.timezone, now);
@@ -71,10 +84,16 @@ export async function scanGmail(db: Db, sectionId: string, opts: { notify?: bool
     const changes = await mergeSubs(db, profile, sectionId, found, today, now);
 
     const stats = { read: messages.length, pdfs: withPdf.length, subs: found.filter((d) => !d.bill).length, bills: found.filter((d) => d.bill).length };
-    await mark({ status: "ok", last_scan_at: now.toISOString(), scan_error: null, scan_stats: stats });
+    await mark({ status: "ok", last_scan_at: now.toISOString(), scan_error: null, scan_stats: stats, retry_after: null });
     if (opts.notify) await notifyChanges(db, profile, sectionId, changes);
     return { ok: true, found: found.length, added: changes.added.length };
   } catch (e) {
+    if (e instanceof GmailRateLimited) {
+      // The space keeps what it had: a partial read would look like bills that went away.
+      await mark({ scan_error: String(e).slice(0, 300), last_scan_at: now.toISOString(), retry_after: new Date(now.getTime() + RATE_LIMIT_REST_MS).toISOString() });
+      console.warn("[gmail] rate limited, resting", sectionId);
+      return { ok: false, error: "busy" };
+    }
     const expired = e instanceof GoogleAuthError;
     await mark({ status: expired ? "expired" : row.status, scan_error: String(e).slice(0, 300), last_scan_at: now.toISOString() });
     console.error("[gmail] scan failed", e);
@@ -142,8 +161,9 @@ async function notifyChanges(db: Db, profile: Profile, sectionId: string, c: { a
 export async function scanDueGmail(db: Db, now = new Date()) {
   const cutoff = new Date(now.getTime() - 20 * 3600000).toISOString();
   const stale = `last_scan_at.is.null,last_scan_at.lt.${cutoff}`;
-  const { data: due } = await db.from("gmail_connections").select("section_id").eq("status", "ok").or(stale).limit(1);
-  const sectionId = due?.[0]?.section_id;
+  const { data: due } = await db.from("gmail_connections").select("section_id,retry_after").eq("status", "ok").or(stale).order("last_scan_at", { nullsFirst: true }).limit(20);
+  // Inboxes Gmail rate-limited rest until retry_after.
+  const sectionId = due?.find((c) => !c.retry_after || Date.parse(c.retry_after) <= now.getTime())?.section_id;
   if (!sectionId) return null;
   // Claim it first so overlapping ticks don't scan the same inbox twice.
   const { data: claimed } = await db.from("gmail_connections").update({ last_scan_at: now.toISOString() }).eq("section_id", sectionId).or(stale).select("section_id");

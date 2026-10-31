@@ -40,6 +40,7 @@ async function call<T>(access: string, method: string, path: string, body?: unkn
     method,
     headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new GoogleAuthError("unauthorized");
   if (res.status === 404 || res.status === 410) return null as T;

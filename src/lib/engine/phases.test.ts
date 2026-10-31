@@ -4,6 +4,26 @@ import { claimWithRetry, runPhases } from "./phases";
 const noWait = async () => {};
 
 describe("runPhases", () => {
+  it("stops waiting for a phase past its limit, and defers phases once the budget is spent", async () => {
+    let now = 0;
+    const ran: string[] = [];
+    const { outcomes, phases } = await runPhases(
+      [
+        ["hangs", () => new Promise<string[]>(() => {})],
+        ["slow", async () => ((now += 44_500), ran.push("slow"), ["s"])],
+        ["late", async () => (ran.push("late"), ["l"])],
+      ],
+      { phaseMs: 30, budgetMs: 45_000, clock: () => now },
+    );
+    expect(ran).toEqual(["slow"]);
+    expect(outcomes).toEqual(["s"]);
+    expect(phases).toEqual([
+      { phase: "hangs", ok: false, error: "Error: timed out after 0s" },
+      { phase: "slow", ok: true },
+      { phase: "late", ok: true, deferred: true },
+    ]);
+  });
+
   it("keeps running the other phases when one throws, and reports which failed", async () => {
     const ran: string[] = [];
     const { outcomes, phases } = await runPhases([

@@ -96,6 +96,11 @@ export function SubscriptionsView({
     };
     flash(text[result] ?? t.subs.resultFailed);
     router.replace(`/sections/${section.id}`, { scroll: false });
+    // Connecting started the first scan on the server; show it running until it lands.
+    if (result === "connected") {
+      setScanning(true);
+      waitForScan(Date.now() - 3 * 60_000).finally(() => setScanning(false));
+    }
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const subs = useMemo(() => items.map((item) => ({ item, sub: readSub(item.props) })).filter((x): x is { item: Item; sub: SubProps } => !!x.sub), [items]);
@@ -108,13 +113,9 @@ export function SubscriptionsView({
   const cancelled = subs.filter((x) => x.sub.status === "cancelled");
   const hidden = subs.filter((x) => x.sub.status === "hidden");
 
-  async function scan() {
-    setScanning(true);
-    const started = Date.now();
+  /** The scan runs on the server; check every few seconds until it records a finish after `started`. */
+  async function waitForScan(started: number) {
     try {
-      const res = await fetch("/api/google/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sectionId: section.id }) });
-      if (!res.ok) throw new Error("start");
-      // The scan runs on the server; check every few seconds until it records a finish.
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 4000));
         const s = (await (await fetch(`/api/google/scan?sectionId=${section.id}`)).json()) as { lastScanAt: string | null; status: string | null; failed: boolean };
@@ -127,6 +128,18 @@ export function SubscriptionsView({
         return;
       }
       flash(t.subs.resultFailed);
+    } catch {
+      flash(t.subs.resultFailed);
+    }
+  }
+
+  async function scan() {
+    setScanning(true);
+    const started = Date.now();
+    try {
+      const res = await fetch("/api/google/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sectionId: section.id }) });
+      if (!res.ok) flash(t.subs.resultFailed);
+      else await waitForScan(started);
     } catch {
       flash(t.subs.resultFailed);
     } finally {

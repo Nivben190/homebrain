@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Outgoing calls in the engine have timeouts
 - [ ] A slow phase is reported as timed out and the rest still run; phases past the budget are deferred

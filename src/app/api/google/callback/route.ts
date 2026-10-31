@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/session";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { appOrigin } from "@/lib/url";
@@ -8,8 +8,8 @@ import { scanGmail } from "@/lib/subs/scan";
 import { calendarAccount, CALENDAR_SCOPE, CALENDAR_STATE } from "@/lib/gcal";
 
 export const dynamic = "force-dynamic";
-// The first scan reads up to a year of receipts.
-export const maxDuration = 120;
+// The first scan reads up to a year of receipts, after the person is already back in the space.
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   const origin = await appOrigin();
@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
     if ([plain, "Subscriptions", "מנויים"].includes(section.title.trim())) {
       await db.from("sections").update({ title: `${section.title.trim()} · ${email.split("@")[0]}` }).eq("id", sectionId);
     }
-    const result = await scanGmail(db, sectionId);
-    return back(result.ok ? "connected" : result.error, result.ok ? `${email}: found ${result.found}` : "scan");
+    after(() => scanGmail(db, sectionId));
+    return back("connected", email);
   } catch (e) {
     // iOS sometimes opens the return link twice; the second code is already used.
     if (e instanceof GoogleAuthError) {

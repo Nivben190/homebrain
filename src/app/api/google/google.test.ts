@@ -11,7 +11,8 @@ vi.mock("@/lib/push", () => import("@/test/app").then((m) => m.pushMock));
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (fn: () => unknown) => void fn() }));
 
 process.env.NEXT_PUBLIC_APP_URL = "https://brain.test";
-const { signState, sealToken, GMAIL_SCOPE } = await import("@/lib/subs/gmail");
+const { signState, sealToken, GMAIL_SCOPE, gmailBackoff } = await import("@/lib/subs/gmail");
+gmailBackoff.ms = 1;
 const { CALENDAR_SCOPE, CALENDAR_STATE } = await import("@/lib/gcal");
 const { scanDueGmail, scanGmail } = await import("@/lib/subs/scan");
 const connect = await import("./connect/route");
@@ -24,7 +25,7 @@ const A = await import("@/app/actions");
 beforeAll(startApp, 120_000);
 
 /** A pretend Google: OAuth, one Netflix receipt in Gmail, and Calendar. */
-let google: { scope: string; tokenError?: string; calendarEvents: unknown[] };
+let google: { scope: string; tokenError?: string; calendarEvents: unknown[]; busy?: boolean };
 beforeEach(() => {
   google = { scope: GMAIL_SCOPE, calendarEvents: [] };
   app.pushes = [];
@@ -34,6 +35,7 @@ beforeEach(() => {
       return google.tokenError ? new Response(JSON.stringify({ error: google.tokenError }), { status: 400 }) : { access_token: "access", refresh_token: "refresh", scope: google.scope };
     if (url.endsWith("/users/me/profile")) return { emailAddress: "niv@gmail.com" };
     if (url.includes("/users/me/messages?")) return { messages: [{ id: "m1" }] };
+    if (url.includes("/users/me/messages/m1") && google.busy) return new Response("Quota exceeded for quota metric 'Queries' and limit 'Queries per minute per user'", { status: 429 });
     if (url.includes("/users/me/messages/m1")) {
       const body = Buffer.from("Your monthly plan: Standard\nTotal: 54.90 ₪").toString("base64url");
       return {
@@ -73,7 +75,8 @@ describe("connect Gmail", () => {
     expect(conn.email).toBe("niv@gmail.com");
     expect(conn.refresh_token).not.toContain("refresh");
     expect(await sql(`select title from sections where id = $1`, [s])).toEqual([{ title: "Subscriptions · niv" }]);
-    expect(await sql(`select title from items where section_id = $1`, [s])).toEqual([{ title: "Netflix" }]);
+    // The first scan runs after the redirect.
+    await vi.waitFor(async () => expect(await sql(`select title from items where section_id = $1`, [s])).toEqual([{ title: "Netflix" }]));
   });
 
   it("refuses someone else's state, a cancelled consent, or a missing read scope", async () => {
@@ -107,6 +110,30 @@ describe("scanning", () => {
     expect(app.pushes.map((p) => p.userId)).toEqual([home.users.owner]);
     // Just scanned: nothing else is due.
     expect(await scanDueGmail(testClient(app.db))).toBeNull();
+  });
+
+  it("rate-limited by Gmail: the space keeps its bills and the cron leaves that inbox alone for an hour", async () => {
+    const home = await homeWith(["owner"]);
+    const s = await subsSpace(home.householdId);
+    await sql(`insert into gmail_connections (section_id, user_id, email, refresh_token) values ($1, $2, 'niv@gmail.com', $3)`, [s, home.users.owner, sealToken("refresh")]);
+    const db = testClient(app.db);
+    expect(await scanGmail(db, s)).toMatchObject({ ok: true, added: 1 });
+
+    google.busy = true;
+    const now = new Date();
+    expect(await scanGmail(db, s, { now })).toEqual({ ok: false, error: "busy" });
+    expect(await sql(`select title from items where section_id = $1`, [s])).toEqual([{ title: "Netflix" }]);
+    const [conn] = await sql<{ status: string; retry_after: Date }>(`select status, retry_after from gmail_connections where section_id = $1`, [s]);
+    expect(conn.status).toBe("ok");
+    expect(new Date(conn.retry_after).getTime()).toBe(now.getTime() + 3600_000);
+
+    // A day later the scan is due, but the inbox is still resting until retry_after.
+    await sql(`update gmail_connections set last_scan_at = now() - interval '2 days', retry_after = now() + interval '30 minutes' where section_id = $1`, [s]);
+    expect(await scanDueGmail(db)).toBeNull();
+    await sql(`update gmail_connections set retry_after = now() - interval '1 minute' where section_id = $1`, [s]);
+    google.busy = false;
+    expect(await scanDueGmail(db)).toMatchObject({ ok: true });
+    expect(await sql(`select retry_after from gmail_connections where section_id = $1`, [s])).toEqual([{ retry_after: null }]);
   });
 
   it("an expired Google grant marks the inbox expired", async () => {

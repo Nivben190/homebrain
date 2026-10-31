@@ -33,7 +33,7 @@ export async function getForecast(lat: number, lon: number, timeZone: string): P
     forecast_days: "2",
   });
   try {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { next: { revalidate: 1800 } });
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
     const d = await res.json();
     return {

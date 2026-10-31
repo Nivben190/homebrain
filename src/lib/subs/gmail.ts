@@ -29,12 +29,18 @@ export function googleAuthUrl(origin: string, state: string, scope = GMAIL_SCOPE
 
 export class GoogleAuthError extends Error {}
 export class GmailApiDisabled extends Error {}
+/** Gmail kept saying "too many requests" after every retry: try this inbox again later. */
+export class GmailRateLimited extends Error {}
+
+/** How long the first retry waits; tests shorten it. */
+export const gmailBackoff = { ms: 2000 };
 
 async function token(body: Record<string, string>) {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID!, client_secret: process.env.GOOGLE_CLIENT_SECRET!, ...body }),
+    signal: AbortSignal.timeout(10_000),
   });
   const json = (await res.json()) as { access_token?: string; refresh_token?: string; scope?: string; error?: string };
   // invalid_grant = revoked, expired (7-day tokens in "Testing" mode) or password changed.
@@ -47,7 +53,7 @@ export const exchangeCode = (code: string, origin: string) => token({ grant_type
 export const refreshAccess = async (refreshToken: string) => (await token({ grant_type: "refresh_token", refresh_token: refreshToken })).access_token!;
 
 export async function revokeToken(t: string) {
-  await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(t)}`, { method: "POST" }).catch(() => undefined);
+  await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(t)}`, { method: "POST", signal: AbortSignal.timeout(10_000) }).catch(() => undefined);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -55,12 +61,13 @@ const RATE_LIMITED = /quota|rate ?limit|too many/i;
 
 /** One Gmail call; backs off and retries when Google says we're going too fast. */
 async function gmail<T>(access: string, path: string, attempt = 0): Promise<T> {
-  const res = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${access}` } });
+  const res = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${access}` }, signal: AbortSignal.timeout(20_000) });
   if (res.status === 401) throw new GoogleAuthError("unauthorized");
   if (!res.ok) {
     const text = await res.text();
-    if ((res.status === 429 || (res.status === 403 && RATE_LIMITED.test(text))) && attempt < 4) {
-      await sleep(2000 * 2 ** attempt + Math.random() * 1000);
+    if (res.status === 429 || (res.status === 403 && RATE_LIMITED.test(text))) {
+      if (attempt >= 4) throw new GmailRateLimited(text.slice(0, 300));
+      await sleep(gmailBackoff.ms * 2 ** attempt + Math.random() * (gmailBackoff.ms / 2));
       return gmail<T>(access, path, attempt + 1);
     }
     // Step 2 of the setup: the Gmail API must be enabled in the Cloud project.

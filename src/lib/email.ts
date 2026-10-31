@@ -18,6 +18,7 @@ export async function sendEmail(to: string, subject: string, body: string): Prom
       subject,
       text: body,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (res.ok) return { ok: true };
   const detail = `${res.status} ${await res.text()}`.slice(0, 300);

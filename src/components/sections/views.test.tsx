@@ -467,13 +467,16 @@ describe("subscriptions", () => {
     expect(await screen.findByText(t.subs.resultConnected)).toBeInTheDocument();
     expect(router.replace).toHaveBeenCalledWith(`/sections/${section.id}`, { scroll: false });
     window.history.replaceState(null, "", "/");
-    await user.click(screen.getByRole("button", { name: new RegExp(t.subs.scanNow) }));
+    // The first scan started with the connect; the space waits for it without starting another.
     expect(await screen.findByText(t.subs.done, {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(app.outbound.some((u) => u.endsWith("/api/google/scan"))).toBe(true);
+    expect(app.outbound.some((u) => u.endsWith("/api/google/scan"))).toBe(false);
+    await waitFor(() => expect(screen.getByRole("button", { name: new RegExp(t.subs.scanNow) })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: new RegExp(t.subs.scanNow) }));
+    await waitFor(() => expect(app.outbound.some((u) => u.endsWith("/api/google/scan"))).toBe(true));
     await user.click(screen.getByRole("button", { name: t.subs.disconnect }));
     await user.click(screen.getByRole("button", { name: t.subs.disconnectConfirm.replace("{email}", "me@gmail.com") }));
     expect(await screen.findByText(t.subs.disconnected)).toBeInTheDocument();
-  }, 20_000);
+  }, 30_000);
 
   it("not connected offers to connect; expired asks to reconnect", async () => {
     const { t, section, unmount } = await open("subscriptions");

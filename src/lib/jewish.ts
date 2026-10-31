@@ -25,7 +25,7 @@ export async function getJewishCalendar(lat: number, lon: number, timeZone: stri
     end: endDay,
   });
   try {
-    const res = await fetch(`https://www.hebcal.com/hebcal?${params}`, { next: { revalidate: 6 * 3600 } });
+    const res = await fetch(`https://www.hebcal.com/hebcal?${params}`, { next: { revalidate: 6 * 3600 }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
     const d = await res.json();
     return (d.items ?? []) as HebcalItem[];
