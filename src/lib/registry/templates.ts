@@ -627,6 +627,29 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { title: { en: "Take out the trash", he: "להוציא את הזבל" } },
     ],
   },
+  // Today offers one 21 days before a chag (lib/holidays), named for it.
+  {
+    key: "holidays",
+    category: "plan",
+    icon: "🕯️",
+    color: "amber",
+    view: "checklist",
+    title: { en: "Holidays & hosting", he: "חגים ואירוח" },
+    desc: { en: "Who's coming, who brings what, the menu and the cleaning, room by room. One per holiday.", he: "מי מגיע, מי מביא מה, התפריט והניקיון חדר אחר חדר. אחד לכל חג." },
+    props: [
+      { key: "kind", name: { en: "Kind", he: "סוג" }, type: "select", options: [{ en: "Guests", he: "אורחים" }, { en: "Bringing", he: "מביאים" }, { en: "Menu", he: "תפריט" }, { en: "Cleaning", he: "ניקיון" }, { en: "To buy", he: "לקנות" }] },
+      { key: "who", name: { en: "Who", he: "מי" }, type: "person" },
+    ],
+    items: [
+      { title: { en: "Guest list: who's coming?", he: "רשימת אורחים: מי מגיע?" }, props: { kind: 0 } },
+      { title: { en: "Who brings dessert / wine", he: "מי מביא קינוח / יין" }, props: { kind: 1 } },
+      { title: { en: "Main course", he: "מנה עיקרית" }, props: { kind: 2 } },
+      { title: { en: "Sides and salads", he: "תוספות וסלטים" }, props: { kind: 2 } },
+      { title: { en: "Kitchen", he: "מטבח" }, props: { kind: 3 } },
+      { title: { en: "Living room", he: "סלון" }, props: { kind: 3 } },
+      { title: { en: "Extra chairs and plates", he: "כיסאות וצלחות נוספים" }, props: { kind: 4 } },
+    ],
+  },
   {
     key: "moving",
     category: "plan",

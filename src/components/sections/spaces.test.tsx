@@ -13,6 +13,7 @@ vi.mock("next/link", () => import("@/test/app").then((m) => m.nextLinkMock));
 
 const { NewSectionButton } = await import("./NewSectionButton");
 const { SectionSettingsSheet } = await import("./SectionSettingsSheet");
+const { HolidayCard } = await import("@/components/today/HolidayCard");
 
 beforeAll(startApp, 120_000);
 beforeEach(() => {
@@ -111,6 +112,31 @@ describe("new space", () => {
     await user.click(screen.getByRole("button", { name: t.common.create }));
     expect(await screen.findByText(t.failures.denied)).toBeInTheDocument();
     expect(await spaces(home.householdId)).toEqual([]);
+  });
+});
+
+describe("holiday offer", () => {
+  const pesach = { key: "Pesach-2027", name: "Pesach", hebrew: "פסח", day: "2027-04-21", days: 16 };
+
+  it("makes that holiday's hosting list and opens it", async () => {
+    localStorage.clear();
+    const home = await homeWith(["owner"]);
+    const { user, t } = renderUi(<HolidayCard holiday={pesach} householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
+    expect(await screen.findByText(fill(t.holidays.title, { holiday: "Pesach", n: "16" }))).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: fill(t.holidays.cta, { holiday: "Pesach" }) }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/sections\//)));
+    expect(await sql(`select title, template, owner_id from sections where household_id = $1`, [home.householdId])).toEqual([{ title: "Pesach 2027", template: "holidays", owner_id: null }]);
+  });
+
+  it("dismissed, it stays away for that holiday", async () => {
+    localStorage.clear();
+    const home = await homeWith(["owner"]);
+    const first = renderUi(<HolidayCard holiday={pesach} householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
+    await first.user.click(await screen.findByRole("button", { name: first.t.holidays.dismiss }));
+    first.unmount();
+    renderUi(<HolidayCard holiday={pesach} householdId={home.householdId} userId={home.users.owner} timeZone="Asia/Jerusalem" />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText(/Pesach/)).not.toBeInTheDocument();
   });
 });
 

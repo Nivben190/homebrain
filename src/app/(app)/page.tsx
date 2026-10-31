@@ -23,6 +23,8 @@ import { TodayPractice } from "@/components/today/TodayPractice";
 import { FinderBanner } from "@/components/sections/FinderBanner";
 import { FEW_SPACES } from "@/lib/registry/finder";
 import { OnThisDay, type Memory } from "@/components/today/OnThisDay";
+import { HolidayCard } from "@/components/today/HolidayCard";
+import { HOSTING_AHEAD, hostingHoliday } from "@/lib/holidays";
 import type { Photo } from "@/lib/photos";
 
 /** First image attached to an item (server-side; mirrors lib/photos readPhotos). */
@@ -63,6 +65,7 @@ export default async function TodayPage() {
   const lon = profile.lon ?? DEFAULT_PLACE.lon;
   const forecastP = getForecast(lat, lon, profile.timezone);
   const holyP = getJewishCalendar(lat, lon, profile.timezone, addDays(today, -2), addDays(today, 14));
+  const aheadP = getJewishCalendar(lat, lon, profile.timezone, today, addDays(today, HOSTING_AHEAD));
   const admin = createSupabaseAdmin();
   const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ, activityQ, gmailQ, gcalQ] = await Promise.all([
     supabase.from("runs").select("*").eq("user_id", user.id).is("acknowledged_at", null).gte("fired_at", dayAgo).order("fired_at", { ascending: false }).returns<Run[]>(),
@@ -152,6 +155,13 @@ export default async function TodayPage() {
   const sections = sectionsQ.data ?? [];
   const sectionById = new Map(sections.map((s) => [s.id, s]));
   const awakeToday = (wakeQ.data?.length ?? 0) > 0;
+  const canCreate = ["owner", "adult", "teen"].includes(profile.role);
+  // A holiday space made in the last month already covers the coming chag.
+  const recentHolidaySpace = sections.some((s) => s.template === "holidays" && Date.now() - Date.parse(s.created_at) < 30 * 86400000);
+  async function Holiday() {
+    const holiday = hostingHoliday(await aheadP, today, recentHolidaySpace);
+    return holiday ? <HolidayCard holiday={holiday} householdId={profile.household_id!} userId={user.id} timeZone={profile.timezone} privateOnly={profile.role === "teen"} /> : null;
+  }
 
   const streaks = automations
     .filter((a) => a.actions.some((x) => x.type === "checkoff"))
@@ -182,7 +192,12 @@ export default async function TodayPage() {
       </header>
 
       <PushPrompt />
-      {sections.length <= FEW_SPACES && ["owner", "adult", "teen"].includes(profile.role) && <FinderBanner />}
+      {sections.length <= FEW_SPACES && canCreate && <FinderBanner />}
+      {canCreate && (
+        <Suspense fallback={null}>
+          <Holiday />
+        </Suspense>
+      )}
       <AppBadge count={pending.length} />
 
       {/* Now */}

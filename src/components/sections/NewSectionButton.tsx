@@ -17,7 +17,7 @@ import { spaceType } from "@/lib/registry/spaces";
 import { errorKey } from "@/lib/errors";
 
 /** Creates a space from a template, with its starter items and their first reminders. */
-async function addSpace(
+export async function addSpace(
   sb: SupabaseClient,
   tpl: SectionTemplate,
   opts: { householdId: string; ownerId: string | null; title: string; icon: string; color: string; locale: Locale; timeZone: string },

@@ -323,6 +323,12 @@ export const en = {
     enablePushHint: "So your brain can nudge you.",
     installHint: "Tip: tap Share → Add to Home Screen to install.",
   },
+  holidays: {
+    title: "{holiday} in {n} days 🕯️",
+    body: "Plan who's coming, who brings what, the menu and the cleaning.",
+    cta: "Make a {holiday} list",
+    dismiss: "Not this time",
+  },
   finder: {
     open: "Help me choose",
     openHint: "Say what you want to get better at, and we'll pick the spaces.",
