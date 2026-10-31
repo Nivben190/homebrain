@@ -1,4 +1,3 @@
-import { InviteLinkButton } from "@/components/InviteLinkButton";
 import Link from "next/link";
 import { Suspense } from "react";
 import { requireHome, getT } from "@/lib/session";
@@ -10,7 +9,7 @@ import { fill } from "@/i18n";
 import { firstOn } from "@/lib/agenda";
 import { RunCard } from "@/components/today/RunCard";
 import { AwakeButton } from "@/components/today/AwakeButton";
-import { PushPrompt } from "@/components/today/PushPrompt";
+import { SetupChecklist } from "@/components/today/SetupChecklist";
 import { AppBadge } from "@/components/today/AppBadge";
 import { ActivityStrip, type ActivityRow } from "@/components/today/ActivityStrip";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
@@ -22,7 +21,6 @@ import { DEFAULT_PLACE, getForecast, outdoorWarning, walkAdvice, weatherAt } fro
 import { getJewishCalendar, holyStatus } from "@/lib/jewish";
 import { foodDaysLeft } from "@/lib/engine/food";
 import { TodayPractice } from "@/components/today/TodayPractice";
-import { FinderBanner } from "@/components/sections/FinderBanner";
 import { FEW_SPACES } from "@/lib/registry/finder";
 import { OnThisDay, type Memory } from "@/components/today/OnThisDay";
 import { HolidayCard } from "@/components/today/HolidayCard";
@@ -69,7 +67,7 @@ export default async function TodayPage() {
   const holyP = getJewishCalendar(lat, lon, profile.timezone, addDays(today, -2), addDays(today, 14));
   const aheadP = getJewishCalendar(lat, lon, profile.timezone, today, addDays(today, HOSTING_AHEAD));
   const admin = createSupabaseAdmin();
-  const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ, activityQ, gmailQ, gcalQ] = await Promise.all([
+  const [pendingQ, historyQ, automationsQ, sectionsQ, dueQ, wakeQ, trackerQ, memoriesQ, requestsQ, petsQ, activityQ, gmailQ, gcalQ, pushQ, tickedQ, shortcutQ, invitedQ] = await Promise.all([
     supabase.from("runs").select("*").eq("user_id", user.id).is("acknowledged_at", null).gte("fired_at", dayAgo).order("fired_at", { ascending: false }).returns<Run[]>(),
     supabase.from("runs").select("*").eq("user_id", user.id).gte("fired_at", new Date(now.getTime() - 60 * 86400000).toISOString()).order("fired_at", { ascending: false }).returns<Run[]>(),
     supabase.from("automations").select("*").eq("target_user_id", user.id).eq("enabled", true).returns<Automation[]>(),
@@ -92,6 +90,11 @@ export default async function TodayPage() {
     // Google connections that ended (roadmap 1.9): server-only tables, this user's rows.
     admin.from("gmail_connections").select("section_id,sections(title,icon)").eq("user_id", user.id).eq("status", "expired").returns<{ section_id: string; sections: { title: string; icon: string } | null }[]>(),
     admin.from("calendar_connections").select("status").eq("user_id", user.id).eq("status", "expired").maybeSingle(),
+    // "Get set up": what this person has done so far.
+    supabase.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+    supabase.from("checkins").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+    supabase.from("events").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("payload->>source", "shortcut"),
+    admin.from("household_invites").select("token", { count: "exact", head: true }).eq("created_by", user.id),
   ]);
   const expiredGoogle: ExpiredGoogle[] = [
     ...(gcalQ.data ? [{ key: "gcal", what: "Google Calendar", href: "/api/google/calendar" }] : []),
@@ -201,8 +204,15 @@ export default async function TodayPage() {
         </h1>
       </header>
 
-      <PushPrompt />
-      {sections.length <= FEW_SPACES && canCreate && <FinderBanner />}
+      <SetupChecklist
+        fewSpaces={sections.length <= FEW_SPACES && canCreate}
+        done={{
+          push: (pushQ.count ?? 0) > 0,
+          partner: others.length > 0 || (invitedQ.count ?? 0) > 0,
+          routine: (tickedQ.count ?? 0) > 0,
+          shortcut: (shortcutQ.count ?? 0) > 0,
+        }}
+      />
       {canCreate && (
         <Suspense fallback={null}>
           <Holiday />
@@ -271,13 +281,7 @@ export default async function TodayPage() {
           <p className="mb-2 px-1 text-sm text-muted">🏠 {others.map((o) => `${o.emoji} ${o.display_name}`).join(" · ")}</p>
           <ActivityStrip initial={activityQ.data ?? []} userId={user.id} members={memberList} />
         </>
-      ) : (
-        <div className="glass mb-3 space-y-3 rounded-3xl p-4">
-          <p className="font-semibold">💞 {t.join.waiting}</p>
-          <p className="text-sm text-muted">{t.join.waitingHint}</p>
-          <InviteLinkButton variant="primary" />
-        </div>
-      )}
+      ) : null}
       {/* One swipeable strip: the day (weather, Shabbat) and streaks. */}
       <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4">
         <div className={streaks.length > 0 ? "w-[88%] shrink-0 snap-start" : "w-full shrink-0"}>

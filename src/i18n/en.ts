@@ -357,6 +357,13 @@ export const en = {
     automations: "Automations",
     automationsHint: "Reminders and routines that run by themselves",
   },
+  setup: {
+    title: "Get set up · {n} of {total}",
+    hide: "Hide",
+    steps: { install: "Add the app to your Home Screen", push: "Turn on notifications", partner: "Invite your partner or family", routine: "Tick your first routine", shortcut: "Connect the wake-up Shortcut" },
+    openSpaces: "Open your spaces",
+    openIphone: "iPhone setup",
+  },
   finder: {
     open: "Help me choose",
     openHint: "Say what you want to get better at, and we'll pick the spaces.",

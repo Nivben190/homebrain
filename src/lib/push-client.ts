@@ -13,7 +13,7 @@ function isIos() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
-function isStandalone() {
+export function isStandalone() {
   return window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
 }
 

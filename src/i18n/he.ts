@@ -358,6 +358,13 @@ export const he: Dict = {
     automations: "אוטומציות",
     automationsHint: "תזכורות ושגרות שרצות לבד",
   },
+  setup: {
+    title: "מתחילים · {n} מתוך {total}",
+    hide: "להסתיר",
+    steps: { install: "להוסיף את האפליקציה למסך הבית", push: "להפעיל התראות", partner: "להזמין את בן/בת הזוג או המשפחה", routine: "לסמן שגרה ראשונה", shortcut: "לחבר את קיצור הדרך של ההשכמה" },
+    openSpaces: "למרחבים שלכם",
+    openIphone: "הגדרות אייפון",
+  },
   finder: {
     open: "עזרו לי לבחור",
     openHint: "ספרו במה תרצו להשתפר, ואנחנו נבחר את המרחבים.",

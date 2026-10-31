@@ -22,7 +22,8 @@ const { AwakeButton } = await import("./AwakeButton");
 const { todayKey } = await import("@/lib/engine/habits");
 const { TodayPractice } = await import("./TodayPractice");
 const { OfflineSync } = await import("@/components/OfflineSync");
-const { PushPrompt } = await import("./PushPrompt");
+const { SetupChecklist } = await import("./SetupChecklist");
+const { fill } = await import("@/i18n");
 const { QuickActions } = await import("./QuickActions");
 const { OnThisDay } = await import("./OnThisDay");
 const { AppBadge } = await import("./AppBadge");
@@ -302,33 +303,41 @@ describe("notifications", () => {
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "BElz-dGVzdC1rZXk";
   }
 
-  it("asks once, and saves this phone for pushes", async () => {
+  it("get set up: turning on notifications saves this phone and ticks the step", async () => {
+    localStorage.clear();
     const home = await homeWith(["owner"]);
     phone();
-    const { user, t } = renderUi(<PushPrompt />);
-    await user.click(await screen.findByRole("button", { name: t.settings.enable }));
-    await waitFor(() => expect(screen.queryByText(t.today.enablePush)).not.toBeInTheDocument(), { timeout: 3000 });
+    const { user, t } = renderUi(<SetupChecklist done={{}} fewSpaces={false} />);
+    // A desktop browser has no Home Screen step to do.
+    expect(await screen.findByText(fill(t.setup.title, { n: "1", total: "5" }))).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: t.settings.enable }));
+    expect(await screen.findByText(fill(t.setup.title, { n: "2", total: "5" }), undefined, { timeout: 3000 })).toBeInTheDocument();
     expect(await sql(`select device_label from push_subscriptions where user_id = $1`, [home.users.owner])).toHaveLength(1);
   });
 
-  it("on an iPhone outside the Home Screen it explains how to install first", async () => {
+  it("on an iPhone outside the Home Screen, installing comes first", async () => {
+    localStorage.clear();
     await homeWith(["owner"]);
     phone({ ios: true });
-    const { t } = renderUi(<PushPrompt />);
+    const { t } = renderUi(<SetupChecklist done={{ partner: true }} fewSpaces />);
     expect(await screen.findByText(t.today.installHint)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.settings.enable })).not.toBeInTheDocument();
   });
 
-  it("said no, or already said no before: nothing to show", async () => {
+  it("everything done, or hidden once: nothing to show", async () => {
+    localStorage.clear();
     await homeWith(["owner"]);
-    phone({ permission: "denied" });
-    const { t, unmount } = renderUi(<PushPrompt />);
+    phone({ permission: "granted" });
+    const all = renderUi(<SetupChecklist done={{ push: true, partner: true, routine: true, shortcut: true }} fewSpaces={false} />);
     await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByText(t.today.enablePush)).not.toBeInTheDocument();
-    unmount();
-    phone({ grant: "denied" });
-    const again = renderUi(<PushPrompt />);
-    await again.user.click(await screen.findByRole("button", { name: t.settings.enable }));
-    await waitFor(() => expect(screen.queryByText(t.today.enablePush)).not.toBeInTheDocument(), { timeout: 3000 });
+    expect(screen.queryByText(/of 5/)).not.toBeInTheDocument();
+    all.unmount();
+    const some = renderUi(<SetupChecklist done={{ push: true }} fewSpaces={false} />);
+    await some.user.click(await screen.findByRole("button", { name: some.t.setup.hide }));
+    some.unmount();
+    renderUi(<SetupChecklist done={{ push: true }} fewSpaces={false} />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText(/of 5/)).not.toBeInTheDocument();
   });
 
   it("a family tablet: the next person to turn on pushes gets them", async () => {
