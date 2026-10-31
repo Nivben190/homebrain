@@ -372,6 +372,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   // ---------------------------------------------------------------- Money
   {
     key: "bills",
+    retired: true,
     category: "money",
     icon: "🧾",
     color: "violet",
@@ -636,6 +637,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   },
   {
     key: "renewals",
+    retired: true,
     category: "money",
     icon: "🧾",
     color: "amber",
@@ -650,15 +652,16 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { title: { en: "Dog's rabies vaccine 💉", he: "חיסון כלבת לכלב 💉" } },
     ],
   },
-  // Filled from Gmail receipts (or by hand); private, since it reads one person's inbox.
+  // Bills and subscriptions in one place (it replaced the Bills & payments and Bills &
+// renewals templates). Filled from Gmail or by hand; private, since it reads one person's inbox.
   {
     key: "subscriptions",
     category: "money",
     icon: "💳",
     color: "green",
     view: "subscriptions",
-    title: { en: "Subscriptions", he: "מנויים" },
-    desc: { en: "Connect Gmail: every subscription, what it costs a month, and where to cancel it.", he: "מחברים Gmail: כל המנויים, כמה הם עולים בחודש, ואיפה מבטלים." },
+    title: { en: "Bills & subscriptions", he: "חשבונות ומנויים" },
+    desc: { en: "Electricity, arnona, water, phone and every subscription: what each costs a month, when it's due, and where to cancel. Add by hand or connect Gmail.", he: "חשמל, ארנונה, מים, טלפון וכל המנויים: כמה כל אחד עולה בחודש, מתי משלמים ואיפה מבטלים. מוסיפים ידנית או מחברים Gmail." },
     shared: false,
   },
   {

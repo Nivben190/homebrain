@@ -38,6 +38,14 @@ describe("space finder", () => {
     expect(everyPick.filter((t) => t.retired)).toEqual([]);
   });
 
+  it("money leads with the one Bills & subscriptions space", () => {
+    const r = recommend(["money"]);
+    expect(r[0].template.key).toBe("subscriptions");
+    expect(r[0].template.title.en).toBe("Bills & subscriptions");
+    expect(keys(r)).not.toContain("bills");
+    expect(keys(r)).not.toContain("renewals");
+  });
+
   it("keeps the list short and ignores unknown goals", () => {
     expect(recommend(FINDER_GOALS.map((g) => g.key))).toHaveLength(MAX_RECOMMENDATIONS);
     expect(recommend(["nope"])).toEqual([]);
