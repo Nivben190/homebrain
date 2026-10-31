@@ -42,7 +42,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^5.0.5",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "15.5.28",
     "fake-indexeddb": "^6.2.7",
     "jiti": "^2.7.0",
