@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireHome } from "@/lib/session";
+import { getT, requireHome } from "@/lib/session";
 import { AutomationEditor } from "@/components/brain/AutomationEditor";
 import type { Automation, Section } from "@/lib/db-types";
 import type { AutomationDef } from "@/lib/engine/types";
@@ -13,8 +13,23 @@ const BLANK: AutomationDef = {
   actions: [{ type: "push", title: "", body: "" }],
 };
 
-export default async function AutomationPage({ params }: { params: Promise<{ id: string }> }) {
+/** "Automate this" from a space: a reminder that opens it, ready to set a schedule for. */
+function forSpace(space: Pick<Section, "id" | "title" | "icon">, open: string): AutomationDef {
+  return {
+    ...BLANK,
+    name: space.title,
+    icon: space.icon,
+    actions: [
+      { type: "push", title: `${space.icon} ${space.title}`, body: "" },
+      { type: "open_section", sectionId: space.id, label: open },
+    ],
+  };
+}
+
+export default async function AutomationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ section?: string }> }) {
   const { id } = await params;
+  const { section: fromSpace } = (await searchParams) ?? {};
+  const t = await getT();
   const { supabase, user, members } = await requireHome();
   let automation: Automation | null = null;
   if (id !== "new") {
@@ -30,7 +45,10 @@ export default async function AutomationPage({ params }: { params: Promise<{ id:
       initial={
         automation
           ? { name: automation.name, icon: automation.icon, enabled: automation.enabled, trigger: automation.trigger, conditions: automation.conditions, actions: automation.actions }
-          : BLANK
+          : (() => {
+              const space = fromSpace ? sections?.find((s) => s.id === fromSpace) : null;
+              return space ? forSpace(space, t.sections.automateOpen) : BLANK;
+            })()
       }
       initialTarget={automation?.target_user_id ?? user.id}
       userId={user.id}

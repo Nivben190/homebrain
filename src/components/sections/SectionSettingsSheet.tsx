@@ -1,7 +1,8 @@
 "use client";
 import { errorKey } from "@/lib/errors";
 import { useEffect, useState } from "react";
-import { Copy, Link2, Plus, Share2, Trash2, X } from "lucide-react";
+import { Copy, Link2, Plus, Share2, Trash2, X, Zap } from "lucide-react";
+import Link from "next/link";
 import { shareSpaceTemplate, unshareSpaceTemplate } from "@/app/actions";
 import { useRouter } from "next/navigation";
 import { fill } from "@/i18n";
@@ -192,6 +193,14 @@ export function SectionSettingsSheet({
             <NotesSyncHelp />
           </>
         )}
+
+        <Link href={`/brain/new?section=${section.id}`} className="flex w-full items-center gap-3 rounded-2xl bg-sunken p-3 text-start">
+          <Zap className="size-5 shrink-0 text-accent" />
+          <span className="min-w-0">
+            <span className="block font-bold">{t.sections.automate}</span>
+            <span className="block text-xs text-muted">{t.sections.automateHint}</span>
+          </span>
+        </Link>
 
         <button type="button" onClick={makeLikeThis} disabled={copying} className="flex w-full items-center gap-3 rounded-2xl bg-sunken p-3 text-start disabled:opacity-60">
           <Copy className="size-5 shrink-0 text-accent" />

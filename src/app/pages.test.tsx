@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { app, homeWith, router, signIn, sql, startApp } from "@/test/app";
 import { renderUi } from "@/test/ui";
 import { addDays, todayKey } from "@/lib/engine/habits";
@@ -22,6 +22,7 @@ const { default: MoneyPage } = await import("@/app/(app)/money/page");
 const { default: BrainPage } = await import("@/app/(app)/brain/page");
 const { default: WeeklyPage } = await import("@/app/(app)/weekly/page");
 const { default: HomeHubPage } = await import("@/app/(app)/home/page");
+const { default: AutomationPage } = await import("@/app/(app)/brain/[id]/page");
 
 beforeAll(startApp, 120_000);
 beforeEach(() => {
@@ -176,6 +177,21 @@ describe("home tab", () => {
       expect(screen.getAllByRole("link").some((a) => a.getAttribute("href") === href)).toBe(true);
     }
     expect(screen.getByText(t.hub.addPet)).toBeInTheDocument();
+  });
+});
+
+describe("automate this", () => {
+  it("a new automation from a space opens that space, named after it, and saves", async () => {
+    const home = await homeWith(["owner"]);
+    const [space] = await sql<{ id: string }>(`insert into sections (household_id, title, icon) values ($1, 'Plants', '🪴') returning id`, [home.householdId]);
+    const { user, t } = renderUi(await AutomationPage({ params: Promise.resolve({ id: "new" }), searchParams: Promise.resolve({ section: space.id }) }));
+    expect(screen.getByLabelText(t.brain.name)).toHaveValue("Plants");
+    await user.click(screen.getByRole("button", { name: t.common.save }));
+    await waitFor(async () => {
+      const [a] = await sql<{ name: string; actions: { type: string; sectionId?: string }[] }>(`select name, actions from automations where household_id = $1`, [home.householdId]);
+      expect(a.name).toBe("Plants");
+      expect(a.actions).toContainEqual(expect.objectContaining({ type: "open_section", sectionId: space.id }));
+    });
   });
 });
 
