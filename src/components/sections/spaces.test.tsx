@@ -100,6 +100,8 @@ describe("new space", () => {
     await user.click(screen.getByRole("button", { name: fill(t.finder.add, { n: "3" }) }));
     await waitFor(async () => expect((await spaces(home.householdId)).map((s) => s.title).sort()).toEqual(["Dog health", "Fridge", "Groceries"]));
     expect(router.push).toHaveBeenCalledWith("/sections");
+    // What they wanted help with is kept for the owner's weekly report.
+    expect(await sql(`select payload->'goals' as goals from events where user_id = $1 and type = 'finder'`, [home.users.owner])).toEqual([{ goals: ["dog", "food"] }]);
   });
 
   it("Get fit asks how to keep it and makes that kind of space", async () => {

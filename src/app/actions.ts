@@ -35,6 +35,7 @@ import { AMOUNT_PROP } from "@/lib/money";
 import { HOOK_PURPOSES, hashKey, newKey, type HookPurpose } from "@/lib/hook-keys";
 import { sendEmail } from "@/lib/email";
 import { signupAlert, type SignupVia } from "@/lib/signup-alert";
+import { feedbackMail, sendFeedbackToOwner } from "@/lib/owner-alerts";
 
 type Result<T = undefined> = (T extends undefined ? { ok: true } : { ok: true; data: T }) | { ok: false; error: string };
 
@@ -522,6 +523,16 @@ export async function updateProfile(patch: z.input<typeof settingsInput>): Promi
   if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Me → Send feedback: emailed to the app's owner. */
+export async function sendFeedback(text: string): Promise<Result> {
+  const { user, profile } = await requireHome();
+  const parsed = z.string().trim().min(3).max(4000).safeParse(text);
+  if (!parsed.success) return { ok: false, error: "too short" };
+  if (!(await allow(createSupabaseAdmin(), "feedback", user.id))) return { ok: false, error: "too_many" };
+  const sent = await sendFeedbackToOwner(feedbackMail({ text: parsed.data, email: user.email ?? null, name: profile.display_name, locale: profile.locale, at: new Date() }));
+  return sent ? { ok: true } : { ok: false, error: "not sent" };
 }
 
 export async function signOut() {

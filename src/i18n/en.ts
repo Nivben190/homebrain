@@ -377,6 +377,14 @@ export const en = {
     dataHint: "Export or delete your account",
     attention: "Needs attention",
   },
+  feedback: {
+    title: "Send feedback",
+    hint: "An idea, a bug, anything. It goes straight to the people who make the app.",
+    placeholder: "What would make the app better for you?",
+    send: "Send",
+    sent: "Thanks! It's on its way 💌",
+    failed: "Couldn't send it right now. Try again later.",
+  },
   finder: {
     open: "Help me choose",
     openHint: "Say what you want to get better at, and we'll pick the spaces.",

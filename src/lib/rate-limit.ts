@@ -22,6 +22,8 @@ export const LIMITS = {
   signUp: { limit: 5, windowSeconds: 3600 },
   /** Per person: each export reads every table and file. */
   export: { limit: 5, windowSeconds: 3600 },
+  /** Per person: feedback emails the owner. */
+  feedback: { limit: 5, windowSeconds: 86_400 },
   /** Per guest link: a sitter ticks a handful of things a day. */
   guest: { limit: 120, windowSeconds: 3600 },
 } satisfies Record<string, Limit>;

@@ -121,6 +121,8 @@ export function NewSectionButton({
     setBusy(true);
     setError(null);
     const sb = supabaseBrowser();
+    // What people want help with, for the owner's weekly report.
+    await sb.from("events").insert({ user_id: userId, type: "finder", payload: { goals, picked: picked.map((p) => p.key) } });
     const ids: string[] = [];
     for (const tpl of picked) {
       const res = await addSpace(sb, tpl, {

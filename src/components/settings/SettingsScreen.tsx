@@ -9,6 +9,7 @@ import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { Button, Card, EmojiPicker, Field, Input, PageHeader, SectionTitle, Select, Sheet } from "@/components/ui";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { FeedbackRow } from "./FeedbackRow";
 import type { Member } from "@/components/sections/PropertyInput";
 import type { Profile } from "@/lib/db-types";
 import { DailyBrainSettings, type DailyPrefs } from "./DailyBrainSettings";
@@ -151,6 +152,7 @@ export function SettingsScreen({
             </span>
             <ChevronRight className="size-5 text-faint rtl:rotate-180" />
           </Link>
+          <FeedbackRow />
         </div>
       )}
 

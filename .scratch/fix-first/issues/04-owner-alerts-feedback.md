@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Failed phase / silent engine email, throttled to one an hour
 - [ ] Weekly retention email, sent once per week
