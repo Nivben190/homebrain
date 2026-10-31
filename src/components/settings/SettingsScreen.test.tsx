@@ -19,7 +19,7 @@ beforeAll(startApp, 120_000);
 const daily = { place: null, briefing: true, wrapup: true, wrapup_time: "21:30", quiet_shabbat: false, shabbat_shop: false, quiet_from: null, quiet_to: null, muted_sections: [], digest: false };
 const brain = { ok: true, ageSeconds: 20, failedPhases: [], failedJobs: 0, expiredGoogle: 0 };
 
-async function setup(role = "owner", inviteCode: string | null = "ABCD1234") {
+async function setup(role = "owner", inviteCode: string | null = "ABCD1234", extra: Record<string, unknown> = {}) {
   const home = await homeWith([role]);
   const ui = renderUi(
     <SettingsScreen
@@ -35,11 +35,32 @@ async function setup(role = "owner", inviteCode: string | null = "ABCD1234") {
       roster={[{ id: home.users[role], name: "Niv", emoji: "🦊", role: role as "owner" }]}
       userId={home.users[role]}
       spaces={[]}
+      {...extra}
     />,
   );
   const profile = () => sql<Record<string, unknown>>(`select display_name, phone, timezone, wake_mode, wake_time::text, briefing, quiet_shabbat, quiet_from::text, quiet_to::text from profiles where user_id = $1`, [home.users[role]]);
   return { ...ui, home, profile };
 }
+
+describe("Me as short pages", () => {
+  it("the menu lists each group with a dot where something needs attention", async () => {
+    const { t } = await setup("owner", "ABCD1234", { part: "menu", gcal: { email: "a@b.c", expired: true } });
+    for (const part of ["profile", "notifications", "family", "connections", "data"] as const) {
+      expect(screen.getByRole("link", { name: new RegExp(t.me.parts[part]) })).toHaveAttribute("href", `/me/${part}`);
+    }
+    expect(screen.getByRole("link", { name: new RegExp(t.me.parts.connections) }).querySelector(`[aria-label="${t.me.attention}"]`)).not.toBeNull();
+    expect(screen.getByRole("link", { name: new RegExp(t.me.parts.profile) }).querySelector(`[aria-label="${t.me.attention}"]`)).toBeNull();
+    expect(screen.queryByText(t.settings.wakeMode)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: new RegExp(t.hub.automations) })).toHaveAttribute("href", "/brain");
+  });
+
+  it("one page shows only its group, with a way back", async () => {
+    const { t } = await setup("owner", "ABCD1234", { part: "family" });
+    expect(screen.getByText("ABCD1234")).toBeInTheDocument();
+    expect(screen.queryByText(t.settings.wakeMode)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: t.common.back })).toHaveAttribute("href", "/me");
+  });
+});
 
 describe("settings", () => {
   it("name and phone save when you leave the field", async () => {

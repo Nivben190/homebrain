@@ -365,6 +365,14 @@ export const he: Dict = {
     openSpaces: "למרחבים שלכם",
     openIphone: "הגדרות אייפון",
   },
+  me: {
+    parts: { profile: "פרופיל", notifications: "התראות", family: "משפחה", connections: "חיבורים", data: "המידע שלכם" },
+    profileHint: "שם, טלפון, אזור זמן, השכמה",
+    notificationsHint: "המוח היומי, שעות שקט, הטלפון הזה",
+    connectionsHint: "פיד יומן, יומן Google, Gmail",
+    dataHint: "ייצוא או מחיקת החשבון",
+    attention: "דורש תשומת לב",
+  },
   finder: {
     open: "עזרו לי לבחור",
     openHint: "ספרו במה תרצו להשתפר, ואנחנו נבחר את המרחבים.",

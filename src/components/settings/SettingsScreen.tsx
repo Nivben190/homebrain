@@ -19,6 +19,7 @@ import { useToast } from "@/components/Toaster";
 import { errorKey } from "@/lib/errors";
 import { InviteLinkButton } from "@/components/InviteLinkButton";
 import { MembersCard, type HomeMember } from "./MembersCard";
+import type { SettingsPart } from "@/lib/settings-parts";
 
 type ProfileForm = Pick<Profile, "display_name" | "emoji" | "timezone" | "wake_mode"> & { phone: string; wake_time: string; email: string };
 
@@ -34,6 +35,7 @@ export function useCopy() {
   };
 }
 
+/** Without `part`, every group at once. */
 export function SettingsScreen({
   profile,
   household,
@@ -48,6 +50,7 @@ export function SettingsScreen({
   userId,
   spaces,
   devices = [],
+  part,
 }: {
   profile: ProfileForm;
   household: { name: string; invite_code: string | null }; // null: only owners and adults invite
@@ -62,6 +65,7 @@ export function SettingsScreen({
   userId: string;
   spaces: { id: string; icon: string; title: string }[];
   devices?: PushDevice[];
+  part?: SettingsPart;
 }) {
   const { t } = useI18n();
   const [p, setP] = useState(profile);
@@ -75,6 +79,20 @@ export function SettingsScreen({
   useEffect(() => {
     getPushState().then(setPush);
   }, []);
+
+  const show = (group: Exclude<SettingsPart, "menu">) => !part || part === group;
+  // A dot on a menu row that needs attention.
+  const attention: Partial<Record<SettingsPart, boolean>> = {
+    notifications: devices.some((d) => d.lastOk === false),
+    connections: !!gcal?.expired || gmail.some((g) => g.expired),
+  };
+  const menu: { part: Exclude<SettingsPart, "menu">; icon: string; hint: string }[] = [
+    { part: "profile", icon: "🙂", hint: t.me.profileHint },
+    { part: "notifications", icon: "🔔", hint: t.me.notificationsHint },
+    { part: "family", icon: "👨‍👩‍👧", hint: household.name },
+    { part: "connections", icon: "🔗", hint: t.me.connectionsHint },
+    { part: "data", icon: "🗂️", hint: t.me.dataHint },
+  ];
 
   const flash = (ok: boolean, error?: string) => (ok ? toast.success(t.settings.saved) : toast.error(t.failures[errorKey(error)]));
 
@@ -96,8 +114,47 @@ export function SettingsScreen({
 
   return (
     <>
-      <PageHeader title={t.settings.title} action={<LanguageSwitch />} />
+      <PageHeader
+        title={part && part !== "menu" ? t.me.parts[part] : t.settings.title}
+        back={part && part !== "menu" ? <Link href="/me" aria-label={t.common.back} className="flex size-10 items-center justify-center rounded-full bg-sunken"><ChevronRight className="size-5 rotate-180 rtl:rotate-0" /></Link> : undefined}
+        action={!part || part === "menu" ? <LanguageSwitch /> : undefined}
+      />
 
+      {part === "menu" && (
+        <div className="glass mt-3 divide-y divide-card-border overflow-hidden rounded-3xl">
+          {menu.map((m) => (
+            <Link key={m.part} href={`/me/${m.part}`} className="flex items-center gap-3 px-4 py-3.5">
+              <span className="text-2xl">{m.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 font-semibold">
+                  {t.me.parts[m.part]}
+                  {attention[m.part] && <span aria-label={t.me.attention} className="size-2 rounded-full bg-danger" />}
+                </span>
+                <span className="block truncate text-sm text-muted">{m.hint}</span>
+              </span>
+              <ChevronRight className="size-5 text-faint rtl:rotate-180" />
+            </Link>
+          ))}
+          <Link href="/me/iphone" className="flex items-center gap-3 px-4 py-3.5">
+            <Smartphone className="size-6 text-accent" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{t.iphone.title}</span>
+              <span className="block truncate text-sm text-muted">{t.settings.iphoneHint}</span>
+            </span>
+            <ChevronRight className="size-5 text-faint rtl:rotate-180" />
+          </Link>
+          <Link href="/brain" className="flex items-center gap-3 px-4 py-3.5">
+            <span className="text-2xl">🧠</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{t.hub.automations}</span>
+              <span className="block truncate text-sm text-muted">{t.hub.automationsHint}</span>
+            </span>
+            <ChevronRight className="size-5 text-faint rtl:rotate-180" />
+          </Link>
+        </div>
+      )}
+
+      {(show("profile") || part === "menu") && (
       <Card className="flex items-center gap-4">
         <button onClick={() => setEmojiSheet(true)} aria-label={t.onboarding.emoji} className="flex size-16 shrink-0 items-center justify-center rounded-[1.4rem] bg-accent-soft text-4xl transition active:scale-90">
           {p.emoji}
@@ -107,7 +164,10 @@ export function SettingsScreen({
           <p className="truncate px-1 text-sm text-muted">{p.email}</p>
         </div>
       </Card>
+      )}
 
+      {show("profile") && (
+      <>
       <SectionTitle>{t.settings.profile}</SectionTitle>
       <Card className="space-y-4">
         <Field label={t.onboarding.phone}>
@@ -132,7 +192,11 @@ export function SettingsScreen({
           </div>
         </Field>
       </Card>
+      </>
+      )}
 
+      {show("notifications") && (
+      <>
       <DailyBrainSettings initial={daily} spaces={spaces} />
 
       <SectionTitle>{t.settings.notifications}</SectionTitle>
@@ -160,7 +224,11 @@ export function SettingsScreen({
       <div className="mt-3">
         <BrainStatusCard status={brain} />
       </div>
+      </>
+      )}
 
+      {show("family") && (
+      <>
       <SectionTitle>{t.settings.household}</SectionTitle>
       <Card className="space-y-4">
         <div className="flex items-center gap-2">
@@ -187,26 +255,25 @@ export function SettingsScreen({
         )}
         <MembersCard members={roster} userId={userId} />
       </Card>
+      </>
+      )}
 
-      <Link href="/brain" className="glass mt-3 flex items-center gap-3 rounded-3xl p-4">
-        <span className="text-2xl">🧠</span>
-        <span className="flex-1">
-          <span className="block font-semibold">{t.hub.automations}</span>
-          <span className="block text-sm text-muted">{t.hub.automationsHint}</span>
-        </span>
-        <ChevronRight className="size-5 text-faint rtl:rotate-180" />
-      </Link>
+      {!part && (
+        <>
+          <SectionTitle>{t.settings.iphone}</SectionTitle>
+          <Link href="/me/iphone" className="glass flex items-center gap-3 rounded-3xl p-4">
+            <Smartphone className="size-6 text-accent" />
+            <span className="flex-1">
+              <span className="block font-semibold">{t.iphone.title}</span>
+              <span className="block text-sm text-muted">{t.settings.iphoneHint}</span>
+            </span>
+            <ChevronRight className="size-5 text-faint rtl:rotate-180" />
+          </Link>
+        </>
+      )}
 
-      <SectionTitle>{t.settings.iphone}</SectionTitle>
-      <Link href="/me/iphone" className="glass flex items-center gap-3 rounded-3xl p-4">
-        <Smartphone className="size-6 text-accent" />
-        <span className="flex-1">
-          <span className="block font-semibold">{t.iphone.title}</span>
-          <span className="block text-sm text-muted">{t.settings.iphoneHint}</span>
-        </span>
-        <ChevronRight className="size-5 text-faint rtl:rotate-180" />
-      </Link>
-
+      {show("connections") && (
+      <>
       <SectionTitle>{t.settings.calendar}</SectionTitle>
       <Card className="space-y-3">
         <div className="flex gap-3">
@@ -240,14 +307,18 @@ export function SettingsScreen({
           </div>
         </>
       )}
+      </>
+      )}
 
-      <YourDataCard email={p.email} partners={partners} />
+      {show("data") && <YourDataCard email={p.email} partners={partners} />}
 
-      <form action={signOut} className="mt-8">
-        <Button variant="ghost" className="w-full">
-          <LogOut className="size-4 rtl:rotate-180" /> {t.settings.signOut}
-        </Button>
-      </form>
+      {(!part || part === "menu") && (
+        <form action={signOut} className="mt-8">
+          <Button variant="ghost" className="w-full">
+            <LogOut className="size-4 rtl:rotate-180" /> {t.settings.signOut}
+          </Button>
+        </form>
+      )}
 
 
       <Sheet open={emojiSheet} onClose={() => setEmojiSheet(false)} title={t.onboarding.emoji}>
@@ -294,7 +365,7 @@ function GoogleCalendarCard({ gcal }: { gcal: { email: string | null; expired: b
             setBusy(true);
             await disconnectCalendar();
             setBusy(false);
-            router.replace("/me");
+            router.replace("/me/connections");
           }}
           className="flex h-11 w-full items-center justify-center rounded-2xl bg-sunken font-semibold"
         >

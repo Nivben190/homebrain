@@ -364,6 +364,14 @@ export const en = {
     openSpaces: "Open your spaces",
     openIphone: "iPhone setup",
   },
+  me: {
+    parts: { profile: "Profile", notifications: "Notifications", family: "Family", connections: "Connections", data: "Your data" },
+    profileHint: "Name, phone, time zone, waking up",
+    notificationsHint: "Daily brain, quiet hours, this phone",
+    connectionsHint: "Calendar feed, Google Calendar, Gmail",
+    dataHint: "Export or delete your account",
+    attention: "Needs attention",
+  },
   finder: {
     open: "Help me choose",
     openHint: "Say what you want to get better at, and we'll pick the spaces.",
